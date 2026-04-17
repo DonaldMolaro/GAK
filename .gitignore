@@ -1,0 +1,13 @@
+.DS_Store
+
+# Build outputs
+*.o
+*.d
+*.a
+GA
+gak_tests
+
+# Coverage artifacts
+*.profraw
+*.profdata
+coverage.txt
