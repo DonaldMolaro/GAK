@@ -1,6 +1,6 @@
 OUTPUT = GA
 CXX ?= c++
-CXXFLAGS ?= -O2 -g
+CXXFLAGS ?= -O2 -g -std=c++14
 CPPFLAGS ?=
 CPPFLAGS += -I../include -I../src
 DEPFLAGS = -MMD -MP

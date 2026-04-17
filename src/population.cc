@@ -17,27 +17,28 @@
 // and symbolic ( rather than binary ) bases.
 //  
 //
-#include <stdio.h>
-#include <stdlib.h>
 #include <assert.h>
-#include <sys/types.h>
-#include <unistd.h>
-#include <math.h>
-
+#include <cmath>
+#include <algorithm>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
 #include <iostream>
-using namespace std;
+#include <stdexcept>
+#include <utility>
 
 #include "base.hh"
 #include "chromosome.hh"
 #include "population.hh"
 #include "except.hh"
 
-extern "C"
+namespace
 {
-   time_t time (time_t *t);
+bool IsVerboseEnabled()
+{
+   return std::getenv("GAK_VERBOSE") != NULL;
 }
-
-#define VERBOSE
+}
 //
 // Population module;
 //         This is the heart of the genectic algorithim system. It intializes and
@@ -57,33 +58,31 @@ Population::Population(OperationTechnique POperation,
 		       FitnessTechnique PFitness,
 		       VariableLength PVariable,
 		       int PbaseStates)
+   : populationInitialized(false),
+     numberofIndividuals(PnumberofIndividuals),
+     numberofTrials(PnumberofTrials),
+     GenecticDeversity(PGenecticDeversity),
+     BitMutationRate(PBitMutationRate),
+     CrossOverRate(PCrossOverRate),
+     Operation(POperation),
+     Reproduction(PReproductionTechnique),
+     ParentSelection(PParentSelection),
+     Deletion(PDeletion),
+     Fitness(PFitness),
+     Variable(PVariable),
+     baseStates(PbaseStates)
 {
-   Operation                 = POperation;            // Minimize or Maximize function.
-   numberofIndividuals       = PnumberofIndividuals;  // Number of Chromosomes at any one time.
-   numberofTrials            = PnumberofTrials;       // Number to be generated in the whole optimization.
-   GenecticDeversity         = PGenecticDeversity;    // The length of the Chromosome in bits.
-   BitMutationRate           = PBitMutationRate;      // How often a single bit is mutated.
-   CrossOverRate             = PCrossOverRate;        // How often the children are different from parents.
-   Reproduction              = PReproductionTechnique;// How the population is strutrured.
-   ParentSelection           = PParentSelection;      // How parrents are selected.
-   Deletion                  = PDeletion;             // How many "unfit" members are done away with.
-   Fitness                   = PFitness;              // How the fitness of the members is evalated.
-   Variable                  = PVariable;             // If Variable length chromosomes are ok.
-   baseStates                = PbaseStates;           // number of Permitted base states.
-   populationTable = 0;
-   fitnessTable = 0;
-   windowedFitnessTable = 0;
-   linearNormalizedfitnessTable = 0;
    //
    // Seed the random number generator with something reasonable.
    //
-   time_t currenttime;
-   time(&currenttime);
-   srandom(currenttime);
+   std::time_t currenttime;
+   std::time(&currenttime);
+   randomGenerator.seed(static_cast<unsigned int>(currenttime));
    //
    //
    //
-#ifdef VERBOSE
+   if (IsVerboseEnabled())
+   {
    fprintf(stderr,"Operation             :: %s\n", Operation == Minimize ? "Minimize" : "Maximize");
    fprintf(stderr,"Number of Individuals :: %d\n",numberofIndividuals);
    fprintf(stderr,"Number of Trails      :: %d\n",numberofTrials);
@@ -92,24 +91,122 @@ Population::Population(OperationTechnique POperation,
    fprintf(stderr,"Cross Over Rate       :: %4.3f\n",CrossOverRate);
    fprintf(stderr,"Duplicate Reproduction:: %s\n", Reproduction == DuplicatesNotAllowed ? "NOT Ok." : " Ok.");
    fprintf(stderr,"Variable              :: %s\n", Variable ==  VariableLengthNotPermitted ? "NOT Ok." : " Ok.");
-#endif
-   populationInitialized = false;
-};
-
-Population::~Population()
-{
-   if (populationInitialized == true)
-   {
-      for ( int i = 0 ; i < numberofIndividuals ; i++ )
-      {
-	 delete populationTable[i];
-      }
    }
-   delete[] populationTable;
-   delete[] fitnessTable;
-   delete[] windowedFitnessTable;
-   delete[] linearNormalizedfitnessTable;
-};
+}
+
+int Population::numToReplaceForDeletion() const
+{
+   switch (Deletion)
+   {
+   case DeleteAll:
+      return numberofIndividuals;
+   case DeleteAllButBest:
+      return numberofIndividuals - 1;
+   case DeleteHalf:
+      return  numberofIndividuals / 2;
+   case DeleteQuarter:
+      return numberofIndividuals / 4;
+   case DeleteLast:
+      return 2;
+   default:
+      throw GAFatalException(__FILE__,__LINE__,"Unsupported deletion technique");
+   }
+}
+
+int Population::replacementIndex(int offset) const
+{
+   switch (Operation)
+   {
+   case Maximize:
+      return offset;
+   case Minimize:
+      return (numberofIndividuals - 1) - offset;
+   default:
+      throw GAFatalException(__FILE__,__LINE__,"Unsupported operation technique");
+   }
+}
+
+void Population::printPopulationSummary()
+{
+   const int summaryCount = std::min(numberofIndividuals, kSummaryCount);
+   if (summaryCount <= 0)
+   {
+      return;
+   }
+
+   if (Operation == Maximize)
+      fprintf(stderr,"Best %d Members are:\n",summaryCount);
+   else
+      fprintf(stderr,"Worst %d Members are:\n",summaryCount);
+
+   for ( int i = 0 ; i < summaryCount ; i++ )
+   {
+      FitnessPrint(populationTable[(numberofIndividuals - 1) - i].get()->ChromosomeStr());
+      fprintf(stderr,"(F = %3.8f)\n",fitnessTable[(numberofIndividuals - 1) - i]);
+   }
+
+   if (Operation == Maximize)
+      fprintf(stderr,"Worst %d Members are:\n",summaryCount);
+   else
+      fprintf(stderr,"Best %d Members are:\n",summaryCount);
+
+   for ( int i = 0 ; i < summaryCount ; i++ )
+   {
+      FitnessPrint(populationTable[i].get()->ChromosomeStr());
+      fprintf(stderr,"(F = %3.8f)\n",fitnessTable[i]);
+   }
+}
+
+Chromosome *Population::selectRandomParent(int *selected)
+{
+   *selected = randomIndex(numberofIndividuals);
+   return populationTable[*selected].get();
+}
+
+int Population::randomIndex(int upperBoundExclusive)
+{
+   if (upperBoundExclusive <= 0)
+   {
+      throw GAFatalException(__FILE__,__LINE__,"Random index requested with non-positive upper bound");
+   }
+
+   std::uniform_int_distribution<int> distribution(0, upperBoundExclusive - 1);
+   return distribution(randomGenerator);
+}
+
+long Population::randomBelow(long upperBoundExclusive)
+{
+   if (upperBoundExclusive <= 0)
+   {
+      throw GAFatalException(__FILE__,__LINE__,"Random value requested with non-positive upper bound");
+   }
+
+   std::uniform_int_distribution<long> distribution(0, upperBoundExclusive - 1);
+   return distribution(randomGenerator);
+}
+
+bool Population::appendReplacement(std::vector<std::unique_ptr<Chromosome> >& replacementList,
+                                   Chromosome *candidate,
+                                   int& numberGenerated,
+                                   int numberToReplace,
+                                   bool allowDuplicates)
+{
+   if (!allowDuplicates && findMatch(candidate,replacementList,numberGenerated) == true)
+   {
+      delete candidate;
+      return false;
+   }
+
+   if (numberGenerated < numberToReplace)
+   {
+      replacementList.push_back(std::unique_ptr<Chromosome>(candidate));
+      numberGenerated++;
+      return true;
+   }
+
+   delete candidate;
+   return false;
+}
 
 
 
@@ -127,102 +224,42 @@ void Population::run()
    int numberBorn = initializePopulation();
    evaluatePopulation();
    int numGen = 0;
-   int numToReplace = 0;
-   switch (Deletion)
-   {
-   case DeleteAll:
-      numToReplace = numberofIndividuals;
-      break;
-   case DeleteAllButBest:
-      numToReplace = numberofIndividuals - 1;
-      break;
-   case DeleteHalf:
-      numToReplace =  numberofIndividuals / 2;
-      break;
-   case DeleteQuarter:
-      numToReplace = numberofIndividuals / 4;
-      break;
-   case DeleteLast:
-      numToReplace = 2;
-      break;
-   default:
-      fprintf(stderr,"UNKNOWN DELETION TECHNIQUE...(dead)\n");
-      exit ( -1 );
-      break;
-   }
+   const int numToReplace = numToReplaceForDeletion();
    while ( numberBorn < numberofTrials )
    {
-      Chromosome **replacementList;
-      replacementList = breedPopulation(numToReplace);
-      numberBorn +=     insertNewPopulation(replacementList,numToReplace);
+      std::vector<std::unique_ptr<Chromosome> > replacementList = breedPopulation(numToReplace);
+      numberBorn += insertNewPopulation(std::move(replacementList),numToReplace);
       evaluatePopulation();
       fprintf(stderr,"Generation %d Number of Evaluations %d \n",numGen++,numberBorn);
-#ifdef VERBOSE
-      //
-      //
-      if (Operation == Maximize )
-	 fprintf(stderr,"Best 5 Members are:\n");
-      else
-	 fprintf(stderr,"Worst 5 Members are:\n");
-	 
-      for ( int i = 0 ; i < 5 ; i++ )
+      if (IsVerboseEnabled())
       {
-	 FitnessPrint(populationTable[(numberofIndividuals - 1) - i]->ChromosomeStr());
-	 fprintf(stderr,"(F = %3.8f)\n",fitnessTable[(numberofIndividuals - 1) - i]);
+         printPopulationSummary();
       }
-      
-      if (Operation == Maximize )
-	 fprintf(stderr,"Worst 5 Members are:\n");
-      else
-	 fprintf(stderr,"Best 5 Members are:\n");
-      
-      for ( int i = 0 ; i < 5 ; i++ )
-      {
-	 FitnessPrint(populationTable[i]->ChromosomeStr());
-	 fprintf(stderr,"(F = %3.8f)\n",fitnessTable[i]);
-      }
-      //
-      //
-#endif
-#define XGRAPH
-#undef XGRAPH
-#ifdef XGRAPH
-      if (Operation == Maximize)
-      {
-	 for ( int i = 0 ; i < 1 ; i++ )
-	 {
-	    fprintf(stdout,"%d %d\n",numberBorn,fitnessTable[(numberofIndividuals - 1) - i]);
-	 }
-      }
-      else
-      {
-	 for ( int i = 0 ; i < 1 ; i++ )
-	 {
-	    fprintf(stdout,"%d %d\n",numberBorn,fitnessTable[i]);
-	 }
-      }
-      //
-      //
-#endif     
    }
 
-      fprintf(stderr,"Generation %d Number of Evaluations %d \n",numGen++,numberBorn);
+   fprintf(stderr,"Generation %d Number of Evaluations %d \n",numGen++,numberBorn);
    switch(Operation)
    {
-      case Maximize:
-      for ( int i = 0 ; i < 5 ; i++ )
+      case Maximize: {
+      const int summaryCount = std::min(numberofIndividuals, kSummaryCount);
+      for ( int i = 0 ; i < summaryCount ; i++ )
       {
-	 FitnessPrint(populationTable[(numberofIndividuals - 1) - i]->ChromosomeStr());
+	 FitnessPrint(populationTable[(numberofIndividuals - 1) - i].get()->ChromosomeStr());
 	 fprintf(stderr,"%f\n",fitnessTable[(numberofIndividuals - 1) - i]);
       }
       break;
-      case Minimize:
-      for ( int i = 0 ; i < 5 ; i++ )
+      }
+      case Minimize: {
+      const int summaryCount = std::min(numberofIndividuals, kSummaryCount);
+      for ( int i = 0 ; i < summaryCount ; i++ )
       {
-	 FitnessPrint(populationTable[i]->ChromosomeStr());
+	 FitnessPrint(populationTable[i].get()->ChromosomeStr());
 	 fprintf(stderr,"%f\n",fitnessTable[i]);
       }
       break;
+      }
+      default:
+      throw GAFatalException(__FILE__,__LINE__,"Unsupported operation technique");
    }
 }
 //
@@ -231,15 +268,15 @@ void Population::run()
 //
 int Population::initializePopulation()
 {
-   populationTable              = new Chromosome*[numberofIndividuals];
-   fitnessTable                 = new double[numberofIndividuals];
-   windowedFitnessTable         = new double[numberofIndividuals];
-   linearNormalizedfitnessTable = new double[numberofIndividuals];
+   populationTable.clear();
+   populationTable.reserve(numberofIndividuals);
+   fitnessTable.assign(numberofIndividuals, -1.0);
+   windowedFitnessTable.assign(numberofIndividuals, 0.0);
+   linearNormalizedfitnessTable.assign(numberofIndividuals, 0.0);
    
    for ( int i = 0 ; i < numberofIndividuals ; i++ )
    {
-      populationTable[i] = new Chromosome(GenecticDeversity,Variable,baseStates);  
-      fitnessTable[i] = -1.00;
+      populationTable.push_back(std::make_unique<Chromosome>(GenecticDeversity,Variable,baseStates));
    }
    populationInitialized = true;
    return numberofIndividuals;
@@ -254,7 +291,7 @@ void Population::evaluatePopulation()
    {
       if (fitnessTable[i] < 0.0)
       {
-	 fitnessTable[i] = FitnessFunction(populationTable[i]->ChromosomeStr());
+	 fitnessTable[i] = FitnessFunction(populationTable[i].get()->ChromosomeStr());
       }
    }
    sortPopulation();
@@ -290,44 +327,51 @@ Chromosome *Population::selectParrent(int *selected,double *rouletteTable)
       if (rouletteTable[i] > maximumFitness) maximumFitness = rouletteTable[i];
     }
    
-  double *invertedrouletteTable = new double[numberofIndividuals];
+  std::vector<double> invertedrouletteTable(numberofIndividuals);
   double invertedTotalFitness = 0.00;
 
    for ( int i = 0 ; i < numberofIndividuals ; i++ )
      {
-       invertedrouletteTable[i] = (maximumFitness - rouletteTable[i]) + 1.00;
-       assert(invertedrouletteTable[i] > 0.00);
-       invertedTotalFitness   += invertedrouletteTable[i];
+       double invertedFitness = (maximumFitness - rouletteTable[i]) + 1.00;
+       invertedrouletteTable[i] = invertedFitness;
+       invertedTotalFitness += invertedFitness;
      }
    
    long int selectValue;
-   if (totalFitness <= 0.0 || invertedTotalFitness <= 0.0)
-     {
-       delete[] invertedrouletteTable;
-       throw GAFatalException(__FILE__,__LINE__,"Roulette selection requires positive total fitness");
-     }
    switch (Operation)
      {
      case Maximize:
-       selectValue = random() % (long int)rint(totalFitness);
+       if (totalFitness <= 0.0)
+       {
+          *selected = randomIndex(numberofIndividuals);
+          return populationTable[*selected].get();
+       }
+       selectValue = randomBelow(static_cast<long int>(std::rint(totalFitness)));
        while (selectValue >= 0)
 	 {
-	   selectValue -= (long int)rint(rouletteTable[++(*selected)]);
+	   selectValue -= static_cast<long int>(std::rint(rouletteTable[++(*selected)]));
 	 }
        break;
      case Minimize:
-       selectValue = random() % (long int)rint(invertedTotalFitness);
+       if (invertedTotalFitness <= 0.0)
+       {
+          *selected = randomIndex(numberofIndividuals);
+          return populationTable[*selected].get();
+       }
+       selectValue = randomBelow(static_cast<long int>(std::rint(invertedTotalFitness)));
        while (selectValue >= 0)
 	 {
-	   selectValue -= (long int)rint(invertedrouletteTable[++(*selected)]);
+	   selectValue -= static_cast<long int>(std::rint(invertedrouletteTable[++(*selected)]));
 	 }
        break;
+     default:
+       throw GAFatalException(__FILE__,__LINE__,"Unsupported operation technique");
      }
-   assert(*selected != -1);
-   assert(*selected >= 0);
-   assert(*selected < numberofIndividuals);
-   delete[] invertedrouletteTable;
-   return populationTable[*selected];
+   if (*selected < 0 || *selected >= numberofIndividuals)
+   {
+      throw GAFatalException(__FILE__,__LINE__,"Roulette selection produced an invalid index");
+   }
+   return populationTable[*selected].get();
 }
 
 double *Population::selectFitnessTable()
@@ -335,29 +379,24 @@ double *Population::selectFitnessTable()
    switch (Fitness)
    {
    case FitnessIsEvaluation:
-      return fitnessTable;
-      break;
+      return fitnessTable.data();
    case WindowedFitness:
-      return windowedFitnessTable;
-      break;
+      return windowedFitnessTable.data();
    case LinearNormalizedFitness:
-      return linearNormalizedfitnessTable;
-      break;
+      return linearNormalizedfitnessTable.data();
    default:
-      fprintf(stderr,"UNKNOWN FITNESS TECHNIQUE .. dead\n");
-      assert(0);
+      throw GAFatalException(__FILE__,__LINE__,"Unsupported fitness technique");
    }
-   assert(0);
-   return (double *)NULL;
 }
 //
 // Generate a population of Children.
 // Select a set of parrents and mate them to generate two
 // Children.
 //
-Chromosome **Population::breedPopulation(int numberToReplace)
+std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int numberToReplace)
 {
-   Chromosome **replacementList = new Chromosome*[numberToReplace];
+   std::vector<std::unique_ptr<Chromosome> > replacementList;
+   replacementList.reserve(numberToReplace);
 #ifdef VVERBOSE
 	    fprintf(stderr,"Adding to replacement list.. duplicates %s permitted\n",Reproduction == DuplicatesNotAllowed ? "NOT" : "");
 #endif 
@@ -365,11 +404,16 @@ Chromosome **Population::breedPopulation(int numberToReplace)
   switch (ParentSelection)
    {
    case RouletteWheel:
+   case Random:
       while (numberGenerated < numberToReplace)
       {
 	 int selected = -1;
-	 Chromosome *father = selectParrent(&selected,selectFitnessTable());
-	 Chromosome *mother = selectParrent(&selected,selectFitnessTable());
+	 Chromosome *father = (ParentSelection == RouletteWheel)
+	    ? selectParrent(&selected,selectFitnessTable())
+	    : selectRandomParent(&selected);
+	 Chromosome *mother = (ParentSelection == RouletteWheel)
+	    ? selectParrent(&selected,selectFitnessTable())
+	    : selectRandomParent(&selected);
 	 Chromosome *son;
 	 Chromosome *daughter;
 	 mother->Mate(father,&son,&daughter,CrossOverRate,Chromosome::SinglePoint);
@@ -384,75 +428,36 @@ Chromosome **Population::breedPopulation(int numberToReplace)
 	 switch (Reproduction)
 	 {
 	 case DuplicatesAllowed:
-	    if (numberGenerated < numberToReplace)
-	       replacementList[numberGenerated++] = son;
-	    else
-	       delete son;
+	    appendReplacement(replacementList,son,numberGenerated,numberToReplace,true);
 	    //
 	    // Keep the daugter if necessary to complete the
 	    // replacement for the next generation.
 	    //
-	    if (numberGenerated < numberToReplace)
-	       replacementList[numberGenerated++] = daughter;
-	    else
-	       delete daughter;
+	    appendReplacement(replacementList,daughter,numberGenerated,numberToReplace,true);
 	    break;
 	 case DuplicatesNotAllowed:
-	    if (findMatch(son,replacementList,numberGenerated) == true)
-	    {
-#ifdef VVERBOSE
-	       fprintf(stderr,"Deleted ::");
-	       FitnessPrint(son->ChromosomeStr());
-	       fprintf(stderr,"...\n");
-#endif
-	       delete son;
-	    }
-	    else
-	    {
-	       if (numberGenerated < numberToReplace)
-		  replacementList[numberGenerated++] = son;
-	       else
-		  delete son;
-	    }
+	    appendReplacement(replacementList,son,numberGenerated,numberToReplace,false);
 	    //
 	    // Keep the daugter if necessary to complete the
 	    // replacement for the next generation.
 	    //
-	    if (findMatch(daughter,replacementList,numberGenerated) == true)
-	    {
-#ifdef VVERBOSE
-	       fprintf(stderr,"Deleted ::");
-	       FitnessPrint(daughter->ChromosomeStr());
-	       fprintf(stderr,"...\n");
-#endif
-	       delete daughter;
-	    }
-	    else
-	    {
-	       if (numberGenerated < numberToReplace)
-		  replacementList[numberGenerated++] = daughter;
-	       else
-		  delete daughter;
-	    }
+	    appendReplacement(replacementList,daughter,numberGenerated,numberToReplace,false);
 	    break;
 	 }
       }
       break;
    default:
-      fprintf(stderr,"Unsupported Reproduction Teechnique..dead.\n");
-      assert(0);
-      break;
+      throw GAFatalException(__FILE__,__LINE__,"Unsupported parent selection technique");
    }
    return replacementList;
 }
-//
-//
-//
-bool Population::findMatch(Chromosome *candidate,Chromosome **pop, int tableLength)
+bool Population::findMatch(const Chromosome *candidate,
+			   const std::vector<std::unique_ptr<Chromosome> >& pop,
+			   int tableLength) const
 {
    for ( int i = 0 ; i < tableLength ; i++ )
    {
-      if (candidate->compare(pop[i]) == true) 
+      if (candidate->compare(pop[i].get()) == true)
       {
 	 return true;
       }
@@ -465,7 +470,7 @@ bool Population::findMatch(Chromosome *candidate,Chromosome **pop, int tableLeng
 // Population table must be sorted in decending order; the highest 
 // fitness are at the end.
 //
-int Population::insertNewPopulation(Chromosome **replacementList,int numToReplace)
+int Population::insertNewPopulation(std::vector<std::unique_ptr<Chromosome> > replacementList,int numToReplace)
 {
    //
    // Assume population table is sorted by fitness.
@@ -473,76 +478,24 @@ int Population::insertNewPopulation(Chromosome **replacementList,int numToReplac
 #ifdef VVERBOSE
    fprintf(stderr,"Replacing population.. duplicates %s permitted\n",Reproduction == DuplicatesNotAllowed ? "NOT" : "");
 #endif 
-   assert(numToReplace <= numberofIndividuals);
-   int replaced = 0;
-   switch (Reproduction)
+   if (numToReplace > numberofIndividuals)
    {
-   case DuplicatesAllowed:
-      switch (Operation)
-      {
-      case Maximize:
-	 for ( int i = 0 ; i < numToReplace; i++ )
-	 {
-	    fitnessTable[i] = -1;
-	    delete populationTable[i];
-	    populationTable[i] = replacementList[i];
-	    replaced++;
-	 }
-	 break;
-      case Minimize:
-	 for ( int i = 0 ; i < numToReplace; i++ )
-	 {
-	    fitnessTable          [(numberofIndividuals - 1) - i] = -1;
-	    delete populationTable[(numberofIndividuals - 1) - i];
-	    populationTable       [(numberofIndividuals - 1) - i] = replacementList[i];
-	    replaced++;
-	 }
-	 break;
-      default:
-	 break;
-      }
-      break;
-   case DuplicatesNotAllowed:
-      switch (Operation)
-      {
-      case Maximize:
-	 for ( int i = 0 ; i < numToReplace; i++ )
-	 {
-	    if (findMatch(replacementList[i],populationTable,numberofIndividuals) == true)
-	    {
-	       delete replacementList[i];
-	    }
-	    else
-	    {
-	       fitnessTable[i] = -1;
-	       delete populationTable[i];
-	       populationTable[i] = replacementList[i];
-	       replaced++;
-	    }
-	 }
-	 break;
-      case Minimize:
-	 for ( int i = 0 ; i < numToReplace; i++ )
-	 {
-	    if (findMatch(replacementList[i],populationTable,numberofIndividuals) == true)
-	    {
-	       delete replacementList[i];
-	    }
-	    else
-	    {
-	       fitnessTable          [(numberofIndividuals - 1) - i] = -1;
-	       delete populationTable[(numberofIndividuals - 1) - i];
-	       populationTable       [(numberofIndividuals - 1) - i] = replacementList[i];
-	       replaced++;
-	    }
-	 }
-	 break;
-      default:
-	 break;
-      }
-      break;
+      throw GAFatalException(__FILE__,__LINE__,"Cannot replace more individuals than exist in the population");
    }
-   delete[] replacementList;
+   int replaced = 0;
+   for ( int i = 0 ; i < numToReplace; i++ )
+   {
+      const int index = replacementIndex(i);
+      if (Reproduction == DuplicatesNotAllowed &&
+          findMatch(replacementList[i].get(),populationTable,numberofIndividuals) == true)
+      {
+         continue;
+      }
+
+      fitnessTable[index] = -1;
+      populationTable[index] = std::move(replacementList[i]);
+      replaced++;
+   }
    return replaced;
 }
 //
@@ -551,32 +504,25 @@ int Population::insertNewPopulation(Chromosome **replacementList,int numToReplac
 //
 void Population::sortPopulation()
 {
-   //
-   // Uses shell's method of sorting.. good for partialiy ordered
-   // data.
-   // Outline for sort taken from K&R 1st ed. page 58.
-   //
-   for (int gap = numberofIndividuals / 2 ;  gap > 0 ; gap /= 2 )
+   std::vector<int> order(numberofIndividuals);
+   for ( int i = 0 ; i < numberofIndividuals ; i++ )
    {
-      for ( int i = gap ; i < numberofIndividuals; i++ )
-      {
-	 for ( int j = i - gap ; j >= 0 && fitnessTable[j]>fitnessTable[j+gap]; j -=gap)
-	 {
-	    // Exchange the fitness value and the Chromsome for a particular
-	    // position.
-	    //
-	    double tmp          = fitnessTable[j];
-	    fitnessTable[j]     = fitnessTable[j+gap];
-	    fitnessTable[j+gap] = tmp;
-	    //
-	    // Exchange the Chromosome string..
-	    //
-	    Chromosome *ctmp       = populationTable[j];
-	    populationTable[j]     = populationTable[j+gap];
-	    populationTable[j+gap] = ctmp;
-	 }
-      }
+      order[i] = i;
    }
+
+   std::sort(order.begin(), order.end(),
+             [this](int left, int right) { return fitnessTable[left] < fitnessTable[right]; });
+
+   std::vector<double> sortedFitness(numberofIndividuals);
+   std::vector<std::unique_ptr<Chromosome> > sortedPopulation(numberofIndividuals);
+   for ( int i = 0 ; i < numberofIndividuals ; i++ )
+   {
+      sortedFitness[i] = fitnessTable[order[i]];
+      sortedPopulation[i] = std::move(populationTable[order[i]]);
+   }
+
+   fitnessTable.swap(sortedFitness);
+   populationTable.swap(sortedPopulation);
 }
 //
 //
@@ -599,12 +545,3 @@ int Population::decode(BaseString *b,int start,int end)
    }
    return res;
 }
-
-
-
-
-
-
-
-
-

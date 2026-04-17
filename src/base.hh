@@ -24,9 +24,9 @@ private:
   int numBytes;
   int baseLength;
   int bitLength;
-  inline int testBit(int i) const;
-  inline void setBit(int i);
-  inline void clearBit(int i);
+  int testBit(int i) const;
+  void setBit(int i);
+  void clearBit(int i);
 public:
   BaseString(int length,int numStates);
   ~BaseString() = default;
@@ -37,5 +37,10 @@ public:
   void assign(int i,int value) { if (value) set(i,value); else clear(i); }
   void printBits(std::ostream &ostr) const;           // For debuging purposes only.
   void print(char **value,std::ostream &ostr) const;  // For debuging purposes only.
+#ifdef GAK_TESTING
+  int testBitForTesting(int i) const { return testBit(i); }
+  void setBitForTesting(int i) { setBit(i); }
+  void clearBitForTesting(int i) { clearBit(i); }
+#endif
 };
 #endif

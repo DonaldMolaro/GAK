@@ -21,6 +21,7 @@ test:
 coverage:
 	$(MAKE) -C tests clean
 	$(MAKE) -C src clean
+	$(MAKE) -C src COVERAGE=1
 	$(MAKE) -C tests coverage COVERAGE=1
 
 clean:

@@ -10,12 +10,16 @@
 #define __GA_Chromosome_hh__
 #include <iosfwd>
 #include <memory>
+#include <random>
 
 class Chromosome
 {
 public:
   enum CrossOverType { SinglePoint,TwoPoint,Uniform };
 private:
+  static std::mt19937& randomGenerator();
+  static int randomBit();
+  static int randomIndex(int upperBoundExclusive);
   int  ChromosomeLength;
   int  variableLength;
   int  baseStates;
@@ -42,6 +46,7 @@ public:
 	     unsigned int numStates = 2); 
 
   ~Chromosome() = default;
+  static void seedRandom(unsigned int seed);
   int ChromosomeLen() const                { return ChromosomeLength; }
   BaseString *ChromosomeStr() const        { return ChromosomeString.get(); }
   void SingleBitMutate(double probability = 0.008);

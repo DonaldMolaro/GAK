@@ -1,7 +1,7 @@
 AR ?= ar
 RANLIB ?= ranlib
 CXX ?= c++
-CXXFLAGS ?= -O2 -g -std=c++11
+CXXFLAGS ?= -O2 -g -std=c++14
 CPPFLAGS ?=
 CPPFLAGS += -I.
 DEPFLAGS = -MMD -MP

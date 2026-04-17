@@ -32,33 +32,35 @@ double IntLog2(int x)
 
 BaseString::BaseString(int Len,int numStates)
 {
-  if ( (Len > 0)&&(numStates >1) )
-    {
-      baseLength   = static_cast<int>(std::ceil(IntLog2(numStates))); // # of bits required to represent base
-      stringLength = Len;                         // Length of string in bases.
-      bitLength    = stringLength * baseLength;   // Length of string in bits.
-      numBytes     = bitLength / 8;                  
-      if (bitLength % 8 ) numBytes++;
-
-      bits.assign(numBytes, 0);
-      startPos.resize(stringLength);
-      endPos.resize(stringLength);
-
-      for ( int baseNo = 0 ; baseNo < stringLength ; baseNo++ )
-	{
-	  int startBit = baseNo * baseLength;
-	  int endBit   = (baseNo * baseLength) + baseLength;
-	  startPos[baseNo] = startBit;
-	  endPos[baseNo]   = endBit;
-	}
-    }
-  else
+  if (Len <= 0)
     {
       throw GAFatalException(__FILE__,__LINE__,"Attempted to create non-sencical BaseString");
     }
+  if (numStates <= 1)
+    {
+      throw GAFatalException(__FILE__,__LINE__,"Attempted to create non-sencical BaseString");
+    }
+
+  baseLength   = static_cast<int>(std::ceil(IntLog2(numStates))); // # of bits required to represent base
+  stringLength = Len;                         // Length of string in bases.
+  bitLength    = stringLength * baseLength;   // Length of string in bits.
+  numBytes     = bitLength / 8;
+  if (bitLength % 8 ) numBytes++;
+
+  bits.assign(numBytes, 0);
+  startPos.resize(stringLength);
+  endPos.resize(stringLength);
+
+  for ( int baseNo = 0 ; baseNo < stringLength ; baseNo++ )
+    {
+      int startBit = baseNo * baseLength;
+      int endBit   = (baseNo * baseLength) + baseLength;
+      startPos[baseNo] = startBit;
+      endPos[baseNo]   = endBit;
+    }
 }
 
-inline int BaseString::testBit(int i) const
+int BaseString::testBit(int i) const
 {
   /*
    * Dragons here...
@@ -68,7 +70,7 @@ inline int BaseString::testBit(int i) const
 	   : ( throw GAFatalException(__FILE__,__LINE__,"Attempted to TEST out of range bit"),0 ) );
 }
 
-inline void BaseString::setBit(int i)
+void BaseString::setBit(int i)
 {
   if ( ( i >= 0)&&(i < bitLength) ) 
     {
@@ -83,7 +85,7 @@ inline void BaseString::setBit(int i)
   
 }
 
-inline void BaseString::clearBit(int i)
+void BaseString::clearBit(int i)
 {
   if ( ( i >= 0)&&(i < bitLength) )
     {
@@ -189,4 +191,3 @@ void BaseString::print(char **value,std::ostream &ostr) const
    }
    ostr << printable_bits;
 }
-

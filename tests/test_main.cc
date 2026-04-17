@@ -1,6 +1,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <unistd.h>
@@ -138,9 +139,17 @@ void test_base_string()
   symbolic.set(1, 2);
   symbolic.clear(2);
 
+  BaseString byte_aligned(4, 4);
+  byte_aligned.set(0, 3);
+  byte_aligned.set(1, 2);
+  byte_aligned.set(2, 1);
+  byte_aligned.clear(3);
+
   expect_true(symbolic.test(0) == 4, "Symbolic base should preserve assigned values");
   expect_true(symbolic.test(1) == 2, "Symbolic base should preserve non-binary states");
   expect_true(symbolic.test(2) == 0, "Clear should reset symbolic base to zero");
+  expect_true(byte_aligned.test(0) == 3, "Byte-aligned symbolic bases should store values correctly");
+  expect_true(byte_aligned.test(3) == 0, "Byte-aligned clear should preserve zero values");
 }
 
 void test_base_string_error_paths()
@@ -152,6 +161,11 @@ void test_base_string_error_paths()
       BaseString invalid(0, 2);
     },
     "Invalid BaseString constructor arguments should throw");
+  expect_throws<GAFatalException>(
+    []() {
+      BaseString invalid_states(1, 1);
+    },
+    "Invalid BaseString state count should throw");
 
   BaseString binary(2, 2);
   expect_throws<GAFatalException>(
@@ -163,6 +177,41 @@ void test_base_string_error_paths()
   expect_throws<GAFatalException>(
     [&binary]() { binary.clear(3); },
     "Out-of-range clear should throw");
+
+  expect_throws<GAFatalException>(
+    [&binary]() { binary.testBitForTesting(-1); },
+    "Out-of-range internal testBit should throw");
+  expect_throws<GAFatalException>(
+    [&binary]() { binary.setBitForTesting(-1); },
+    "Out-of-range internal setBit should throw");
+  expect_throws<GAFatalException>(
+    [&binary]() { binary.clearBitForTesting(-1); },
+    "Out-of-range internal clearBit should throw");
+}
+
+void test_base_string_print_helpers()
+{
+  BaseString binary(4, 2);
+  binary.set(0);
+  binary.clear(1);
+  binary.set(2);
+  binary.clear(3);
+
+  std::ostringstream bits_out;
+  binary.printBits(bits_out);
+  expect_true(bits_out.str() == "1010", "printBits should render the packed bit string");
+
+  BaseString symbolic(3, 3);
+  symbolic.set(0, 0);
+  symbolic.set(1, 1);
+  symbolic.set(2, 2);
+  char zero[] = "a";
+  char one[] = "b";
+  char two[] = "c";
+  char *values[] = { zero, one, two };
+  std::ostringstream text_out;
+  symbolic.print(values, text_out);
+  expect_true(text_out.str() == "abc", "print should render symbolic values");
 }
 
 void test_exception_and_stringutil_helpers()
@@ -185,6 +234,7 @@ void test_exception_and_stringutil_helpers()
 
 void test_mutation_rate_zero_preserves_chromosome()
 {
+  Chromosome::seedRandom(1);
   Chromosome chromosome(makeBinaryString("10101100"));
   Chromosome original(makeBinaryString("10101100"));
 
@@ -193,9 +243,37 @@ void test_mutation_rate_zero_preserves_chromosome()
   expect_true(chromosome.compare(&original), "Mutation rate 0 should leave chromosome unchanged");
 }
 
+void test_chromosome_constructor_and_compare_paths()
+{
+  SilentStderr silence;
+  Chromosome::seedRandom(2);
+
+  expect_throws<GAFatalException>(
+    []() {
+      Chromosome too_long(2049, 0, 2);
+    },
+    "Overlong chromosome constructor should throw");
+
+  Chromosome left(makeBinaryString("1010"));
+  Chromosome right(makeBinaryString("0101"));
+  Chromosome symbolic(5, 0, 4);
+  expect_true(!left.compare(&right), "compare should return false for different chromosomes");
+  expect_true(!left.compare(&symbolic), "compare should return false for mismatched lengths");
+  for (int i = 0 ; i < symbolic.ChromosomeLen() ; i++)
+    {
+      int value = symbolic.ChromosomeStr()->test(i);
+      expect_true(value >= 0 && value < 4, "Non-binary constructor should initialize values in range");
+    }
+
+  std::ostringstream out;
+  left.print(out);
+  expect_true(!out.str().empty(), "print should write chromosome contents");
+}
+
 void test_invalid_mutation_probability_throws()
 {
   SilentStderr silence;
+  Chromosome::seedRandom(3);
   Chromosome chromosome(makeBinaryString("10101100"));
 
   expect_throws<GANonFatalException>(
@@ -203,8 +281,35 @@ void test_invalid_mutation_probability_throws()
     "Impossible mutation probability should throw a non-fatal exception");
 }
 
+void test_non_binary_mutation_with_probability_one_stays_in_range()
+{
+  Chromosome::seedRandom(4);
+  Chromosome chromosome(new BaseString(5, 4), 0, 4);
+  chromosome.SingleBitMutate(1.0);
+
+  for (int i = 0 ; i < chromosome.ChromosomeLen() ; i++)
+    {
+      int value = chromosome.ChromosomeStr()->test(i);
+      expect_true(value >= 0 && value < 4, "Non-binary mutation should keep values within range");
+    }
+}
+
+void test_binary_mutation_with_probability_one_changes_only_bits()
+{
+  Chromosome::seedRandom(5);
+  Chromosome chromosome(makeBinaryString("000000"));
+  chromosome.SingleBitMutate(1.0);
+
+  for (int i = 0 ; i < chromosome.ChromosomeLen() ; i++)
+    {
+      int value = chromosome.ChromosomeStr()->test(i);
+      expect_true(value == 0 || value == 1, "Binary mutation should keep values binary");
+    }
+}
+
 void test_mate_without_crossover_clones_parents()
 {
+  Chromosome::seedRandom(6);
   Chromosome mother(makeBinaryString("11110000"));
   Chromosome father(makeBinaryString("00001111"));
   Chromosome *son = 0;
@@ -223,6 +328,7 @@ void test_mate_without_crossover_clones_parents()
 
 void test_uniform_crossover_is_reachable_and_safe()
 {
+  Chromosome::seedRandom(7);
   Chromosome mother(makeBinaryString("11110000"));
   Chromosome father(makeBinaryString("00001111"));
 
@@ -246,6 +352,7 @@ void test_uniform_crossover_is_reachable_and_safe()
 
 void test_two_point_crossover_is_reachable_and_safe()
 {
+  Chromosome::seedRandom(8);
   Chromosome mother(makeBinaryString("11110000"));
   Chromosome father(makeBinaryString("00001111"));
 
@@ -270,6 +377,7 @@ void test_two_point_crossover_is_reachable_and_safe()
 void test_mate_rejects_mismatched_fixed_lengths()
 {
   SilentStderr silence;
+  Chromosome::seedRandom(9);
   Chromosome mother(makeBinaryString("1111"));
   Chromosome father(makeBinaryString("00001111"));
 
@@ -284,6 +392,7 @@ void test_mate_rejects_mismatched_fixed_lengths()
 
 void test_variable_length_mating_supports_different_lengths()
 {
+  Chromosome::seedRandom(10);
   Chromosome mother(makeBinaryString("1111"), 1, 2);
   Chromosome father(makeBinaryString("000011"), 1, 2);
 
@@ -303,6 +412,63 @@ void test_variable_length_mating_supports_different_lengths()
     }
 }
 
+void test_variable_length_uniform_crossover()
+{
+  Chromosome::seedRandom(11);
+  Chromosome mother(makeBinaryString("1111"), 1, 2);
+  Chromosome father(makeBinaryString("000011"), 1, 2);
+
+  Chromosome *son = 0;
+  Chromosome *daughter = 0;
+  mother.Mate(&father, &son, &daughter, 1.0, Chromosome::Uniform);
+
+  expect_true(son != 0 && daughter != 0, "Variable-length uniform crossover should produce children");
+  expect_true(son->ChromosomeLen() == father.ChromosomeLen(),
+	      "Variable-length uniform crossover should preserve son length");
+  expect_true(daughter->ChromosomeLen() == mother.ChromosomeLen(),
+	      "Variable-length uniform crossover should preserve daughter length");
+
+  delete son;
+  delete daughter;
+}
+
+void test_variable_length_uniform_crossover_with_longer_mother()
+{
+  Chromosome::seedRandom(13);
+  Chromosome mother(makeBinaryString("111100"), 1, 2);
+  Chromosome father(makeBinaryString("0000"), 1, 2);
+
+  Chromosome *son = 0;
+  Chromosome *daughter = 0;
+  mother.Mate(&father, &son, &daughter, 1.0, Chromosome::Uniform);
+
+  expect_true(son != 0 && daughter != 0, "Variable-length uniform crossover should handle longer mothers");
+  expect_true(son->ChromosomeLen() == father.ChromosomeLen(),
+	      "Longer-mother uniform crossover should preserve son length");
+  expect_true(daughter->ChromosomeLen() == mother.ChromosomeLen(),
+	      "Longer-mother uniform crossover should preserve daughter length");
+
+  delete son;
+  delete daughter;
+}
+
+void test_invalid_crossover_type_throws()
+{
+  SilentStderr silence;
+  Chromosome::seedRandom(12);
+  Chromosome mother(makeBinaryString("1111"));
+  Chromosome father(makeBinaryString("0000"));
+
+  expect_throws<GANonFatalException>(
+    [&mother, &father]() {
+      Chromosome *son = 0;
+      Chromosome *daughter = 0;
+      mother.Mate(&father, &son, &daughter, 1.0,
+		  static_cast<Chromosome::CrossOverType>(99));
+    },
+    "Unsupported crossover type should throw");
+}
+
 void test_population_decode()
 {
   SilentStderr silence;
@@ -319,6 +485,51 @@ void test_population_decode()
   expect_true(pop.decode(&bits, 0, 4) == 11, "Decode should interpret bits in big-endian order");
 }
 
+void test_population_random_helpers()
+{
+  SilentStderr silence;
+  InspectablePopulation pop(Population::Maximize, 4, 4, 1, 0.0, 0.0,
+			    Population::DuplicatesAllowed, Population::RouletteWheel,
+			    Population::DeleteAll, Population::FitnessIsEvaluation,
+			    Population::VariableLengthNotPermitted, 2);
+
+  for (int i = 0 ; i < 20 ; i++)
+    {
+      int index = pop.randomIndex(3);
+      expect_true(index >= 0 && index < 3, "randomIndex should stay within bounds");
+    }
+
+  for (int i = 0 ; i < 20 ; i++)
+    {
+      long value = pop.randomBelow(7);
+      expect_true(value >= 0 && value < 7, "randomBelow should stay within bounds");
+    }
+
+  expect_throws<GAFatalException>(
+    [&pop]() { pop.randomIndex(0); },
+    "randomIndex should reject non-positive bounds");
+  expect_throws<GAFatalException>(
+    [&pop]() { pop.randomBelow(0); },
+    "randomBelow should reject non-positive bounds");
+}
+
+void test_population_zero_total_selection_falls_back_to_uniform()
+{
+  SilentStderr silence;
+  InspectablePopulation pop(Population::Maximize, 2, 2, 1, 0.0, 0.0,
+			    Population::DuplicatesAllowed, Population::RouletteWheel,
+			    Population::DeleteAll, Population::FitnessIsEvaluation,
+			    Population::VariableLengthNotPermitted, 2);
+  pop.initializePopulation();
+  double roulette[2] = {0.0, 0.0};
+  int selected = -1;
+
+  expect_true(pop.selectParrent(&selected, roulette) != 0,
+	      "Roulette selection should fall back to uniform choice when all weights are zero");
+  expect_true(selected >= 0 && selected < pop.numberofIndividuals,
+	      "Uniform fallback selection should still return an in-range index");
+}
+
 void test_windowed_fitness_is_positive_for_maximize()
 {
   SilentStderr silence;
@@ -330,8 +541,7 @@ void test_windowed_fitness_is_positive_for_maximize()
   pop.initializePopulation();
   for (int i = 0 ; i < 3 ; i++)
     {
-      delete pop.populationTable[i];
-      pop.populationTable[i] = new Chromosome(makeBinaryString(i == 0 ? "0" : "1"));
+      pop.populationTable[i].reset(new Chromosome(makeBinaryString(i == 0 ? "0" : "1")));
       pop.fitnessTable[i] = -1.0;
     }
   pop.populationInitialized = true;
@@ -354,8 +564,7 @@ void test_windowed_fitness_is_positive_for_minimize()
   pop.initializePopulation();
   for (int i = 0 ; i < 3 ; i++)
     {
-      delete pop.populationTable[i];
-      pop.populationTable[i] = new Chromosome(makeBinaryString(i == 0 ? "0" : "1"));
+      pop.populationTable[i].reset(new Chromosome(makeBinaryString(i == 0 ? "0" : "1")));
       pop.fitnessTable[i] = -1.0;
     }
   pop.populationInitialized = true;
@@ -382,12 +591,308 @@ void test_fitness_table_selection()
 				   Population::DeleteAll, Population::LinearNormalizedFitness,
 				   Population::VariableLengthNotPermitted, 2);
 
-  expect_true(evaluation.selectFitnessTable() == evaluation.fitnessTable,
+  expect_true(evaluation.selectFitnessTable() == evaluation.fitnessTable.data(),
 	      "FitnessIsEvaluation should select the raw fitness table");
-  expect_true(windowed.selectFitnessTable() == windowed.windowedFitnessTable,
+  expect_true(windowed.selectFitnessTable() == windowed.windowedFitnessTable.data(),
 	      "WindowedFitness should select the windowed fitness table");
-  expect_true(normalized.selectFitnessTable() == normalized.linearNormalizedfitnessTable,
+  expect_true(normalized.selectFitnessTable() == normalized.linearNormalizedfitnessTable.data(),
 	      "LinearNormalizedFitness should select the normalized fitness table");
+}
+
+void prepare_population(InspectablePopulation& pop, const std::string& first_bits,
+			const std::string& second_bits)
+{
+  pop.initializePopulation();
+  pop.populationTable[0].reset(new Chromosome(makeBinaryString(first_bits)));
+  pop.populationTable[1].reset(new Chromosome(makeBinaryString(second_bits)));
+  for (int i = 0 ; i < pop.numberofIndividuals ; i++)
+    {
+      pop.fitnessTable[i] = -1.0;
+    }
+  pop.populationInitialized = true;
+  pop.evaluatePopulation();
+}
+
+void test_population_selection_and_replacement_branches()
+{
+  SilentStderr silence;
+
+  InspectablePopulation min_pop(Population::Minimize, 2, 2, 4, 0.0, 0.0,
+				Population::DuplicatesAllowed, Population::RouletteWheel,
+				Population::DeleteAll, Population::FitnessIsEvaluation,
+				Population::VariableLengthNotPermitted, 2);
+  prepare_population(min_pop, "1111", "0000");
+  int selected = -1;
+  Chromosome *chosen = min_pop.selectParrent(&selected, min_pop.selectFitnessTable());
+  expect_true(chosen != 0, "Minimize roulette selection should return a chromosome");
+  expect_true(selected >= 0 && selected < min_pop.numberofIndividuals,
+	      "Minimize roulette selection should produce an in-range index");
+
+  InspectablePopulation dup_not_allowed(Population::Maximize, 2, 2, 4, 0.0, 0.0,
+					Population::DuplicatesNotAllowed, Population::RouletteWheel,
+					Population::DeleteAll, Population::FitnessIsEvaluation,
+					Population::VariableLengthNotPermitted, 2);
+  prepare_population(dup_not_allowed, "1111", "0000");
+  std::vector<std::unique_ptr<Chromosome> > bred = dup_not_allowed.breedPopulation(1);
+  expect_true(bred.size() == 1, "DuplicatesNotAllowed breeding should still generate requested children");
+  expect_true(dup_not_allowed.findMatch(bred[0].get(), bred, 1),
+	      "findMatch should report a present chromosome");
+
+  std::vector<std::unique_ptr<Chromosome> > replacements_max;
+  replacements_max.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1111"))));
+  replacements_max.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0000"))));
+  int replaced_max = dup_not_allowed.insertNewPopulation(std::move(replacements_max), 2);
+  expect_true(replaced_max >= 0, "insertNewPopulation should handle duplicates-not-allowed maximize path");
+
+  InspectablePopulation dup_not_allowed_min(Population::Minimize, 2, 2, 4, 0.0, 0.0,
+					    Population::DuplicatesNotAllowed, Population::RouletteWheel,
+					    Population::DeleteAll, Population::FitnessIsEvaluation,
+					    Population::VariableLengthNotPermitted, 2);
+  prepare_population(dup_not_allowed_min, "1111", "0000");
+  std::vector<std::unique_ptr<Chromosome> > replacements_min;
+  replacements_min.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1111"))));
+  replacements_min.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0000"))));
+  int replaced_min = dup_not_allowed_min.insertNewPopulation(std::move(replacements_min), 2);
+  expect_true(replaced_min >= 0, "insertNewPopulation should handle duplicates-not-allowed minimize path");
+
+  InspectablePopulation dup_not_allowed_new(Population::Maximize, 2, 2, 4, 0.0, 0.0,
+					    Population::DuplicatesNotAllowed, Population::RouletteWheel,
+					    Population::DeleteAll, Population::FitnessIsEvaluation,
+					    Population::VariableLengthNotPermitted, 2);
+  prepare_population(dup_not_allowed_new, "1111", "0000");
+  std::vector<std::unique_ptr<Chromosome> > replacements_new;
+  replacements_new.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0011"))));
+  replacements_new.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1100"))));
+  int replaced_new = dup_not_allowed_new.insertNewPopulation(std::move(replacements_new), 2);
+  expect_true(replaced_new > 0, "Duplicates-not-allowed maximize path should insert new chromosomes");
+
+  InspectablePopulation dup_not_allowed_new_min(Population::Minimize, 2, 2, 4, 0.0, 0.0,
+						Population::DuplicatesNotAllowed, Population::RouletteWheel,
+						Population::DeleteAll, Population::FitnessIsEvaluation,
+						Population::VariableLengthNotPermitted, 2);
+  prepare_population(dup_not_allowed_new_min, "1111", "0000");
+  std::vector<std::unique_ptr<Chromosome> > replacements_new_min;
+  replacements_new_min.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0011"))));
+  replacements_new_min.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1100"))));
+  int replaced_new_min = dup_not_allowed_new_min.insertNewPopulation(std::move(replacements_new_min), 2);
+  expect_true(replaced_new_min > 0, "Duplicates-not-allowed minimize path should insert new chromosomes");
+
+}
+
+void test_population_append_replacement_helper()
+{
+  SilentStderr silence;
+  InspectablePopulation pop(Population::Maximize, 2, 2, 4, 0.0, 0.0,
+			    Population::DuplicatesNotAllowed, Population::RouletteWheel,
+			    Population::DeleteAll, Population::FitnessIsEvaluation,
+			    Population::VariableLengthNotPermitted, 2);
+
+  std::vector<std::unique_ptr<Chromosome> > replacement_list;
+  int generated = 0;
+
+  expect_true(pop.appendReplacement(replacement_list,
+				    new Chromosome(makeBinaryString("1111")),
+				    generated, 2, false),
+	      "appendReplacement should keep the first unique child");
+  expect_true(!pop.appendReplacement(replacement_list,
+				     new Chromosome(makeBinaryString("1111")),
+				     generated, 2, false),
+	      "appendReplacement should reject duplicate unique-only children");
+  expect_true(pop.appendReplacement(replacement_list,
+				    new Chromosome(makeBinaryString("0000")),
+				    generated, 2, false),
+	      "appendReplacement should keep a second unique child");
+  expect_true(!pop.appendReplacement(replacement_list,
+				     new Chromosome(makeBinaryString("0011")),
+				     generated, 2, true),
+	      "appendReplacement should delete overflow children when the replacement list is full");
+}
+
+void test_population_insert_new_population_rejects_overflow()
+{
+  SilentStderr silence;
+  InspectablePopulation pop(Population::Maximize, 2, 2, 4, 0.0, 0.0,
+			    Population::DuplicatesAllowed, Population::RouletteWheel,
+			    Population::DeleteAll, Population::FitnessIsEvaluation,
+			    Population::VariableLengthNotPermitted, 2);
+  prepare_population(pop, "1111", "0000");
+
+  std::vector<std::unique_ptr<Chromosome> > replacements;
+  replacements.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0011"))));
+  replacements.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1100"))));
+  replacements.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0101"))));
+
+  expect_throws<GAFatalException>(
+    [&pop, &replacements]() mutable {
+      pop.insertNewPopulation(std::move(replacements), 3);
+    },
+    "insertNewPopulation should reject replacement counts larger than the population");
+}
+
+void test_population_selection_guard_and_random_fitness_modes()
+{
+  SilentStderr silence;
+
+  InspectablePopulation fractional(Population::Maximize, 2, 2, 1, 0.0, 0.0,
+				   Population::DuplicatesAllowed, Population::RouletteWheel,
+				   Population::DeleteAll, Population::FitnessIsEvaluation,
+				   Population::VariableLengthNotPermitted, 2);
+  fractional.initializePopulation();
+  int selected = -1;
+  double roulette[2] = {0.4, 0.4};
+  expect_throws<GAFatalException>(
+    [&fractional, &selected, &roulette]() { fractional.selectParrent(&selected, roulette); },
+    "Roulette selection should throw when rounded weights produce an invalid index");
+
+  InspectablePopulation windowed(Population::Maximize, 4, 4, 1, 0.0, 0.0,
+				 Population::DuplicatesAllowed, Population::RouletteWheel,
+				 Population::DeleteAll, Population::WindowedFitness,
+				 Population::VariableLengthNotPermitted, 2);
+  prepare_population(windowed, "1", "0");
+  selected = -1;
+  expect_true(windowed.selectParrent(&selected, windowed.selectFitnessTable()) != 0,
+	      "Windowed fitness selection should return a chromosome");
+
+  InspectablePopulation normalized(Population::Maximize, 4, 4, 1, 0.0, 0.0,
+				   Population::DuplicatesAllowed, Population::RouletteWheel,
+				   Population::DeleteAll, Population::LinearNormalizedFitness,
+				   Population::VariableLengthNotPermitted, 2);
+  prepare_population(normalized, "1", "0");
+  selected = -1;
+  expect_true(normalized.selectParrent(&selected, normalized.selectFitnessTable()) != 0,
+	      "Linear normalized fitness selection should return a chromosome");
+
+  InspectablePopulation random_selection(Population::Maximize, 2, 4, 4, 0.0, 0.0,
+					 Population::DuplicatesAllowed, Population::Random,
+					 Population::DeleteAll, Population::FitnessIsEvaluation,
+					 Population::VariableLengthNotPermitted, 2);
+  prepare_population(random_selection, "1111", "0000");
+  std::vector<std::unique_ptr<Chromosome> > random_bred = random_selection.breedPopulation(2);
+  expect_true(random_bred.size() == 2,
+	      "Random parent selection should generate the requested number of children");
+}
+
+void test_population_invalid_enum_paths()
+{
+  SilentStderr silence;
+
+  InspectablePopulation bad_delete(Population::Maximize, 2, 2, 1, 0.0, 0.0,
+				   Population::DuplicatesAllowed, Population::RouletteWheel,
+				   static_cast<Population::DeletetionTechnique>(99),
+				   Population::FitnessIsEvaluation,
+				   Population::VariableLengthNotPermitted, 2);
+  expect_throws<GAFatalException>(
+    [&bad_delete]() { bad_delete.run(); },
+    "Unsupported deletion technique should throw");
+
+  InspectablePopulation bad_fitness(Population::Maximize, 2, 2, 1, 0.0, 0.0,
+				    Population::DuplicatesAllowed, Population::RouletteWheel,
+				    Population::DeleteAll,
+				    static_cast<Population::FitnessTechnique>(99),
+				    Population::VariableLengthNotPermitted, 2);
+  expect_throws<GAFatalException>(
+    [&bad_fitness]() { bad_fitness.selectFitnessTable(); },
+    "Unsupported fitness technique should throw");
+
+  InspectablePopulation bad_parent(Population::Maximize, 2, 2, 4, 0.0, 0.0,
+				   Population::DuplicatesAllowed,
+				   static_cast<Population::ParrentSelectionTechnique>(99),
+				   Population::DeleteAll, Population::FitnessIsEvaluation,
+				   Population::VariableLengthNotPermitted, 2);
+  prepare_population(bad_parent, "1111", "0000");
+  expect_throws<GAFatalException>(
+    [&bad_parent]() { bad_parent.breedPopulation(1); },
+    "Unsupported parent selection technique should throw");
+
+  InspectablePopulation bad_operation(Population::Maximize, 2, 2, 4, 0.0, 0.0,
+				      Population::DuplicatesAllowed, Population::RouletteWheel,
+				      Population::DeleteAll, Population::FitnessIsEvaluation,
+				      Population::VariableLengthNotPermitted, 2);
+  prepare_population(bad_operation, "1111", "0000");
+  bad_operation.Operation = static_cast<Population::OperationTechnique>(99);
+  expect_throws<GAFatalException>(
+    [&bad_operation]() {
+      int selected = -1;
+      bad_operation.selectParrent(&selected, bad_operation.selectFitnessTable());
+    },
+    "Unsupported operation technique in selection should throw");
+
+  std::vector<std::unique_ptr<Chromosome> > replacements;
+  replacements.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1111"))));
+  expect_throws<GAFatalException>(
+    [&bad_operation, &replacements]() mutable {
+      bad_operation.insertNewPopulation(std::move(replacements), 1);
+    },
+    "Unsupported operation technique in replacement should throw");
+
+  InspectablePopulation bad_operation_dup(Population::Maximize, 2, 2, 4, 0.0, 0.0,
+					  Population::DuplicatesNotAllowed, Population::RouletteWheel,
+					  Population::DeleteAll, Population::FitnessIsEvaluation,
+					  Population::VariableLengthNotPermitted, 2);
+  prepare_population(bad_operation_dup, "1111", "0000");
+  bad_operation_dup.Operation = static_cast<Population::OperationTechnique>(99);
+  std::vector<std::unique_ptr<Chromosome> > dup_replacements;
+  dup_replacements.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0011"))));
+  expect_throws<GAFatalException>(
+    [&bad_operation_dup, &dup_replacements]() mutable {
+      bad_operation_dup.insertNewPopulation(std::move(dup_replacements), 1);
+    },
+    "Unsupported operation technique in duplicate-filtered replacement should throw");
+}
+
+void test_population_verbose_path()
+{
+  setenv("GAK_VERBOSE", "1", 1);
+  InspectablePopulation pop(Population::Maximize, 6, 8, 1, 0.0, 0.0,
+			    Population::DuplicatesAllowed, Population::RouletteWheel,
+			    Population::DeleteAll, Population::FitnessIsEvaluation,
+			    Population::VariableLengthNotPermitted, 2);
+  pop.run();
+  unsetenv("GAK_VERBOSE");
+  expect_true(pop.populationInitialized, "Verbose run path should still complete successfully");
+}
+
+void test_population_verbose_minimize_path()
+{
+  setenv("GAK_VERBOSE", "1", 1);
+  InspectablePopulation pop(Population::Minimize, 6, 8, 1, 0.0, 0.0,
+			    Population::DuplicatesAllowed, Population::RouletteWheel,
+			    Population::DeleteAll, Population::FitnessIsEvaluation,
+			    Population::VariableLengthNotPermitted, 2);
+  pop.run();
+  unsetenv("GAK_VERBOSE");
+  expect_true(pop.populationInitialized, "Verbose minimize path should still complete successfully");
+}
+
+void test_population_run_modes()
+{
+  SilentStderr silence;
+
+  InspectablePopulation delete_all(Population::Maximize, 6, 8, 1, 0.0, 0.0,
+				   Population::DuplicatesAllowed, Population::RouletteWheel,
+				   Population::DeleteAll, Population::FitnessIsEvaluation,
+				   Population::VariableLengthNotPermitted, 2);
+  delete_all.run();
+
+  InspectablePopulation delete_half(Population::Maximize, 6, 8, 1, 0.0, 0.0,
+				    Population::DuplicatesAllowed, Population::RouletteWheel,
+				    Population::DeleteHalf, Population::FitnessIsEvaluation,
+				    Population::VariableLengthNotPermitted, 2);
+  delete_half.run();
+
+  InspectablePopulation delete_quarter(Population::Maximize, 8, 10, 1, 0.0, 0.0,
+				       Population::DuplicatesAllowed, Population::RouletteWheel,
+				       Population::DeleteQuarter, Population::FitnessIsEvaluation,
+				       Population::VariableLengthNotPermitted, 2);
+  delete_quarter.run();
+
+  InspectablePopulation delete_last_min(Population::Minimize, 6, 8, 1, 0.0, 0.0,
+					Population::DuplicatesAllowed, Population::RouletteWheel,
+					Population::DeleteLast, Population::FitnessIsEvaluation,
+					Population::VariableLengthNotPermitted, 2);
+  delete_last_min.run();
+
+  expect_true(delete_last_min.populationInitialized, "Additional run modes should complete successfully");
 }
 
 void test_delete_all_but_best_runs()
@@ -400,8 +905,8 @@ void test_delete_all_but_best_runs()
   pop.run();
 
   expect_true(pop.populationInitialized == true, "Population should initialize during run");
-  expect_true(pop.populationTable != 0, "Population should retain its table after run");
-  expect_true(pop.populationTable[pop.numberofIndividuals - 1]->ChromosomeStr()->test(0) == 1,
+  expect_true(!pop.populationTable.empty(), "Population should retain its table after run");
+  expect_true(pop.populationTable[pop.numberofIndividuals - 1].get()->ChromosomeStr()->test(0) == 1,
 	      "Best chromosome should remain present after DeleteAllButBest runs");
 }
 
@@ -411,18 +916,35 @@ int main()
 {
   test_base_string();
   test_base_string_error_paths();
+  test_base_string_print_helpers();
   test_exception_and_stringutil_helpers();
   test_mutation_rate_zero_preserves_chromosome();
+  test_chromosome_constructor_and_compare_paths();
   test_invalid_mutation_probability_throws();
+  test_non_binary_mutation_with_probability_one_stays_in_range();
+  test_binary_mutation_with_probability_one_changes_only_bits();
   test_mate_without_crossover_clones_parents();
   test_uniform_crossover_is_reachable_and_safe();
   test_two_point_crossover_is_reachable_and_safe();
   test_mate_rejects_mismatched_fixed_lengths();
   test_variable_length_mating_supports_different_lengths();
+  test_variable_length_uniform_crossover();
+  test_variable_length_uniform_crossover_with_longer_mother();
+  test_invalid_crossover_type_throws();
   test_population_decode();
+  test_population_random_helpers();
+  test_population_zero_total_selection_falls_back_to_uniform();
   test_windowed_fitness_is_positive_for_maximize();
   test_windowed_fitness_is_positive_for_minimize();
   test_fitness_table_selection();
+  test_population_selection_and_replacement_branches();
+  test_population_append_replacement_helper();
+  test_population_insert_new_population_rejects_overflow();
+  test_population_selection_guard_and_random_fitness_modes();
+  test_population_invalid_enum_paths();
+  test_population_verbose_path();
+  test_population_verbose_minimize_path();
+  test_population_run_modes();
   test_delete_all_but_best_runs();
 
   if (g_failures != 0)

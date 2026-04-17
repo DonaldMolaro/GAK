@@ -22,10 +22,42 @@
 //
 #include <cstdlib>
 #include <iostream>
+#include <random>
 
 #include "except.hh"
 #include "base.hh"
 #include "chromosome.hh"
+
+namespace
+{
+std::mt19937& ChromosomeRandomGenerator()
+{
+  static std::mt19937 generator(0);
+  return generator;
+}
+}
+std::mt19937& Chromosome::randomGenerator()
+{
+  return ChromosomeRandomGenerator();
+}
+
+int Chromosome::randomBit()
+{
+  std::uniform_int_distribution<int> distribution(0, 1);
+  return distribution(randomGenerator());
+}
+
+int Chromosome::randomIndex(int upperBoundExclusive)
+{
+  std::uniform_int_distribution<int> distribution(0, upperBoundExclusive - 1);
+  return distribution(randomGenerator());
+}
+
+void Chromosome::seedRandom(unsigned int seed)
+{
+  randomGenerator().seed(seed);
+}
+
 //
 // Chromosome implementation. 
 //
@@ -54,7 +86,7 @@ Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int Pb
     {
       for ( int i = 0 ; i < ChromosomeLength ; i++ )
 	{
-	  if (random()&0x01) ChromosomeString->set(i);
+	  if (randomBit()) ChromosomeString->set(i);
 	  else ChromosomeString->clear(i);
 	}
     }
@@ -62,7 +94,7 @@ Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int Pb
     {
       for ( int i = 0 ; i < ChromosomeLength ; i++ )
 	{
-	  ChromosomeString->set(i,random() % baseStates);
+	  ChromosomeString->set(i,randomIndex(baseStates));
 	}
     }
 }
@@ -88,19 +120,20 @@ void Chromosome::SingleBitMutate(double probability)
   if ((probability >= 0.0)&&(probability <= 1.0))
     {
       int probabilityMask = (int) ( probability * 65535.0 );
+      std::uniform_int_distribution<int> distribution(0, 0xFFFF);
    
       for ( int i = 0 ; i < ChromosomeLength ; i++ )
 	{
-	  if ((random() & 0xFFFF) < probabilityMask)
+	  if (distribution(randomGenerator()) < probabilityMask)
 	    {
 	      if (baseStates == 2)
 		{
-		  if (random()&0x01) ChromosomeString->set(i);
+		  if (randomBit()) ChromosomeString->set(i);
 		  else ChromosomeString->clear(i);
 		}
 	      else
 		{
-		  ChromosomeString->set(i,random() % baseStates);
+		  ChromosomeString->set(i,randomIndex(baseStates));
 		}
 	      
 	    }
@@ -119,7 +152,8 @@ void Chromosome::SingleBitMutate(double probability)
 int Chromosome::testCrossOverRate(double crossOverRate)
 {
   int probabilityMask = (int) ( crossOverRate * 65535.0 );
-  if ((random() & 0xFFFF) < probabilityMask) return 1;
+  std::uniform_int_distribution<int> distribution(0, 0xFFFF);
+  if (distribution(randomGenerator()) < probabilityMask) return 1;
   else return 0;
 }
 //
@@ -157,12 +191,12 @@ void Chromosome::singlePointCrossOver(BaseString *mother,BaseString *father,
   int MotherCrossoverPoint;
   if (this->variableLength) 
     {
-      FatherCrossoverPoint = random() % father->length();
-      MotherCrossoverPoint = random() % mother->length();
+      FatherCrossoverPoint = randomIndex(father->length());
+      MotherCrossoverPoint = randomIndex(mother->length());
     }
   else
     { 
-      FatherCrossoverPoint = random() % father->length();
+      FatherCrossoverPoint = randomIndex(father->length());
       MotherCrossoverPoint = FatherCrossoverPoint;
     }
   int FatherPrimaryLength = FatherCrossoverPoint;
@@ -243,20 +277,15 @@ void Chromosome::uniformCrossOver(BaseString *mother,BaseString *father,
       // New Chromosomes are made up of random bits of the two parrents
       for ( int i = 0 ; i < copyLength ; i++ )
 	{
-	  switch (random() & 0x01 )
+	  if (randomBit() == 0)
 	    {
-	    case 0:
 	      boy->assign(i,father->test(i));
 	      girl->assign(i,mother->test(i));
-	      break;
-	    case 1:
+	    }
+	  else
+	    {
 	      boy->assign(i,mother->test(i));
 	      girl->assign(i,father->test(i));
-	      break;
-	    default:
-	      throw GAFatalException(__FILE__,__LINE__,
-				     "Impossible case in uniform crossover .. dead");
-	      break;
 	    }
 	}
       for ( int i = copyLength ; i < father->length() ; i++ )
@@ -275,19 +304,15 @@ void Chromosome::uniformCrossOver(BaseString *mother,BaseString *father,
       // New Chromosomes are made up of random bits of the two parrents
       for ( int i = 0 ; i < father->length() ; i++ )
 	{
-	  switch (random() & 0x01 )
+	  if (randomBit() == 0)
 	    {
-	    case 0:
 	      boy->assign(i,father->test(i));
 	      girl->assign(i,mother->test(i));
-	      break;
-	    case 1:
+	    }
+	  else
+	    {
 	      boy->assign(i,mother->test(i));
 	      girl->assign(i,father->test(i));
-	      break;
-	    default:
-	      throw GAFatalException(__FILE__,__LINE__,"impossible case in uniform crossover .. dead");
-	      break;
 	    }
 	}
     }
@@ -334,7 +359,6 @@ void Chromosome::Mate(Chromosome *father,Chromosome **son,Chromosome **daughter,
 	  break;
 	default:
 	  throw GANonFatalException(__FILE__,__LINE__,"Unimplemented crossover type");
-	  break;
 	}
     }
   else 
@@ -372,6 +396,4 @@ bool Chromosome::compare(const Chromosome *candidate) const
     }
   return false;
 }
-
-
 
