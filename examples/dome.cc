@@ -8,6 +8,16 @@
 #include "population.hh"
 #include "dome.hh"
 
+Dome::Dome(const Population::Options& options)
+   : Dome(options.toConfiguration())
+{
+}
+
+Dome::Dome(const Population::Configuration& configuration)
+   : Population(configuration)
+{
+}
+
 Dome::Dome(
    Population::OperationTechnique Operation,
    int numberofIndividuals,
@@ -16,20 +26,25 @@ Dome::Dome(
    double BitMutationRate,
    double CrossOverRate,
    Population::ReproductionTechniques ReproductionTechniques,
-   Population::ParrentSelectionTechnique ParentSelction,
-   Population::DeletetionTechnique Deletetion,
+   Population::ParentSelectionTechnique ParentSelction,
+   Population::DeletionTechnique Deletetion,
    Population::FitnessTechnique Fitness,
    Population::VariableLength Variable,
    int baseStates
-   ):Population(
-      Operation,numberofIndividuals,numberofTrials,
-      GenecticDeversity,BitMutationRate,CrossOverRate,
-      ReproductionTechniques,ParentSelction,
-      Deletetion,Fitness,
-      Variable,baseStates
-      )
+   )
+   : Dome(Population::Configuration{Operation,
+                                    numberofIndividuals,
+                                    numberofTrials,
+                                    GenecticDeversity,
+                                    BitMutationRate,
+                                    CrossOverRate,
+                                    ReproductionTechniques,
+                                    ParentSelction,
+                                    Deletetion,
+                                    Fitness,
+                                    Variable,
+                                    baseStates})
 {
-   fprintf(stderr,"In Dome Construtor\n");
 }
 
 
@@ -60,5 +75,3 @@ void Dome::FitnessPrint(BaseString *b)
    
    fprintf(stderr,"X ( %6.2f ) Y ( %6.2f ) ",x2,y2);
 }
-
-

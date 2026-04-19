@@ -1,15 +1,17 @@
-#ifndef __GA_Spell_hh__
-#define __GA_Spell_hh__
+#ifndef __GA_Knapsack_hh__
+#define __GA_Knapsack_hh__
+
+#include <vector>
+
 #include "population.hh"
 
-class Spell : public Population
+class Knapsack : public Population
 {
-   double sqr ( double x );
 public:
-   explicit Spell(const Population::Options& options);
-   explicit Spell(const Population::Configuration& configuration);
-   [[deprecated("Use Spell(const Population::Options&) or Spell(const Population::Configuration&)")]]
-   Spell(
+   explicit Knapsack(const Population::Options& options);
+   explicit Knapsack(const Population::Configuration& configuration);
+   [[deprecated("Use Knapsack(const Population::Options&) or Knapsack(const Population::Configuration&)")]]
+   Knapsack(
       Population::OperationTechnique Operation,
       int numberofIndividuals,
       int numberofTrials,
@@ -23,8 +25,15 @@ public:
       Population::VariableLength Variable,
       int baseStates
       );
-  
+
    double FitnessFunction(BaseString *b) override;
    void FitnessPrint(BaseString *b) override;
+
+private:
+   static const int kCapacity = 35;
+   static const int kItemCount = 12;
+   static const int kWeights[kItemCount];
+   static const int kValues[kItemCount];
 };
+
 #endif

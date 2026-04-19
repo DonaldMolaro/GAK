@@ -9,10 +9,21 @@
  * the population object.
  */
 
+#ifndef __GA_TS_hh__
+#define __GA_TS_hh__
+#include "population.hh"
+#include <random>
+#include <utility>
+#include <vector>
+
 class TravelingSalesman : public Population
 {
-   double sqr ( double x );
 public:
+   TravelingSalesman(const Population::Options& options,
+                     int gridS = 0);
+   TravelingSalesman(const Population::Configuration& configuration,
+                     int gridS = 0);
+   [[deprecated("Use TravelingSalesman(const Population::Options&, int) or TravelingSalesman(const Population::Configuration&, int)")]]
    TravelingSalesman(
       Population::OperationTechnique Operation,
       int numberofIndividuals,
@@ -21,19 +32,27 @@ public:
       double BitMutationRate,
       double CrossOverRate,
       Population::ReproductionTechniques PReproductionTechniques,
-      Population::ParrentSelectionTechnique ParentSelction,
-      Population::DeletetionTechnique Deletetion,
+      Population::ParentSelectionTechnique ParentSelction,
+      Population::DeletionTechnique Deletetion,
       Population::FitnessTechnique Fitness,
       Population::VariableLength Variable,
       int baseStates,
       int gridS = 0
       );
   
-   virtual double FitnessFunction(BaseString *b);
-   virtual void FitnessPrint(BaseString *b);
+   double FitnessFunction(BaseString *b) override;
+   void FitnessPrint(BaseString *b) override;
 private:
-   int NumCities;
-   int GridSize;
-   int *XCoord;
-   int *YCoord;
+   using Coordinate = std::pair<int, int>;
+
+   bool hasCityCoordinate(int allocated, const Coordinate& coordinate) const;
+   Coordinate randomCoordinate();
+   void initializeCityCoordinates();
+
+   int numCities;
+   int gridSize;
+   std::vector<int> xCoordinates;
+   std::vector<int> yCoordinates;
+   std::mt19937 randomGenerator;
 };
+#endif

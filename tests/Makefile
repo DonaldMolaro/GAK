@@ -1,8 +1,9 @@
 OUTPUT = gak_tests
 CXX ?= c++
-CXXFLAGS ?= -O2 -g -std=c++11
+CXXFLAGS ?= -O2 -g -std=c++14
 CPPFLAGS ?=
 CPPFLAGS += -I../src
+CPPFLAGS += -DGAK_TESTING
 DEPFLAGS = -MMD -MP
 LDFLAGS ?=
 LDFLAGS += -L../src

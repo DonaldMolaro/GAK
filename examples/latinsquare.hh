@@ -1,15 +1,15 @@
-#ifndef __GA_Spell_hh__
-#define __GA_Spell_hh__
+#ifndef __GA_LatinSquare_hh__
+#define __GA_LatinSquare_hh__
+
 #include "population.hh"
 
-class Spell : public Population
+class LatinSquare : public Population
 {
-   double sqr ( double x );
 public:
-   explicit Spell(const Population::Options& options);
-   explicit Spell(const Population::Configuration& configuration);
-   [[deprecated("Use Spell(const Population::Options&) or Spell(const Population::Configuration&)")]]
-   Spell(
+   explicit LatinSquare(const Population::Options& options);
+   explicit LatinSquare(const Population::Configuration& configuration);
+   [[deprecated("Use LatinSquare(const Population::Options&) or LatinSquare(const Population::Configuration&)")]]
+   LatinSquare(
       Population::OperationTechnique Operation,
       int numberofIndividuals,
       int numberofTrials,
@@ -23,8 +23,12 @@ public:
       Population::VariableLength Variable,
       int baseStates
       );
-  
+
    double FitnessFunction(BaseString *b) override;
    void FitnessPrint(BaseString *b) override;
+
+private:
+   int squareSize(const BaseString *b) const;
 };
+
 #endif

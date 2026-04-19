@@ -3,8 +3,8 @@
 
 #include <string>
 
-const std::string recordSep = "*";
-const std::string fieldSep = "^";
+constexpr const char recordSep[] = "*";
+constexpr const char fieldSep[] = "^";
 
 int find_instance(std::string candidate, int instance, std::string target);
 

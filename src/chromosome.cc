@@ -22,10 +22,53 @@
 //
 #include <cstdlib>
 #include <iostream>
+#include <utility>
+#include <random>
 
 #include "except.hh"
 #include "base.hh"
 #include "chromosome.hh"
+
+namespace
+{
+std::mt19937& ChromosomeRandomGenerator()
+{
+  static std::mt19937 generator(0);
+  return generator;
+}
+}
+std::mt19937& Chromosome::randomGenerator()
+{
+  return ChromosomeRandomGenerator();
+}
+
+int Chromosome::randomBit()
+{
+  std::uniform_int_distribution<int> distribution(0, 1);
+  return distribution(randomGenerator());
+}
+
+int Chromosome::randomIndex(int upperBoundExclusive)
+{
+  std::uniform_int_distribution<int> distribution(0, upperBoundExclusive - 1);
+  return distribution(randomGenerator());
+}
+
+void Chromosome::seedRandom(unsigned int seed)
+{
+  randomGenerator().seed(seed);
+}
+
+Chromosome::BaseStringPtr Chromosome::cloneBaseString(const BaseString *source, int baseStates)
+{
+  auto clone = std::make_unique<BaseString>(source->length(), baseStates);
+  for ( int i = 0 ; i < source->length() ; i++ )
+    {
+      clone->assign(i,source->test(i));
+    }
+  return clone;
+}
+
 //
 // Chromosome implementation. 
 //
@@ -54,7 +97,7 @@ Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int Pb
     {
       for ( int i = 0 ; i < ChromosomeLength ; i++ )
 	{
-	  if (random()&0x01) ChromosomeString->set(i);
+	  if (randomBit()) ChromosomeString->set(i);
 	  else ChromosomeString->clear(i);
 	}
     }
@@ -62,7 +105,7 @@ Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int Pb
     {
       for ( int i = 0 ; i < ChromosomeLength ; i++ )
 	{
-	  ChromosomeString->set(i,random() % baseStates);
+	  ChromosomeString->set(i,randomIndex(baseStates));
 	}
     }
 }
@@ -88,19 +131,20 @@ void Chromosome::SingleBitMutate(double probability)
   if ((probability >= 0.0)&&(probability <= 1.0))
     {
       int probabilityMask = (int) ( probability * 65535.0 );
+      std::uniform_int_distribution<int> distribution(0, 0xFFFF);
    
       for ( int i = 0 ; i < ChromosomeLength ; i++ )
 	{
-	  if ((random() & 0xFFFF) < probabilityMask)
+	  if (distribution(randomGenerator()) < probabilityMask)
 	    {
 	      if (baseStates == 2)
 		{
-		  if (random()&0x01) ChromosomeString->set(i);
+		  if (randomBit()) ChromosomeString->set(i);
 		  else ChromosomeString->clear(i);
 		}
 	      else
 		{
-		  ChromosomeString->set(i,random() % baseStates);
+		  ChromosomeString->set(i,randomIndex(baseStates));
 		}
 	      
 	    }
@@ -119,7 +163,8 @@ void Chromosome::SingleBitMutate(double probability)
 int Chromosome::testCrossOverRate(double crossOverRate)
 {
   int probabilityMask = (int) ( crossOverRate * 65535.0 );
-  if ((random() & 0xFFFF) < probabilityMask) return 1;
+  std::uniform_int_distribution<int> distribution(0, 0xFFFF);
+  if (distribution(randomGenerator()) < probabilityMask) return 1;
   else return 0;
 }
 //
@@ -150,19 +195,19 @@ int Chromosome::testCrossOverRate(double crossOverRate)
 //         - return the two children.
 //
 //
-void Chromosome::singlePointCrossOver(BaseString *mother,BaseString *father,
-				      BaseString **son,BaseString **daughter)
+std::pair<Chromosome::BaseStringPtr, Chromosome::BaseStringPtr>
+Chromosome::singlePointCrossOver(const BaseString *mother,const BaseString *father)
 {
   int FatherCrossoverPoint;
   int MotherCrossoverPoint;
   if (this->variableLength) 
     {
-      FatherCrossoverPoint = random() % father->length();
-      MotherCrossoverPoint = random() % mother->length();
+      FatherCrossoverPoint = randomIndex(father->length());
+      MotherCrossoverPoint = randomIndex(mother->length());
     }
   else
     { 
-      FatherCrossoverPoint = random() % father->length();
+      FatherCrossoverPoint = randomIndex(father->length());
       MotherCrossoverPoint = FatherCrossoverPoint;
     }
   int FatherPrimaryLength = FatherCrossoverPoint;
@@ -175,8 +220,8 @@ void Chromosome::singlePointCrossOver(BaseString *mother,BaseString *father,
   // The daughter is made up of the Primary section of the mother chromosome and the
   //     secondary section of the father chromosome.
   //
-  BaseString *boy   = new BaseString(FatherPrimaryLength + MotherSecondaryLength,baseStates);
-  BaseString *girl  = new BaseString(MotherPrimaryLength + FatherSecondaryLength,baseStates);
+  auto boy = std::make_unique<BaseString>(FatherPrimaryLength + MotherSecondaryLength,baseStates);
+  auto girl = std::make_unique<BaseString>(MotherPrimaryLength + FatherSecondaryLength,baseStates);
   //
   // Copy primary sections of chromosomes.
   //
@@ -204,31 +249,26 @@ void Chromosome::singlePointCrossOver(BaseString *mother,BaseString *father,
 	}
       
     }
-  *son = boy;
-  *daughter = girl;
+  return std::make_pair(std::move(boy), std::move(girl));
 }
 //
 //
-void Chromosome::twoPointCrossOver(BaseString *mother,BaseString *father,
-				   BaseString **son,BaseString **daughter)
+std::pair<Chromosome::BaseStringPtr, Chromosome::BaseStringPtr>
+Chromosome::twoPointCrossOver(const BaseString *mother,const BaseString *father)
 {
   //
   // A two point cross over is just two single points and some extra memory.
   //
-  BaseString *tmpFather = 0;
-  BaseString *tmpMother = 0;
-  singlePointCrossOver(mother,father,&tmpFather,&tmpMother);
-  singlePointCrossOver(tmpMother,tmpFather,son,daughter);
-  delete tmpFather;
-  delete tmpMother;
+  std::pair<BaseStringPtr, BaseStringPtr> intermediate = singlePointCrossOver(mother,father);
+  return singlePointCrossOver(intermediate.second.get(), intermediate.first.get());
 }
 //
 //
-void Chromosome::uniformCrossOver(BaseString *mother,BaseString *father,
-				  BaseString **son,BaseString **daughter)
+std::pair<Chromosome::BaseStringPtr, Chromosome::BaseStringPtr>
+Chromosome::uniformCrossOver(const BaseString *mother,const BaseString *father)
 {
-  BaseString *boy;
-  BaseString *girl;
+  BaseStringPtr boy;
+  BaseStringPtr girl;
   if (this->variableLength)
     {
       //
@@ -237,26 +277,21 @@ void Chromosome::uniformCrossOver(BaseString *mother,BaseString *father,
       // one of the parrents strings, it then copies the remaining
       // bits into the appropriate sexed children.
       //
-      boy  = new BaseString(father->length(),baseStates);
-      girl = new BaseString(mother->length(),baseStates);
+      boy  = std::make_unique<BaseString>(father->length(),baseStates);
+      girl = std::make_unique<BaseString>(mother->length(),baseStates);
       int copyLength = std::min(father->length(),mother->length());
       // New Chromosomes are made up of random bits of the two parrents
       for ( int i = 0 ; i < copyLength ; i++ )
 	{
-	  switch (random() & 0x01 )
+	  if (randomBit() == 0)
 	    {
-	    case 0:
 	      boy->assign(i,father->test(i));
 	      girl->assign(i,mother->test(i));
-	      break;
-	    case 1:
+	    }
+	  else
+	    {
 	      boy->assign(i,mother->test(i));
 	      girl->assign(i,father->test(i));
-	      break;
-	    default:
-	      throw GAFatalException(__FILE__,__LINE__,
-				     "Impossible case in uniform crossover .. dead");
-	      break;
 	    }
 	}
       for ( int i = copyLength ; i < father->length() ; i++ )
@@ -270,36 +305,31 @@ void Chromosome::uniformCrossOver(BaseString *mother,BaseString *father,
     }
   else
     {
-      boy  = new BaseString(father->length(),baseStates);
-      girl = new BaseString(mother->length(),baseStates); 
+      boy  = std::make_unique<BaseString>(father->length(),baseStates);
+      girl = std::make_unique<BaseString>(mother->length(),baseStates); 
       // New Chromosomes are made up of random bits of the two parrents
       for ( int i = 0 ; i < father->length() ; i++ )
 	{
-	  switch (random() & 0x01 )
+	  if (randomBit() == 0)
 	    {
-	    case 0:
 	      boy->assign(i,father->test(i));
 	      girl->assign(i,mother->test(i));
-	      break;
-	    case 1:
+	    }
+	  else
+	    {
 	      boy->assign(i,mother->test(i));
 	      girl->assign(i,father->test(i));
-	      break;
-	    default:
-	      throw GAFatalException(__FILE__,__LINE__,"impossible case in uniform crossover .. dead");
-	      break;
 	    }
 	}
     }
-  *son = boy;
-  *daughter = girl;
+  return std::make_pair(std::move(boy), std::move(girl));
 }
 //
 // Probabilsitcially mate two Chromosomes together, resultsing in two
 // children. 
 //
-void Chromosome::Mate(Chromosome *father,Chromosome **son,Chromosome **daughter,
-		       double crossOverRate,CrossOverType crossType)
+std::pair<Chromosome::ChromosomePtr, Chromosome::ChromosomePtr>
+Chromosome::matePair(Chromosome *father,double crossOverRate,CrossOverType crossType)
 {
   Chromosome *mother = this;         // Just for notation purposes.
   //
@@ -309,8 +339,7 @@ void Chromosome::Mate(Chromosome *father,Chromosome **son,Chromosome **daughter,
       throw GAFatalException(__FILE__,__LINE__,"Missmatch in Chromosome strings");
     }
   //
-  BaseString *sonString;
-  BaseString *daughterString; 
+  std::pair<BaseStringPtr, BaseStringPtr> children;
   //
   // Only cross the chromosomes if we pass the
   // crossOverRate test.
@@ -320,21 +349,17 @@ void Chromosome::Mate(Chromosome *father,Chromosome **son,Chromosome **daughter,
       switch (crossType)
 	{
 	case SinglePoint:
-	  singlePointCrossOver(mother->ChromosomeStr(),father->ChromosomeStr(),
-			       &sonString,&daughterString);
+	  children = singlePointCrossOver(mother->ChromosomeStr(),father->ChromosomeStr());
 	  break;
 	case TwoPoint:
-	  twoPointCrossOver(mother->ChromosomeStr(),father->ChromosomeStr(),
-			    &sonString,&daughterString);
+	  children = twoPointCrossOver(mother->ChromosomeStr(),father->ChromosomeStr());
 	 
 	  break;
 	case Uniform:
-	  uniformCrossOver(mother->ChromosomeStr(),father->ChromosomeStr(),
-			   &sonString,&daughterString);
+	  children = uniformCrossOver(mother->ChromosomeStr(),father->ChromosomeStr());
 	  break;
 	default:
 	  throw GANonFatalException(__FILE__,__LINE__,"Unimplemented crossover type");
-	  break;
 	}
     }
   else 
@@ -344,20 +369,20 @@ void Chromosome::Mate(Chromosome *father,Chromosome **son,Chromosome **daughter,
       // the Father into the Son and the bits from the mother
       // into the daughter.
       //
-      sonString      = new BaseString(father->ChromosomeLen(),baseStates);
-      daughterString = new BaseString(mother->ChromosomeLen(),baseStates);
-      for ( int i = 0 ; i < father->ChromosomeLen() ; i++ )
-	{
-	  sonString->assign(i,father->ChromosomeStr()->test(i));
-	}
-      for ( int i = 0 ; i < mother->ChromosomeLen() ; i++ )
-	{
-	  daughterString->assign(i,mother->ChromosomeStr()->test(i));
-	}
+      children = std::make_pair(cloneBaseString(father->ChromosomeStr(),baseStates),
+                                cloneBaseString(mother->ChromosomeStr(),baseStates));
     }
-  *son      = new Chromosome(sonString,father->variableLength,baseStates);
-  *daughter = new Chromosome(daughterString,mother->variableLength,baseStates);
-  return;
+  return std::make_pair(
+      std::make_unique<Chromosome>(children.first.release(),father->variableLength,baseStates),
+      std::make_unique<Chromosome>(children.second.release(),mother->variableLength,baseStates));
+}
+
+void Chromosome::Mate(Chromosome *father,Chromosome **son,Chromosome **daughter,
+		       double crossOverRate,CrossOverType crossType)
+{
+  std::pair<ChromosomePtr, ChromosomePtr> children = matePair(father, crossOverRate, crossType);
+  *son = children.first.release();
+  *daughter = children.second.release();
 }
 
 bool Chromosome::compare(const Chromosome *candidate) const
@@ -372,6 +397,3 @@ bool Chromosome::compare(const Chromosome *candidate) const
     }
   return false;
 }
-
-
-
