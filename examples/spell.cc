@@ -8,6 +8,16 @@
 #include "population.hh"
 #include "spell.hh"
 
+Spell::Spell(const Population::Options& options)
+   : Spell(options.toConfiguration())
+{
+}
+
+Spell::Spell(const Population::Configuration& configuration)
+   : Population(configuration)
+{
+}
+
 Spell::Spell(
    Population::OperationTechnique Operation,
    int numberofIndividuals,
@@ -16,20 +26,25 @@ Spell::Spell(
    double BitMutationRate,
    double CrossOverRate,
    Population::ReproductionTechniques ReproductionTechniques,
-   Population::ParrentSelectionTechnique ParentSelction,
-   Population::DeletetionTechnique Deletetion,
+   Population::ParentSelectionTechnique ParentSelction,
+   Population::DeletionTechnique Deletetion,
    Population::FitnessTechnique Fitness,
    Population::VariableLength Variable,
    int baseStates
-   ):Population(
-      Operation,numberofIndividuals,numberofTrials,
-      GenecticDeversity,BitMutationRate,CrossOverRate,
-      ReproductionTechniques,ParentSelction,
-      Deletetion,Fitness,
-      Variable,baseStates
-      )
+   )
+   : Spell(Population::Configuration{Operation,
+                                     numberofIndividuals,
+                                     numberofTrials,
+                                     GenecticDeversity,
+                                     BitMutationRate,
+                                     CrossOverRate,
+                                     ReproductionTechniques,
+                                     ParentSelction,
+                                     Deletetion,
+                                     Fitness,
+                                     Variable,
+                                     baseStates})
 {
-   fprintf(stderr,"In Spell Construtor\n");
 }
 
 double Spell::FitnessFunction(BaseString *b)
@@ -89,9 +104,6 @@ void Spell::FitnessPrint(BaseString *b)
    }
    fprintf(stderr," ::");
 }
-
-
-
 
 
 

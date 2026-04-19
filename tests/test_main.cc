@@ -90,9 +90,27 @@ BaseString *makeBinaryString(const std::string& bits)
   return b;
 }
 
+Population::Options make_population_options(Population::OperationMode operation,
+					    int individuals,
+					    int trials,
+					    int diversity,
+					    double mutation,
+					    double crossover,
+					    Population::ReproductionMode reproduction,
+					    Population::ParentSelectionMode selection,
+					    Population::DeletionMode deletion,
+					    Population::FitnessMode fitness,
+					    Population::VariableLengthMode variable_length,
+					    int states);
+
 class InspectablePopulation : public Population
 {
 public:
+  explicit InspectablePopulation(const Options& options)
+    : Population(options)
+  {
+  }
+
   InspectablePopulation(OperationTechnique op,
 			int individuals,
 			int trials,
@@ -100,25 +118,83 @@ public:
 			double mutation,
 			double crossover,
 			ReproductionTechniques reproduction,
-			ParrentSelectionTechnique selection,
-			DeletetionTechnique deletion,
+			ParentSelectionTechnique selection,
+			DeletionTechnique deletion,
 			FitnessTechnique fitness,
 			VariableLength variable,
 			int states)
-    : Population(op, individuals, trials, diversity, mutation, crossover,
-		 reproduction, selection, deletion, fitness, variable, states)
+    : Population(make_population_options(op == Minimize ? Population::OperationMode::Minimize
+						       : Population::OperationMode::Maximize,
+					 individuals,
+					 trials,
+					 diversity,
+					 mutation,
+					 crossover,
+					 reproduction == DuplicatesNotAllowed
+					    ? Population::ReproductionMode::DisallowDuplicates
+					    : Population::ReproductionMode::AllowDuplicates,
+					 selection == Random
+					    ? Population::ParentSelectionMode::Random
+					    : Population::ParentSelectionMode::RouletteWheel,
+					 deletion == DeleteAllButBest
+					    ? Population::DeletionMode::DeleteAllButBest
+					    : deletion == DeleteHalf
+					       ? Population::DeletionMode::DeleteHalf
+					       : deletion == DeleteQuarter
+						  ? Population::DeletionMode::DeleteQuarter
+						  : deletion == DeleteLast
+						     ? Population::DeletionMode::DeleteLast
+						     : Population::DeletionMode::DeleteAll,
+					 fitness == WindowedFitness
+					    ? Population::FitnessMode::Windowed
+					    : fitness == LinearNormalizedFitness
+					       ? Population::FitnessMode::LinearNormalized
+					       : Population::FitnessMode::Evaluation,
+					 variable == VariableLengthPermitted
+					    ? Population::VariableLengthMode::Variable
+					    : Population::VariableLengthMode::Fixed,
+					 states))
   {
   }
 
-  virtual double FitnessFunction(BaseString *b)
+  double FitnessFunction(BaseString *b) override
   {
     return b->test(0);
   }
 
-  virtual void FitnessPrint(BaseString *)
+  void FitnessPrint(BaseString *) override
   {
   }
 };
+
+Population::Options make_population_options(Population::OperationMode operation,
+					    int individuals,
+					    int trials,
+					    int diversity,
+					    double mutation,
+					    double crossover,
+					    Population::ReproductionMode reproduction,
+					    Population::ParentSelectionMode selection,
+					    Population::DeletionMode deletion,
+					    Population::FitnessMode fitness,
+					    Population::VariableLengthMode variable_length,
+					    int states)
+{
+  Population::Options options;
+  options.operation = operation;
+  options.numberOfIndividuals = individuals;
+  options.numberOfTrials = trials;
+  options.geneticDiversity = diversity;
+  options.bitMutationRate = mutation;
+  options.crossOverRate = crossover;
+  options.reproduction = reproduction;
+  options.parentSelection = selection;
+  options.deletion = deletion;
+  options.fitness = fitness;
+  options.variableLength = variable_length;
+  options.baseStates = states;
+  return options;
+}
 
 void test_base_string()
 {
@@ -150,6 +226,63 @@ void test_base_string()
   expect_true(symbolic.test(2) == 0, "Clear should reset symbolic base to zero");
   expect_true(byte_aligned.test(0) == 3, "Byte-aligned symbolic bases should store values correctly");
   expect_true(byte_aligned.test(3) == 0, "Byte-aligned clear should preserve zero values");
+}
+
+void test_population_options_round_trip()
+{
+  Population::Configuration configuration;
+  configuration.operation = Population::Minimize;
+  configuration.numberOfIndividuals = 17;
+  configuration.numberOfTrials = 99;
+  configuration.geneticDiversity = 23;
+  configuration.bitMutationRate = 0.125;
+  configuration.crossOverRate = 0.75;
+  configuration.reproduction = Population::DuplicatesNotAllowed;
+  configuration.parentSelection = Population::Random;
+  configuration.deletion = Population::DeleteQuarter;
+  configuration.fitness = Population::LinearNormalizedFitness;
+  configuration.variableLength = Population::VariableLengthPermitted;
+  configuration.baseStates = 7;
+
+  Population::Options options = configuration.toOptions();
+  Population::Configuration round_trip = options.toConfiguration();
+
+  expect_true(options.operation == Population::OperationMode::Minimize,
+              "Configuration::toOptions should convert operation");
+  expect_true(options.reproduction == Population::ReproductionMode::DisallowDuplicates,
+              "Configuration::toOptions should convert reproduction");
+  expect_true(options.parentSelection == Population::ParentSelectionMode::Random,
+              "Configuration::toOptions should convert parent selection");
+  expect_true(options.deletion == Population::DeletionMode::DeleteQuarter,
+              "Configuration::toOptions should convert deletion mode");
+  expect_true(options.fitness == Population::FitnessMode::LinearNormalized,
+              "Configuration::toOptions should convert fitness mode");
+  expect_true(options.variableLength == Population::VariableLengthMode::Variable,
+              "Configuration::toOptions should convert variable-length mode");
+  expect_true(round_trip.numberOfIndividuals == configuration.numberOfIndividuals,
+              "Options round trip should preserve individual count");
+  expect_true(round_trip.numberOfTrials == configuration.numberOfTrials,
+              "Options round trip should preserve trial count");
+  expect_true(round_trip.geneticDiversity == configuration.geneticDiversity,
+              "Options round trip should preserve diversity");
+  expect_true(round_trip.bitMutationRate == configuration.bitMutationRate,
+              "Options round trip should preserve mutation rate");
+  expect_true(round_trip.crossOverRate == configuration.crossOverRate,
+              "Options round trip should preserve crossover rate");
+  expect_true(round_trip.baseStates == configuration.baseStates,
+              "Options round trip should preserve base state count");
+  expect_true(round_trip.operation == configuration.operation,
+              "Options round trip should preserve legacy operation");
+  expect_true(round_trip.reproduction == configuration.reproduction,
+              "Options round trip should preserve legacy reproduction");
+  expect_true(round_trip.parentSelection == configuration.parentSelection,
+              "Options round trip should preserve legacy parent selection");
+  expect_true(round_trip.deletion == configuration.deletion,
+              "Options round trip should preserve legacy deletion");
+  expect_true(round_trip.fitness == configuration.fitness,
+              "Options round trip should preserve legacy fitness");
+  expect_true(round_trip.variableLength == configuration.variableLength,
+              "Options round trip should preserve legacy variable-length setting");
 }
 
 void test_base_string_error_paths()
@@ -472,10 +605,12 @@ void test_invalid_crossover_type_throws()
 void test_population_decode()
 {
   SilentStderr silence;
-  InspectablePopulation pop(Population::Maximize, 4, 4, 4, 0.0, 0.0,
-			    Population::DuplicatesAllowed, Population::RouletteWheel,
-			    Population::DeleteAll, Population::FitnessIsEvaluation,
-			    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 4, 4, 4, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
   BaseString bits(4, 2);
   bits.set(0);
   bits.clear(1);
@@ -488,10 +623,12 @@ void test_population_decode()
 void test_population_random_helpers()
 {
   SilentStderr silence;
-  InspectablePopulation pop(Population::Maximize, 4, 4, 1, 0.0, 0.0,
-			    Population::DuplicatesAllowed, Population::RouletteWheel,
-			    Population::DeleteAll, Population::FitnessIsEvaluation,
-			    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 4, 4, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
 
   for (int i = 0 ; i < 20 ; i++)
     {
@@ -516,27 +653,31 @@ void test_population_random_helpers()
 void test_population_zero_total_selection_falls_back_to_uniform()
 {
   SilentStderr silence;
-  InspectablePopulation pop(Population::Maximize, 2, 2, 1, 0.0, 0.0,
-			    Population::DuplicatesAllowed, Population::RouletteWheel,
-			    Population::DeleteAll, Population::FitnessIsEvaluation,
-			    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 2, 2, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
   pop.initializePopulation();
   double roulette[2] = {0.0, 0.0};
   int selected = -1;
 
-  expect_true(pop.selectParrent(&selected, roulette) != 0,
+  expect_true(pop.selectParent(&selected, roulette) != 0,
 	      "Roulette selection should fall back to uniform choice when all weights are zero");
-  expect_true(selected >= 0 && selected < pop.numberofIndividuals,
+  expect_true(selected >= 0 && selected < pop.configuration().numberOfIndividuals,
 	      "Uniform fallback selection should still return an in-range index");
 }
 
 void test_windowed_fitness_is_positive_for_maximize()
 {
   SilentStderr silence;
-  InspectablePopulation pop(Population::Maximize, 3, 3, 1, 0.0, 0.0,
-			    Population::DuplicatesAllowed, Population::RouletteWheel,
-			    Population::DeleteAll, Population::WindowedFitness,
-			    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 3, 3, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Windowed,
+						    Population::VariableLengthMode::Fixed, 2));
 
   pop.initializePopulation();
   for (int i = 0 ; i < 3 ; i++)
@@ -556,10 +697,12 @@ void test_windowed_fitness_is_positive_for_maximize()
 void test_windowed_fitness_is_positive_for_minimize()
 {
   SilentStderr silence;
-  InspectablePopulation pop(Population::Minimize, 3, 3, 1, 0.0, 0.0,
-			    Population::DuplicatesAllowed, Population::RouletteWheel,
-			    Population::DeleteAll, Population::WindowedFitness,
-			    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Minimize, 3, 3, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Windowed,
+						    Population::VariableLengthMode::Fixed, 2));
 
   pop.initializePopulation();
   for (int i = 0 ; i < 3 ; i++)
@@ -578,24 +721,30 @@ void test_windowed_fitness_is_positive_for_minimize()
 void test_fitness_table_selection()
 {
   SilentStderr silence;
-  InspectablePopulation evaluation(Population::Maximize, 3, 3, 1, 0.0, 0.0,
-				   Population::DuplicatesAllowed, Population::RouletteWheel,
-				   Population::DeleteAll, Population::FitnessIsEvaluation,
-				   Population::VariableLengthNotPermitted, 2);
-  InspectablePopulation windowed(Population::Maximize, 3, 3, 1, 0.0, 0.0,
-				 Population::DuplicatesAllowed, Population::RouletteWheel,
-				 Population::DeleteAll, Population::WindowedFitness,
-				 Population::VariableLengthNotPermitted, 2);
-  InspectablePopulation normalized(Population::Maximize, 3, 3, 1, 0.0, 0.0,
-				   Population::DuplicatesAllowed, Population::RouletteWheel,
-				   Population::DeleteAll, Population::LinearNormalizedFitness,
-				   Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation evaluation(make_population_options(Population::OperationMode::Maximize, 3, 3, 1, 0.0, 0.0,
+							   Population::ReproductionMode::AllowDuplicates,
+							   Population::ParentSelectionMode::RouletteWheel,
+							   Population::DeletionMode::DeleteAll,
+							   Population::FitnessMode::Evaluation,
+							   Population::VariableLengthMode::Fixed, 2));
+  InspectablePopulation windowed(make_population_options(Population::OperationMode::Maximize, 3, 3, 1, 0.0, 0.0,
+							 Population::ReproductionMode::AllowDuplicates,
+							 Population::ParentSelectionMode::RouletteWheel,
+							 Population::DeletionMode::DeleteAll,
+							 Population::FitnessMode::Windowed,
+							 Population::VariableLengthMode::Fixed, 2));
+  InspectablePopulation normalized(make_population_options(Population::OperationMode::Maximize, 3, 3, 1, 0.0, 0.0,
+							   Population::ReproductionMode::AllowDuplicates,
+							   Population::ParentSelectionMode::RouletteWheel,
+							   Population::DeletionMode::DeleteAll,
+							   Population::FitnessMode::LinearNormalized,
+							   Population::VariableLengthMode::Fixed, 2));
 
-  expect_true(evaluation.selectFitnessTable() == evaluation.fitnessTable.data(),
+  expect_true(evaluation.selectFitnessWeights() == evaluation.fitnessTable.data(),
 	      "FitnessIsEvaluation should select the raw fitness table");
-  expect_true(windowed.selectFitnessTable() == windowed.windowedFitnessTable.data(),
+  expect_true(windowed.selectFitnessWeights() == windowed.windowedFitnessTable.data(),
 	      "WindowedFitness should select the windowed fitness table");
-  expect_true(normalized.selectFitnessTable() == normalized.linearNormalizedfitnessTable.data(),
+  expect_true(normalized.selectFitnessWeights() == normalized.linearNormalizedfitnessTable.data(),
 	      "LinearNormalizedFitness should select the normalized fitness table");
 }
 
@@ -605,7 +754,7 @@ void prepare_population(InspectablePopulation& pop, const std::string& first_bit
   pop.initializePopulation();
   pop.populationTable[0].reset(new Chromosome(makeBinaryString(first_bits)));
   pop.populationTable[1].reset(new Chromosome(makeBinaryString(second_bits)));
-  for (int i = 0 ; i < pop.numberofIndividuals ; i++)
+  for (int i = 0 ; i < pop.configuration().numberOfIndividuals ; i++)
     {
       pop.fitnessTable[i] = -1.0;
     }
@@ -617,26 +766,30 @@ void test_population_selection_and_replacement_branches()
 {
   SilentStderr silence;
 
-  InspectablePopulation min_pop(Population::Minimize, 2, 2, 4, 0.0, 0.0,
-				Population::DuplicatesAllowed, Population::RouletteWheel,
-				Population::DeleteAll, Population::FitnessIsEvaluation,
-				Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation min_pop(make_population_options(Population::OperationMode::Minimize, 2, 2, 4, 0.0, 0.0,
+							Population::ReproductionMode::AllowDuplicates,
+							Population::ParentSelectionMode::RouletteWheel,
+							Population::DeletionMode::DeleteAll,
+							Population::FitnessMode::Evaluation,
+							Population::VariableLengthMode::Fixed, 2));
   prepare_population(min_pop, "1111", "0000");
   int selected = -1;
-  Chromosome *chosen = min_pop.selectParrent(&selected, min_pop.selectFitnessTable());
+  Chromosome *chosen = min_pop.selectParent(&selected, min_pop.selectFitnessWeights());
   expect_true(chosen != 0, "Minimize roulette selection should return a chromosome");
-  expect_true(selected >= 0 && selected < min_pop.numberofIndividuals,
+  expect_true(selected >= 0 && selected < min_pop.configuration().numberOfIndividuals,
 	      "Minimize roulette selection should produce an in-range index");
 
-  InspectablePopulation dup_not_allowed(Population::Maximize, 2, 2, 4, 0.0, 0.0,
-					Population::DuplicatesNotAllowed, Population::RouletteWheel,
-					Population::DeleteAll, Population::FitnessIsEvaluation,
-					Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation dup_not_allowed(make_population_options(Population::OperationMode::Maximize, 2, 2, 4, 0.0, 0.0,
+								Population::ReproductionMode::DisallowDuplicates,
+								Population::ParentSelectionMode::RouletteWheel,
+								Population::DeletionMode::DeleteAll,
+								Population::FitnessMode::Evaluation,
+								Population::VariableLengthMode::Fixed, 2));
   prepare_population(dup_not_allowed, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > bred = dup_not_allowed.breedPopulation(1);
   expect_true(bred.size() == 1, "DuplicatesNotAllowed breeding should still generate requested children");
-  expect_true(dup_not_allowed.findMatch(bred[0].get(), bred, 1),
-	      "findMatch should report a present chromosome");
+  expect_true(dup_not_allowed.containsChromosome(bred[0].get(), bred, 1),
+	      "containsChromosome should report a present chromosome");
 
   std::vector<std::unique_ptr<Chromosome> > replacements_max;
   replacements_max.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1111"))));
@@ -644,10 +797,12 @@ void test_population_selection_and_replacement_branches()
   int replaced_max = dup_not_allowed.insertNewPopulation(std::move(replacements_max), 2);
   expect_true(replaced_max >= 0, "insertNewPopulation should handle duplicates-not-allowed maximize path");
 
-  InspectablePopulation dup_not_allowed_min(Population::Minimize, 2, 2, 4, 0.0, 0.0,
-					    Population::DuplicatesNotAllowed, Population::RouletteWheel,
-					    Population::DeleteAll, Population::FitnessIsEvaluation,
-					    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation dup_not_allowed_min(make_population_options(Population::OperationMode::Minimize, 2, 2, 4, 0.0, 0.0,
+								    Population::ReproductionMode::DisallowDuplicates,
+								    Population::ParentSelectionMode::RouletteWheel,
+								    Population::DeletionMode::DeleteAll,
+								    Population::FitnessMode::Evaluation,
+								    Population::VariableLengthMode::Fixed, 2));
   prepare_population(dup_not_allowed_min, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > replacements_min;
   replacements_min.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1111"))));
@@ -655,10 +810,12 @@ void test_population_selection_and_replacement_branches()
   int replaced_min = dup_not_allowed_min.insertNewPopulation(std::move(replacements_min), 2);
   expect_true(replaced_min >= 0, "insertNewPopulation should handle duplicates-not-allowed minimize path");
 
-  InspectablePopulation dup_not_allowed_new(Population::Maximize, 2, 2, 4, 0.0, 0.0,
-					    Population::DuplicatesNotAllowed, Population::RouletteWheel,
-					    Population::DeleteAll, Population::FitnessIsEvaluation,
-					    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation dup_not_allowed_new(make_population_options(Population::OperationMode::Maximize, 2, 2, 4, 0.0, 0.0,
+								    Population::ReproductionMode::DisallowDuplicates,
+								    Population::ParentSelectionMode::RouletteWheel,
+								    Population::DeletionMode::DeleteAll,
+								    Population::FitnessMode::Evaluation,
+								    Population::VariableLengthMode::Fixed, 2));
   prepare_population(dup_not_allowed_new, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > replacements_new;
   replacements_new.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0011"))));
@@ -666,10 +823,12 @@ void test_population_selection_and_replacement_branches()
   int replaced_new = dup_not_allowed_new.insertNewPopulation(std::move(replacements_new), 2);
   expect_true(replaced_new > 0, "Duplicates-not-allowed maximize path should insert new chromosomes");
 
-  InspectablePopulation dup_not_allowed_new_min(Population::Minimize, 2, 2, 4, 0.0, 0.0,
-						Population::DuplicatesNotAllowed, Population::RouletteWheel,
-						Population::DeleteAll, Population::FitnessIsEvaluation,
-						Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation dup_not_allowed_new_min(make_population_options(Population::OperationMode::Minimize, 2, 2, 4, 0.0, 0.0,
+										Population::ReproductionMode::DisallowDuplicates,
+										Population::ParentSelectionMode::RouletteWheel,
+										Population::DeletionMode::DeleteAll,
+										Population::FitnessMode::Evaluation,
+										Population::VariableLengthMode::Fixed, 2));
   prepare_population(dup_not_allowed_new_min, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > replacements_new_min;
   replacements_new_min.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0011"))));
@@ -682,10 +841,12 @@ void test_population_selection_and_replacement_branches()
 void test_population_append_replacement_helper()
 {
   SilentStderr silence;
-  InspectablePopulation pop(Population::Maximize, 2, 2, 4, 0.0, 0.0,
-			    Population::DuplicatesNotAllowed, Population::RouletteWheel,
-			    Population::DeleteAll, Population::FitnessIsEvaluation,
-			    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 2, 2, 4, 0.0, 0.0,
+						    Population::ReproductionMode::DisallowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
 
   std::vector<std::unique_ptr<Chromosome> > replacement_list;
   int generated = 0;
@@ -711,10 +872,12 @@ void test_population_append_replacement_helper()
 void test_population_insert_new_population_rejects_overflow()
 {
   SilentStderr silence;
-  InspectablePopulation pop(Population::Maximize, 2, 2, 4, 0.0, 0.0,
-			    Population::DuplicatesAllowed, Population::RouletteWheel,
-			    Population::DeleteAll, Population::FitnessIsEvaluation,
-			    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 2, 2, 4, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
   prepare_population(pop, "1111", "0000");
 
   std::vector<std::unique_ptr<Chromosome> > replacements;
@@ -733,39 +896,47 @@ void test_population_selection_guard_and_random_fitness_modes()
 {
   SilentStderr silence;
 
-  InspectablePopulation fractional(Population::Maximize, 2, 2, 1, 0.0, 0.0,
-				   Population::DuplicatesAllowed, Population::RouletteWheel,
-				   Population::DeleteAll, Population::FitnessIsEvaluation,
-				   Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation fractional(make_population_options(Population::OperationMode::Maximize, 2, 2, 1, 0.0, 0.0,
+							   Population::ReproductionMode::AllowDuplicates,
+							   Population::ParentSelectionMode::RouletteWheel,
+							   Population::DeletionMode::DeleteAll,
+							   Population::FitnessMode::Evaluation,
+							   Population::VariableLengthMode::Fixed, 2));
   fractional.initializePopulation();
   int selected = -1;
   double roulette[2] = {0.4, 0.4};
   expect_throws<GAFatalException>(
-    [&fractional, &selected, &roulette]() { fractional.selectParrent(&selected, roulette); },
+    [&fractional, &selected, &roulette]() { fractional.selectParent(&selected, roulette); },
     "Roulette selection should throw when rounded weights produce an invalid index");
 
-  InspectablePopulation windowed(Population::Maximize, 4, 4, 1, 0.0, 0.0,
-				 Population::DuplicatesAllowed, Population::RouletteWheel,
-				 Population::DeleteAll, Population::WindowedFitness,
-				 Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation windowed(make_population_options(Population::OperationMode::Maximize, 4, 4, 1, 0.0, 0.0,
+							 Population::ReproductionMode::AllowDuplicates,
+							 Population::ParentSelectionMode::RouletteWheel,
+							 Population::DeletionMode::DeleteAll,
+							 Population::FitnessMode::Windowed,
+							 Population::VariableLengthMode::Fixed, 2));
   prepare_population(windowed, "1", "0");
   selected = -1;
-  expect_true(windowed.selectParrent(&selected, windowed.selectFitnessTable()) != 0,
+  expect_true(windowed.selectParent(&selected, windowed.selectFitnessWeights()) != 0,
 	      "Windowed fitness selection should return a chromosome");
 
-  InspectablePopulation normalized(Population::Maximize, 4, 4, 1, 0.0, 0.0,
-				   Population::DuplicatesAllowed, Population::RouletteWheel,
-				   Population::DeleteAll, Population::LinearNormalizedFitness,
-				   Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation normalized(make_population_options(Population::OperationMode::Maximize, 4, 4, 1, 0.0, 0.0,
+							   Population::ReproductionMode::AllowDuplicates,
+							   Population::ParentSelectionMode::RouletteWheel,
+							   Population::DeletionMode::DeleteAll,
+							   Population::FitnessMode::LinearNormalized,
+							   Population::VariableLengthMode::Fixed, 2));
   prepare_population(normalized, "1", "0");
   selected = -1;
-  expect_true(normalized.selectParrent(&selected, normalized.selectFitnessTable()) != 0,
+  expect_true(normalized.selectParent(&selected, normalized.selectFitnessWeights()) != 0,
 	      "Linear normalized fitness selection should return a chromosome");
 
-  InspectablePopulation random_selection(Population::Maximize, 2, 4, 4, 0.0, 0.0,
-					 Population::DuplicatesAllowed, Population::Random,
-					 Population::DeleteAll, Population::FitnessIsEvaluation,
-					 Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation random_selection(make_population_options(Population::OperationMode::Maximize, 2, 4, 4, 0.0, 0.0,
+								 Population::ReproductionMode::AllowDuplicates,
+								 Population::ParentSelectionMode::Random,
+								 Population::DeletionMode::DeleteAll,
+								 Population::FitnessMode::Evaluation,
+								 Population::VariableLengthMode::Fixed, 2));
   prepare_population(random_selection, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > random_bred = random_selection.breedPopulation(2);
   expect_true(random_bred.size() == 2,
@@ -776,44 +947,52 @@ void test_population_invalid_enum_paths()
 {
   SilentStderr silence;
 
-  InspectablePopulation bad_delete(Population::Maximize, 2, 2, 1, 0.0, 0.0,
-				   Population::DuplicatesAllowed, Population::RouletteWheel,
-				   static_cast<Population::DeletetionTechnique>(99),
-				   Population::FitnessIsEvaluation,
-				   Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation bad_delete(make_population_options(Population::OperationMode::Maximize, 2, 2, 1, 0.0, 0.0,
+							   Population::ReproductionMode::AllowDuplicates,
+							   Population::ParentSelectionMode::RouletteWheel,
+							   Population::DeletionMode::DeleteAll,
+							   Population::FitnessMode::Evaluation,
+							   Population::VariableLengthMode::Fixed, 2));
+  bad_delete.config_.deletion = static_cast<Population::DeletionTechnique>(99);
   expect_throws<GAFatalException>(
     [&bad_delete]() { bad_delete.run(); },
     "Unsupported deletion technique should throw");
 
-  InspectablePopulation bad_fitness(Population::Maximize, 2, 2, 1, 0.0, 0.0,
-				    Population::DuplicatesAllowed, Population::RouletteWheel,
-				    Population::DeleteAll,
-				    static_cast<Population::FitnessTechnique>(99),
-				    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation bad_fitness(make_population_options(Population::OperationMode::Maximize, 2, 2, 1, 0.0, 0.0,
+							    Population::ReproductionMode::AllowDuplicates,
+							    Population::ParentSelectionMode::RouletteWheel,
+							    Population::DeletionMode::DeleteAll,
+							    Population::FitnessMode::Evaluation,
+							    Population::VariableLengthMode::Fixed, 2));
+  bad_fitness.config_.fitness = static_cast<Population::FitnessTechnique>(99);
   expect_throws<GAFatalException>(
-    [&bad_fitness]() { bad_fitness.selectFitnessTable(); },
+    [&bad_fitness]() { bad_fitness.selectFitnessWeights(); },
     "Unsupported fitness technique should throw");
 
-  InspectablePopulation bad_parent(Population::Maximize, 2, 2, 4, 0.0, 0.0,
-				   Population::DuplicatesAllowed,
-				   static_cast<Population::ParrentSelectionTechnique>(99),
-				   Population::DeleteAll, Population::FitnessIsEvaluation,
-				   Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation bad_parent(make_population_options(Population::OperationMode::Maximize, 2, 2, 4, 0.0, 0.0,
+							   Population::ReproductionMode::AllowDuplicates,
+							   Population::ParentSelectionMode::RouletteWheel,
+							   Population::DeletionMode::DeleteAll,
+							   Population::FitnessMode::Evaluation,
+							   Population::VariableLengthMode::Fixed, 2));
+  bad_parent.config_.parentSelection = static_cast<Population::ParentSelectionTechnique>(99);
   prepare_population(bad_parent, "1111", "0000");
   expect_throws<GAFatalException>(
     [&bad_parent]() { bad_parent.breedPopulation(1); },
     "Unsupported parent selection technique should throw");
 
-  InspectablePopulation bad_operation(Population::Maximize, 2, 2, 4, 0.0, 0.0,
-				      Population::DuplicatesAllowed, Population::RouletteWheel,
-				      Population::DeleteAll, Population::FitnessIsEvaluation,
-				      Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation bad_operation(make_population_options(Population::OperationMode::Maximize, 2, 2, 4, 0.0, 0.0,
+							      Population::ReproductionMode::AllowDuplicates,
+							      Population::ParentSelectionMode::RouletteWheel,
+							      Population::DeletionMode::DeleteAll,
+							      Population::FitnessMode::Evaluation,
+							      Population::VariableLengthMode::Fixed, 2));
   prepare_population(bad_operation, "1111", "0000");
-  bad_operation.Operation = static_cast<Population::OperationTechnique>(99);
+  bad_operation.config_.operation = static_cast<Population::OperationTechnique>(99);
   expect_throws<GAFatalException>(
     [&bad_operation]() {
       int selected = -1;
-      bad_operation.selectParrent(&selected, bad_operation.selectFitnessTable());
+      bad_operation.selectParent(&selected, bad_operation.selectFitnessWeights());
     },
     "Unsupported operation technique in selection should throw");
 
@@ -825,12 +1004,14 @@ void test_population_invalid_enum_paths()
     },
     "Unsupported operation technique in replacement should throw");
 
-  InspectablePopulation bad_operation_dup(Population::Maximize, 2, 2, 4, 0.0, 0.0,
-					  Population::DuplicatesNotAllowed, Population::RouletteWheel,
-					  Population::DeleteAll, Population::FitnessIsEvaluation,
-					  Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation bad_operation_dup(make_population_options(Population::OperationMode::Maximize, 2, 2, 4, 0.0, 0.0,
+								  Population::ReproductionMode::DisallowDuplicates,
+								  Population::ParentSelectionMode::RouletteWheel,
+								  Population::DeletionMode::DeleteAll,
+								  Population::FitnessMode::Evaluation,
+								  Population::VariableLengthMode::Fixed, 2));
   prepare_population(bad_operation_dup, "1111", "0000");
-  bad_operation_dup.Operation = static_cast<Population::OperationTechnique>(99);
+  bad_operation_dup.config_.operation = static_cast<Population::OperationTechnique>(99);
   std::vector<std::unique_ptr<Chromosome> > dup_replacements;
   dup_replacements.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0011"))));
   expect_throws<GAFatalException>(
@@ -843,10 +1024,12 @@ void test_population_invalid_enum_paths()
 void test_population_verbose_path()
 {
   setenv("GAK_VERBOSE", "1", 1);
-  InspectablePopulation pop(Population::Maximize, 6, 8, 1, 0.0, 0.0,
-			    Population::DuplicatesAllowed, Population::RouletteWheel,
-			    Population::DeleteAll, Population::FitnessIsEvaluation,
-			    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
   pop.run();
   unsetenv("GAK_VERBOSE");
   expect_true(pop.populationInitialized, "Verbose run path should still complete successfully");
@@ -855,10 +1038,12 @@ void test_population_verbose_path()
 void test_population_verbose_minimize_path()
 {
   setenv("GAK_VERBOSE", "1", 1);
-  InspectablePopulation pop(Population::Minimize, 6, 8, 1, 0.0, 0.0,
-			    Population::DuplicatesAllowed, Population::RouletteWheel,
-			    Population::DeleteAll, Population::FitnessIsEvaluation,
-			    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Minimize, 6, 8, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
   pop.run();
   unsetenv("GAK_VERBOSE");
   expect_true(pop.populationInitialized, "Verbose minimize path should still complete successfully");
@@ -868,45 +1053,78 @@ void test_population_run_modes()
 {
   SilentStderr silence;
 
-  InspectablePopulation delete_all(Population::Maximize, 6, 8, 1, 0.0, 0.0,
-				   Population::DuplicatesAllowed, Population::RouletteWheel,
-				   Population::DeleteAll, Population::FitnessIsEvaluation,
-				   Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation delete_all(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
+							   Population::ReproductionMode::AllowDuplicates,
+							   Population::ParentSelectionMode::RouletteWheel,
+							   Population::DeletionMode::DeleteAll,
+							   Population::FitnessMode::Evaluation,
+							   Population::VariableLengthMode::Fixed, 2));
   delete_all.run();
 
-  InspectablePopulation delete_half(Population::Maximize, 6, 8, 1, 0.0, 0.0,
-				    Population::DuplicatesAllowed, Population::RouletteWheel,
-				    Population::DeleteHalf, Population::FitnessIsEvaluation,
-				    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation delete_half(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
+							    Population::ReproductionMode::AllowDuplicates,
+							    Population::ParentSelectionMode::RouletteWheel,
+							    Population::DeletionMode::DeleteHalf,
+							    Population::FitnessMode::Evaluation,
+							    Population::VariableLengthMode::Fixed, 2));
   delete_half.run();
 
-  InspectablePopulation delete_quarter(Population::Maximize, 8, 10, 1, 0.0, 0.0,
-				       Population::DuplicatesAllowed, Population::RouletteWheel,
-				       Population::DeleteQuarter, Population::FitnessIsEvaluation,
-				       Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation delete_quarter(make_population_options(Population::OperationMode::Maximize, 8, 10, 1, 0.0, 0.0,
+							       Population::ReproductionMode::AllowDuplicates,
+							       Population::ParentSelectionMode::RouletteWheel,
+							       Population::DeletionMode::DeleteQuarter,
+							       Population::FitnessMode::Evaluation,
+							       Population::VariableLengthMode::Fixed, 2));
   delete_quarter.run();
 
-  InspectablePopulation delete_last_min(Population::Minimize, 6, 8, 1, 0.0, 0.0,
-					Population::DuplicatesAllowed, Population::RouletteWheel,
-					Population::DeleteLast, Population::FitnessIsEvaluation,
-					Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation delete_last_min(make_population_options(Population::OperationMode::Minimize, 6, 8, 1, 0.0, 0.0,
+								Population::ReproductionMode::AllowDuplicates,
+								Population::ParentSelectionMode::RouletteWheel,
+								Population::DeletionMode::DeleteLast,
+								Population::FitnessMode::Evaluation,
+								Population::VariableLengthMode::Fixed, 2));
   delete_last_min.run();
 
   expect_true(delete_last_min.populationInitialized, "Additional run modes should complete successfully");
 }
 
+void test_population_execute_returns_structured_result()
+{
+  SilentStderr silence;
+
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+  Population::RunResult result = pop.execute(true);
+
+  expect_true(result.generationsCompleted >= 1, "execute should report completed generations");
+  expect_true(result.evaluations >= pop.configuration().numberOfIndividuals,
+	      "execute should report total evaluations");
+  expect_true(!result.generationSummaries.empty(),
+	      "execute(true) should capture per-generation summaries");
+  expect_true(!result.finalSummary.mostFit.empty(),
+	      "execute should capture the final most-fit summary");
+  expect_true(!result.finalSummary.leastFit.empty(),
+	      "execute should capture the final least-fit summary");
+}
+
 void test_delete_all_but_best_runs()
 {
-  InspectablePopulation pop(Population::Maximize, 6, 20, 1, 0.0, 0.0,
-			    Population::DuplicatesAllowed, Population::RouletteWheel,
-			    Population::DeleteAllButBest, Population::FitnessIsEvaluation,
-			    Population::VariableLengthNotPermitted, 2);
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 20, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAllButBest,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
   SilentStderr silence;
   pop.run();
 
   expect_true(pop.populationInitialized == true, "Population should initialize during run");
   expect_true(!pop.populationTable.empty(), "Population should retain its table after run");
-  expect_true(pop.populationTable[pop.numberofIndividuals - 1].get()->ChromosomeStr()->test(0) == 1,
+  expect_true(pop.populationTable[pop.configuration().numberOfIndividuals - 1].get()->ChromosomeStr()->test(0) == 1,
 	      "Best chromosome should remain present after DeleteAllButBest runs");
 }
 
@@ -915,6 +1133,7 @@ void test_delete_all_but_best_runs()
 int main()
 {
   test_base_string();
+  test_population_options_round_trip();
   test_base_string_error_paths();
   test_base_string_print_helpers();
   test_exception_and_stringutil_helpers();
@@ -945,6 +1164,7 @@ int main()
   test_population_verbose_path();
   test_population_verbose_minimize_path();
   test_population_run_modes();
+  test_population_execute_returns_structured_result();
   test_delete_all_but_best_runs();
 
   if (g_failures != 0)

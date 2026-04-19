@@ -1,15 +1,15 @@
-#ifndef __GA_Spell_hh__
-#define __GA_Spell_hh__
+#ifndef __GA_NQueens_hh__
+#define __GA_NQueens_hh__
+
 #include "population.hh"
 
-class Spell : public Population
+class NQueens : public Population
 {
-   double sqr ( double x );
 public:
-   explicit Spell(const Population::Options& options);
-   explicit Spell(const Population::Configuration& configuration);
-   [[deprecated("Use Spell(const Population::Options&) or Spell(const Population::Configuration&)")]]
-   Spell(
+   explicit NQueens(const Population::Options& options);
+   explicit NQueens(const Population::Configuration& configuration);
+   [[deprecated("Use NQueens(const Population::Options&) or NQueens(const Population::Configuration&)")]]
+   NQueens(
       Population::OperationTechnique Operation,
       int numberofIndividuals,
       int numberofTrials,
@@ -23,8 +23,9 @@ public:
       Population::VariableLength Variable,
       int baseStates
       );
-  
+
    double FitnessFunction(BaseString *b) override;
    void FitnessPrint(BaseString *b) override;
 };
+
 #endif

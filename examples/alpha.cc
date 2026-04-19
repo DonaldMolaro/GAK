@@ -1,12 +1,23 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <math.h>
+#include <cstdio>
+#include <cmath>
 #include <iostream>
+#include <memory>
+#include <random>
+#include <ctime>
 #include "base.hh"
 #include "chromosome.hh"
 #include "population.hh"
 #include "alpha.hh"
+
+Alpha::Alpha(const Population::Options& options)
+   : Alpha(options.toConfiguration())
+{
+}
+
+Alpha::Alpha(const Population::Configuration& configuration)
+   : Population(configuration)
+{
+}
 
 Alpha::Alpha(
    Population::OperationTechnique Operation,
@@ -16,20 +27,25 @@ Alpha::Alpha(
    double BitMutationRate,
    double CrossOverRate,
    Population::ReproductionTechniques ReproductionTechniques,
-   Population::ParrentSelectionTechnique ParentSelction,
-   Population::DeletetionTechnique Deletetion,
+   Population::ParentSelectionTechnique ParentSelction,
+   Population::DeletionTechnique Deletetion,
    Population::FitnessTechnique Fitness,
    Population::VariableLength Variable,
    int baseStates
-   ):Population(
-      Operation,numberofIndividuals,numberofTrials,
-      GenecticDeversity,BitMutationRate,CrossOverRate,
-      ReproductionTechniques,ParentSelction,
-      Deletetion,Fitness,
-      Variable,baseStates
-      )
+   )
+   : Alpha(Population::Configuration{Operation,
+                                     numberofIndividuals,
+                                     numberofTrials,
+                                     GenecticDeversity,
+                                     BitMutationRate,
+                                     CrossOverRate,
+                                     ReproductionTechniques,
+                                     ParentSelction,
+                                     Deletetion,
+                                     Fitness,
+                                     Variable,
+                                     baseStates})
 {
-   fprintf(stderr,"In Alpha Construtor\n");
 }
 
 double Alpha::FitnessFunction(BaseString *b)
@@ -100,13 +116,16 @@ void Alpha::FitnessPrint(BaseString *b)
 
 int Alpha::RandomAlgorithim()
 {
-   BaseString *current = new BaseString(13,13);
-   BaseString *next    = new BaseString(13,13);
+   std::mt19937 generator(static_cast<unsigned int>(std::time(NULL)));
+   std::uniform_int_distribution<int> value_distribution(0, 12);
+   std::uniform_int_distribution<int> index_distribution(0, 12);
+   std::unique_ptr<BaseString> current = std::make_unique<BaseString>(13,13);
+   std::unique_ptr<BaseString> next = std::make_unique<BaseString>(13,13);
    for ( int i = 0 ; i < 13 ; i++ )
    {
-      current->set(i,random() % 13);
+      current->set(i,value_distribution(generator));
    }
-   int fitness = 0;
+   int fitness = FitnessFunction(current.get());
    int iter = 0;
    while (fitness < 650)
    {
@@ -114,17 +133,16 @@ int Alpha::RandomAlgorithim()
       {
 	 next->set(i,current->test(i));
       }
-      int index = random() % 13;
-      int value = random() % 13;
+      int index = index_distribution(generator);
+      int value = value_distribution(generator);
       next->set(index,value);
-      int nextFit = FitnessFunction(next);
+      int nextFit = FitnessFunction(next.get());
       if (nextFit > fitness)
       {
-	 delete current;
-	 current = next;
-	 next = new BaseString(13,13);
+	 current = std::move(next);
+	 next = std::make_unique<BaseString>(13,13);
 	 fitness = nextFit;
-	 FitnessPrint(current);
+	 FitnessPrint(current.get());
 	 fprintf(stderr,"Iteration %d New Fitness %d\n",iter,fitness);
       }
       if (( iter % 1000 ) == 0)
@@ -135,6 +153,3 @@ int Alpha::RandomAlgorithim()
    }
    return 0;
 }
-
-
-

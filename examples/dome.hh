@@ -1,7 +1,14 @@
+#ifndef __GA_Dome_hh__
+#define __GA_Dome_hh__
+#include "population.hh"
+
 class Dome : public Population
 {
    double sqr ( double x );
 public:
+   explicit Dome(const Population::Options& options);
+   explicit Dome(const Population::Configuration& configuration);
+   [[deprecated("Use Dome(const Population::Options&) or Dome(const Population::Configuration&)")]]
    Dome(
       Population::OperationTechnique Operation,
       int numberofIndividuals,
@@ -10,13 +17,14 @@ public:
       double BitMutationRate,
       double CrossOverRate,
       Population::ReproductionTechniques PReproductionTechniques,
-      Population::ParrentSelectionTechnique ParentSelction,
-      Population::DeletetionTechnique Deletetion,
+      Population::ParentSelectionTechnique ParentSelction,
+      Population::DeletionTechnique Deletetion,
       Population::FitnessTechnique Fitness,
       Population::VariableLength Variable,
       int baseStates
       );
   
-   virtual double FitnessFunction(BaseString *b);
-   virtual void FitnessPrint(BaseString *b);
+   double FitnessFunction(BaseString *b) override;
+   void FitnessPrint(BaseString *b) override;
 };
+#endif

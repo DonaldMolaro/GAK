@@ -5,19 +5,18 @@
 #include <string>
 #include <stdexcept>
 
-// class GAException : public runtime_error
-class GAException
+class GAException : public std::runtime_error
 {
  public:
   GAException(const std::string& file, 
 	      const int line, 
 	      const std::string& reason);
-  virtual std::ostream& operator<<(std::ostream& ostr);
-  virtual const char* what () const;
+  std::ostream& operator<<(std::ostream& ostr) const;
+  const std::string& file() const noexcept { return file_; }
+  int line() const noexcept { return line_; }
  private:
-  const std::string _file;
-  const int _line;
-  const std::string _reason;
+  std::string file_;
+  int line_;
 };
 
 class GAComplete : public GAException
@@ -26,7 +25,7 @@ class GAComplete : public GAException
   GAComplete(const std::string& file, 
 	     const int line, 
 	     const std::string& reason):
-    GAException(file,line,reason) {} ;
+    GAException(file,line,reason) {}
 };
 
 class GAFatalException : public GAException 
@@ -35,7 +34,7 @@ class GAFatalException : public GAException
   GAFatalException(const std::string& file, 
 		   const int line, 
 		   const std::string& reason):
-    GAException(file,line,reason) {};
+    GAException(file,line,reason) {}
 };
 
 class GANonFatalException : public GAException 
@@ -44,7 +43,7 @@ class GANonFatalException : public GAException
   GANonFatalException(const std::string& file, 
 		      const int line, 
 		      const std::string& reason):
-    GAException(file,line,reason) {};
+    GAException(file,line,reason) {}
 };
 
 #endif

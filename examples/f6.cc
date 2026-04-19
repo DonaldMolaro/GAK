@@ -8,6 +8,16 @@
 #include "population.hh"
 #include "f6.hh"
 
+F6::F6(const Population::Options& options)
+   : F6(options.toConfiguration())
+{
+}
+
+F6::F6(const Population::Configuration& configuration)
+   : Population(configuration)
+{
+}
+
 F6::F6(
    Population::OperationTechnique Operation,
    int numberofIndividuals,
@@ -16,20 +26,25 @@ F6::F6(
    double BitMutationRate,
    double CrossOverRate,
    Population::ReproductionTechniques ReproductionTechniques,
-   Population::ParrentSelectionTechnique ParentSelction,
-   Population::DeletetionTechnique Deletetion,
+   Population::ParentSelectionTechnique ParentSelction,
+   Population::DeletionTechnique Deletetion,
    Population::FitnessTechnique Fitness,
    Population::VariableLength Variable,
    int baseStates
-   ):Population(
-      Operation,numberofIndividuals,numberofTrials,
-      GenecticDeversity,BitMutationRate,CrossOverRate,
-      ReproductionTechniques,ParentSelction,
-      Deletetion,Fitness,
-      Variable,baseStates
-      )
+   )
+   : F6(Population::Configuration{Operation,
+                                  numberofIndividuals,
+                                  numberofTrials,
+                                  GenecticDeversity,
+                                  BitMutationRate,
+                                  CrossOverRate,
+                                  ReproductionTechniques,
+                                  ParentSelction,
+                                  Deletetion,
+                                  Fitness,
+                                  Variable,
+                                  baseStates})
 {
-   fprintf(stderr,"In F6 Construtor\n");
 }
 
 double F6::sqr(double x)
@@ -68,9 +83,6 @@ void F6::FitnessPrint(BaseString *b)
    
    fprintf(stderr,"X ( %3.8f ) Y ( %3.8f ) ",x3,y3);
 }
-
-
-
 
 
 
