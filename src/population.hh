@@ -29,6 +29,8 @@ public:
    enum class VariableLengthMode { Fixed, Variable };
    struct Configuration
    {
+      // Legacy-compatible configuration surface. New code should prefer
+      // `Options`, but this remains useful for bridging older callers.
       OperationTechnique operation = Maximize;
       int numberOfIndividuals = 100;
       int numberOfTrials = 4000;
@@ -46,6 +48,7 @@ public:
    };
    struct Options
    {
+      // Preferred modern configuration surface for new code and examples.
       OperationMode operation = OperationMode::Maximize;
       int numberOfIndividuals = 100;
       int numberOfTrials = 4000;
@@ -63,11 +66,16 @@ public:
    };
    struct PopulationSummary
    {
+      // Snapshot of the strongest and weakest fitness values observed in a
+      // generation or at the end of a run.
       std::vector<double> mostFit;
       std::vector<double> leastFit;
    };
    struct RunResult
    {
+      // Structured execution result returned by `execute()`. This allows
+      // callers to run the GA without coupling to the legacy stderr output in
+      // `run()`.
       int generationsCompleted = 0;
       int evaluations = 0;
       std::vector<PopulationSummary> generationSummaries;
@@ -113,12 +121,20 @@ private:
    //
    //
 protected:
+   // Create an initial chromosome for the starting population. Subclasses can
+   // override this to generate candidates that already satisfy key constraints.
    virtual std::unique_ptr<Chromosome> createInitialChromosome();
+   // Produce two children from a pair of parents. Override this when the
+   // default generic crossover should be replaced with problem-aware mating.
    virtual std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
       mateChromosomes(Chromosome *mother, Chromosome *father);
+   // Apply a mutation step to a chromosome. Override this when mutations need
+   // to preserve invariants such as fixed givens or permutation validity.
    virtual void mutateChromosome(Chromosome *chromosome);
 public:
+   // Construct a population from the preferred modern option set.
    explicit Population(const Options& options);
+   // Construct a population from the legacy-compatible configuration object.
    explicit Population(const Configuration& configuration);
    [[deprecated("Use Population::Options or Population::Configuration")]]
    Population(
@@ -135,11 +151,16 @@ public:
       VariableLength PVariable                 = VariableLengthNotPermitted,
       int PbaseStates                          = 2);
    virtual ~Population();
+   // Subclasses provide the problem-specific score for a chromosome.
    virtual double FitnessFunction(BaseString *b)=0;
+   // Subclasses provide a human-readable rendering of a chromosome.
    virtual void FitnessPrint(BaseString *b)=0;
    const Configuration& configuration() const noexcept { return config_; }
+   // Decode a contiguous range of genes as a base-2 integer.
    int decode(BaseString *b,int start,int end);
+   // Run the GA silently and return a structured summary.
    [[nodiscard]] RunResult execute(bool captureGenerationSummaries = false);
+   // Compatibility wrapper around `execute()` that prints progress/summaries.
    void run();
 };
 #endif

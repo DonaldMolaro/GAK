@@ -17,6 +17,9 @@
 class BaseString
 {
 private:
+  // Packed gene storage. Each logical base occupies enough bits to represent
+  // values in [0, numStates), so symbolic chromosomes can share the same
+  // storage class as binary chromosomes.
   std::vector<unsigned char> bits;
   std::vector<int> startPos;
   std::vector<int> endPos;
@@ -28,10 +31,15 @@ private:
   void setBit(int i);
   void clearBit(int i);
 public:
+  // Build a logical string with `length` gene positions and `numStates`
+  // representable values per position. `numStates == 2` gives classic bits;
+  // larger values produce a symbolic chromosome.
   BaseString(int length,int numStates);
   ~BaseString() = default;
   int length() const               { return stringLength; }
+  // Read the symbolic value stored at a gene position.
   int test(int baseNo) const;
+  // Store a symbolic value at a gene position.
   void set(int baseNo,int value = 1);
   void clear(int baseNo);
   void assign(int i,int value) { if (value) set(i,value); else clear(i); }
