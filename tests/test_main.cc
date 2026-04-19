@@ -5,6 +5,7 @@
 #include <sstream>
 #include <string>
 #include <unistd.h>
+#include <vector>
 
 #include "base.hh"
 #include "chromosome.hh"
@@ -77,6 +78,65 @@ public:
 private:
   int saved_fd_;
   FILE *null_;
+};
+
+class CaptureStderr
+{
+public:
+  CaptureStderr()
+    : saved_fd_(-1),
+      capture_(tmpfile())
+  {
+    fflush(stderr);
+    saved_fd_ = dup(fileno(stderr));
+    if (saved_fd_ >= 0 && capture_ != NULL)
+      {
+        dup2(fileno(capture_), fileno(stderr));
+      }
+  }
+
+  ~CaptureStderr()
+  {
+    if (saved_fd_ >= 0)
+      {
+        fflush(stderr);
+        dup2(saved_fd_, fileno(stderr));
+        close(saved_fd_);
+      }
+    if (capture_ != NULL)
+      {
+        fclose(capture_);
+      }
+  }
+
+  std::string str()
+  {
+    if (capture_ == NULL)
+      {
+        return "";
+      }
+
+    fflush(stderr);
+    long current = ftell(capture_);
+    rewind(capture_);
+
+    std::string output;
+    char buffer[256];
+    while (fgets(buffer, sizeof(buffer), capture_) != NULL)
+      {
+        output += buffer;
+      }
+
+    if (current >= 0)
+      {
+        fseek(capture_, current, SEEK_SET);
+      }
+    return output;
+  }
+
+private:
+  int saved_fd_;
+  FILE *capture_;
 };
 
 BaseString *makeBinaryString(const std::string& bits)
@@ -164,6 +224,29 @@ public:
 
   void FitnessPrint(BaseString *) override
   {
+  }
+};
+
+class DefaultHookPopulation : public Population
+{
+public:
+  explicit DefaultHookPopulation(const Options& options)
+    : Population(options)
+  {
+  }
+
+  using Population::createInitialChromosome;
+  using Population::mateChromosomes;
+  using Population::mutateChromosome;
+
+  double FitnessFunction(BaseString *b) override
+  {
+    return b->test(0);
+  }
+
+  void FitnessPrint(BaseString *b) override
+  {
+    std::fprintf(stderr, "Chromosome:%d\n", b->test(0));
   }
 };
 
@@ -1111,6 +1194,108 @@ void test_population_execute_returns_structured_result()
 	      "execute should capture the final least-fit summary");
 }
 
+void test_population_execute_result_contents_are_consistent()
+{
+  SilentStderr silence;
+
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+  Population::RunResult result = pop.execute(true);
+
+  expect_true(result.generationsCompleted == 1,
+	      "execute should report the expected number of generations for this configuration");
+  expect_true(result.evaluations == 12,
+	      "execute should report the exact evaluation count for this configuration");
+  expect_true(result.generationSummaries.size() == static_cast<std::size_t>(result.generationsCompleted),
+	      "execute(true) should produce one summary per completed generation");
+  expect_true(result.finalSummary.mostFit.size() == 5,
+	      "Final summary should cap most-fit entries at the configured summary count");
+  expect_true(result.finalSummary.leastFit.size() == 5,
+	      "Final summary should cap least-fit entries at the configured summary count");
+
+  for (std::size_t i = 1 ; i < result.finalSummary.mostFit.size() ; i++)
+    {
+      expect_true(result.finalSummary.mostFit[i - 1] >= result.finalSummary.mostFit[i],
+		  "Most-fit summary entries should be sorted from best to less-best");
+    }
+
+  for (std::size_t i = 1 ; i < result.finalSummary.leastFit.size() ; i++)
+    {
+      expect_true(result.finalSummary.leastFit[i - 1] <= result.finalSummary.leastFit[i],
+		  "Least-fit summary entries should be sorted from worst to less-worst");
+    }
+
+  expect_true(result.generationSummaries.back().mostFit == result.finalSummary.mostFit,
+	      "Final summary should match the last captured generation summary for this configuration");
+  expect_true(result.generationSummaries.back().leastFit == result.finalSummary.leastFit,
+	      "Final least-fit summary should match the last captured generation summary");
+}
+
+void test_population_run_output_contains_progress_and_final_summary()
+{
+  DefaultHookPopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+  CaptureStderr capture;
+  pop.run();
+  std::string output = capture.str();
+
+  expect_true(output.find("Generation 0 Number of Evaluations 12") != std::string::npos,
+	      "run should print per-run generation progress");
+  expect_true(output.find("Chromosome:") != std::string::npos,
+	      "run should print chromosome summaries through FitnessPrint");
+  expect_true(output.find("1.000000") != std::string::npos || output.find("0.000000") != std::string::npos,
+	      "run should print final summary fitness values");
+}
+
+void test_population_default_operator_hooks_are_explicitly_exercised()
+{
+  DefaultHookPopulation pop(make_population_options(Population::OperationMode::Maximize, 4, 4, 6, 1.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+
+  std::unique_ptr<Chromosome> initial = pop.createInitialChromosome();
+  expect_true(initial.get() != NULL, "Default createInitialChromosome should produce a chromosome");
+  expect_true(initial->ChromosomeLen() == pop.configuration().geneticDiversity,
+	      "Default createInitialChromosome should use the configured diversity as chromosome length");
+  for (int i = 0 ; i < initial->ChromosomeLen() ; i++)
+    {
+      int value = initial->ChromosomeStr()->test(i);
+      expect_true(value == 0 || value == 1,
+		  "Default createInitialChromosome should respect the configured base state range");
+    }
+
+  std::unique_ptr<Chromosome> mother(new Chromosome(makeBinaryString("111100")));
+  std::unique_ptr<Chromosome> father(new Chromosome(makeBinaryString("000011")));
+  std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+    pop.mateChromosomes(mother.get(), father.get());
+
+  expect_true(children.first.get() != NULL && children.second.get() != NULL,
+	      "Default mateChromosomes should produce two children");
+  expect_true(children.first->compare(father.get()),
+	      "Default mateChromosomes should clone the father into the first child when crossover is disabled");
+  expect_true(children.second->compare(mother.get()),
+	      "Default mateChromosomes should clone the mother into the second child when crossover is disabled");
+
+  pop.mutateChromosome(children.first.get());
+  for (int i = 0 ; i < children.first->ChromosomeLen() ; i++)
+    {
+      int value = children.first->ChromosomeStr()->test(i);
+      expect_true(value == 0 || value == 1,
+		  "Default mutateChromosome should keep binary genes in range");
+    }
+}
+
 void test_delete_all_but_best_runs()
 {
   InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 20, 1, 0.0, 0.0,
@@ -1165,6 +1350,9 @@ int main()
   test_population_verbose_minimize_path();
   test_population_run_modes();
   test_population_execute_returns_structured_result();
+  test_population_execute_result_contents_are_consistent();
+  test_population_run_output_contains_progress_and_final_summary();
+  test_population_default_operator_hooks_are_explicitly_exercised();
   test_delete_all_but_best_runs();
 
   if (g_failures != 0)
