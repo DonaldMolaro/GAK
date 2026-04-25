@@ -139,7 +139,7 @@ double SudokuConstrained::evaluateFitness(const BaseString& genes)
 
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
-      if (rowIsValidPermutation(&genes, row))
+      if (rowIsValidPermutation(genes, row))
       {
          score += kBoardSize;
       }
@@ -186,26 +186,26 @@ void SudokuConstrained::printCandidate(const BaseString& genes, std::ostream& ou
    }
 }
 
-std::unique_ptr<BaseString> SudokuConstrained::cloneBoard(const BaseString *source) const
+BaseString SudokuConstrained::cloneBoard(const BaseString& source) const
 {
-   std::unique_ptr<BaseString> clone = std::make_unique<BaseString>(kCellCount, kBoardSize);
+   BaseString clone(kCellCount, kBoardSize);
    for ( int cell = 0 ; cell < kCellCount ; cell++ )
    {
-      clone->set(cell, source->test(cell));
+      clone.set(cell, source.test(cell));
    }
    return clone;
 }
 
-void SudokuConstrained::fillRowFromParent(BaseString *destination, const BaseString *source, int row) const
+void SudokuConstrained::fillRowFromParent(BaseString& destination, const BaseString& source, int row) const
 {
    const int rowStart = row * kBoardSize;
    for ( int column = 0 ; column < kBoardSize ; column++ )
    {
-      destination->set(rowStart + column, source->test(rowStart + column));
+      destination.set(rowStart + column, source.test(rowStart + column));
    }
 }
 
-void SudokuConstrained::initializeRow(BaseString *board, int row)
+void SudokuConstrained::initializeRow(BaseString& board, int row)
 {
    const int rowStart = row * kBoardSize;
    for ( int column = 0 ; column < kBoardSize ; column++ )
@@ -213,7 +213,7 @@ void SudokuConstrained::initializeRow(BaseString *board, int row)
       const int given = kPuzzle[rowStart + column];
       if (given != 0)
       {
-         board->set(rowStart + column, given - 1);
+         board.set(rowStart + column, given - 1);
       }
    }
 
@@ -221,17 +221,17 @@ void SudokuConstrained::initializeRow(BaseString *board, int row)
    std::shuffle(digits.begin(), digits.end(), randomGenerator_);
    for ( int i = 0 ; i < static_cast<int>(mutableColumnsByRow_[row].size()) ; i++ )
    {
-      board->set(rowStart + mutableColumnsByRow_[row][i], digits[i]);
+      board.set(rowStart + mutableColumnsByRow_[row][i], digits[i]);
    }
 }
 
-bool SudokuConstrained::rowIsValidPermutation(const BaseString *board, int row) const
+bool SudokuConstrained::rowIsValidPermutation(const BaseString& board, int row) const
 {
    std::vector<int> seen(kBoardSize, 0);
    const int rowStart = row * kBoardSize;
    for ( int column = 0 ; column < kBoardSize ; column++ )
    {
-      const int value = board->test(rowStart + column);
+      const int value = board.test(rowStart + column);
       if (value < 0 || value >= kBoardSize || seen[value])
       {
          return false;
@@ -243,10 +243,10 @@ bool SudokuConstrained::rowIsValidPermutation(const BaseString *board, int row) 
 
 std::unique_ptr<Chromosome> SudokuConstrained::createInitialChromosome()
 {
-   std::unique_ptr<BaseString> board = std::make_unique<BaseString>(kCellCount, kBoardSize);
+   BaseString board(kCellCount, kBoardSize);
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
-      initializeRow(board.get(), row);
+      initializeRow(board, row);
    }
    return std::make_unique<Chromosome>(std::move(board),
                                        settings().variableLength == Population::VariableLengthMode::Variable,
@@ -262,22 +262,22 @@ SudokuConstrained::mateChromosomes(Chromosome& mother, Chromosome& father)
    if (probability(randomGenerator_) >= settings().crossOverRate)
    {
       return std::make_pair(
-         std::make_unique<Chromosome>(cloneBoard(&mother.genes()),
+         std::make_unique<Chromosome>(cloneBoard(mother.genes()),
                                       settings().variableLength == Population::VariableLengthMode::Variable,
                                       settings().baseStates),
-         std::make_unique<Chromosome>(cloneBoard(&father.genes()),
+         std::make_unique<Chromosome>(cloneBoard(father.genes()),
                                       settings().variableLength == Population::VariableLengthMode::Variable,
                                       settings().baseStates));
    }
 
-   std::unique_ptr<BaseString> first = std::make_unique<BaseString>(kCellCount, kBoardSize);
-   std::unique_ptr<BaseString> second = std::make_unique<BaseString>(kCellCount, kBoardSize);
+   BaseString first(kCellCount, kBoardSize);
+   BaseString second(kCellCount, kBoardSize);
 
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
       const bool useMotherForFirst = parent_choice(randomGenerator_) == 0;
-      fillRowFromParent(first.get(), useMotherForFirst ? &mother.genes() : &father.genes(), row);
-      fillRowFromParent(second.get(), useMotherForFirst ? &father.genes() : &mother.genes(), row);
+      fillRowFromParent(first, useMotherForFirst ? mother.genes() : father.genes(), row);
+      fillRowFromParent(second, useMotherForFirst ? father.genes() : mother.genes(), row);
    }
 
    return std::make_pair(

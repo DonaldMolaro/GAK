@@ -34,10 +34,10 @@ private:
    int uniquenessScoreForColumn(const BaseString& genes, int column) const;
    int uniquenessScoreForBox(const BaseString& genes, int boxRow, int boxColumn) const;
    int givenConsistencyScore(const BaseString& genes) const;
-   std::unique_ptr<BaseString> cloneBoard(const BaseString *source) const;
-   void fillRowFromParent(BaseString *destination, const BaseString *source, int row) const;
-   void initializeRow(BaseString *board, int row);
-   bool rowIsValidPermutation(const BaseString *board, int row) const;
+   BaseString cloneBoard(const BaseString& source) const;
+   void fillRowFromParent(BaseString& destination, const BaseString& source, int row) const;
+   void initializeRow(BaseString& board, int row);
+   bool rowIsValidPermutation(const BaseString& board, int row) const;
 
    std::vector<RowColumns> mutableColumnsByRow_;
    std::vector<std::vector<int> > missingDigitsByRow_;

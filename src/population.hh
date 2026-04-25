@@ -91,19 +91,18 @@ private:
    void reportRun(std::ostream& out, const RunResult& result, bool printGenerationSummaries);
    void printPopulationSummary(std::ostream& out, const PopulationSummary& summary);
    void printFinalSummary(std::ostream& out, const RunResult& result);
-   Chromosome *selectRandomParent(int *selected);
-   bool containsChromosome(const Chromosome *candidate,
+   int selectRandomParent();
+   bool containsChromosome(const Chromosome& candidate,
                            const std::vector<std::unique_ptr<Chromosome> >& population,
                            int populationLength) const;
    int randomIndex(int upperBoundExclusive);
    long randomBelow(long upperBoundExclusive);
    bool appendReplacement(std::vector<std::unique_ptr<Chromosome> >& replacementList,
-			  Chromosome *candidate,
-			  int& numberGenerated,
+			  std::unique_ptr<Chromosome> candidate,
 			  int numberToReplace,
 			  bool allowDuplicates);
-   double *selectFitnessWeights();
-   Chromosome *selectParent(int *selected,double *rouletteTable);
+   const std::vector<double>& selectFitnessWeights();
+   int selectParent(const std::vector<double>& rouletteTable);
    std::vector<std::unique_ptr<Chromosome> > breedPopulation(int numberToReplace);
    //
    //

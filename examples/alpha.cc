@@ -3,7 +3,6 @@
 #include <iostream>
 #include <memory>
 #include <random>
-#include <ctime>
 #include "base.hh"
 #include "chromosome.hh"
 #include "population.hh"
@@ -82,33 +81,33 @@ void Alpha::printCandidate(const BaseString& genes, std::ostream& out)
 
 int Alpha::RandomAlgorithm()
 {
-   std::mt19937 generator(static_cast<unsigned int>(std::time(NULL)));
+   std::mt19937 generator(randomSeed());
    std::uniform_int_distribution<int> value_distribution(0, 12);
    std::uniform_int_distribution<int> index_distribution(0, 12);
-   std::unique_ptr<BaseString> current = std::make_unique<BaseString>(13,13);
-   std::unique_ptr<BaseString> next = std::make_unique<BaseString>(13,13);
+   BaseString current(13,13);
+   BaseString next(13,13);
    for ( int i = 0 ; i < 13 ; i++ )
    {
-      current->set(i,value_distribution(generator));
+      current.set(i,value_distribution(generator));
    }
-   int fitness = evaluateFitness(*current);
+   int fitness = evaluateFitness(current);
    int iter = 0;
    while (fitness < 650)
    {
       for ( int i = 0 ; i < 13 ; i++ )
       {
-	 next->set(i,current->test(i));
+	 next.set(i,current.test(i));
       }
       int index = index_distribution(generator);
       int value = value_distribution(generator);
-      next->set(index,value);
-      int nextFit = evaluateFitness(*next);
+      next.set(index,value);
+      int nextFit = evaluateFitness(next);
       if (nextFit > fitness)
       {
-	 current = std::move(next);
-	 next = std::make_unique<BaseString>(13,13);
+	 current = next;
+	 next = BaseString(13,13);
 	 fitness = nextFit;
-	 printCandidate(*current, std::cerr);
+	 printCandidate(current, std::cerr);
 	 std::cerr << "Iteration " << iter << " New Fitness " << fitness << '\n';
       }
       if (( iter % 1000 ) == 0)

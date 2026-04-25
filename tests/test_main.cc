@@ -55,7 +55,7 @@ public:
     fflush(stderr);
     saved_fd_ = dup(fileno(stderr));
     null_ = fopen("/dev/null","w");
-    if (saved_fd_ >= 0 && null_ != NULL)
+    if (saved_fd_ >= 0 && null_ != nullptr)
       {
         dup2(fileno(null_), fileno(stderr));
       }
@@ -69,7 +69,7 @@ public:
         dup2(saved_fd_, fileno(stderr));
         close(saved_fd_);
       }
-    if (null_ != NULL)
+    if (null_ != nullptr)
       {
         fclose(null_);
       }
@@ -89,7 +89,7 @@ public:
   {
     fflush(stderr);
     saved_fd_ = dup(fileno(stderr));
-    if (saved_fd_ >= 0 && capture_ != NULL)
+    if (saved_fd_ >= 0 && capture_ != nullptr)
       {
         dup2(fileno(capture_), fileno(stderr));
       }
@@ -103,7 +103,7 @@ public:
         dup2(saved_fd_, fileno(stderr));
         close(saved_fd_);
       }
-    if (capture_ != NULL)
+    if (capture_ != nullptr)
       {
         fclose(capture_);
       }
@@ -111,7 +111,7 @@ public:
 
   std::string str()
   {
-    if (capture_ == NULL)
+    if (capture_ == nullptr)
       {
         return "";
       }
@@ -122,7 +122,7 @@ public:
 
     std::string output;
     char buffer[256];
-    while (fgets(buffer, sizeof(buffer), capture_) != NULL)
+    while (fgets(buffer, sizeof(buffer), capture_) != nullptr)
       {
         output += buffer;
       }
@@ -139,13 +139,13 @@ private:
   FILE *capture_;
 };
 
-BaseString *makeBinaryString(const std::string& bits)
+BaseString makeBinaryString(const std::string& bits)
 {
-  BaseString *b = new BaseString(bits.length(), 2);
+  BaseString b(bits.length(), 2);
   for (int i = 0 ; i < (int)bits.length() ; i++)
     {
-      if (bits[i] == '1') b->set(i);
-      else b->clear(i);
+      if (bits[i] == '1') b.set(i);
+      else b.clear(i);
     }
   return b;
 }
@@ -391,8 +391,8 @@ void test_exception_helpers()
 void test_mutation_rate_zero_preserves_chromosome()
 {
   std::mt19937 random_generator(1);
-  Chromosome chromosome(std::unique_ptr<BaseString>(makeBinaryString("10101100")));
-  Chromosome original(std::unique_ptr<BaseString>(makeBinaryString("10101100")));
+  Chromosome chromosome(makeBinaryString("10101100"));
+  Chromosome original(makeBinaryString("10101100"));
 
   chromosome.mutate(0.0, &random_generator);
 
@@ -410,8 +410,8 @@ void test_chromosome_constructor_and_compare_paths()
     },
     "Overlong chromosome constructor should throw");
 
-  Chromosome left(std::unique_ptr<BaseString>(makeBinaryString("1010")));
-  Chromosome right(std::unique_ptr<BaseString>(makeBinaryString("0101")));
+  Chromosome left(makeBinaryString("1010"));
+  Chromosome right(makeBinaryString("0101"));
   Chromosome symbolic(5, 0, 4, &random_generator);
   expect_true(!left.equals(right), "equals should return false for different chromosomes");
   expect_true(!left.equals(symbolic), "equals should return false for mismatched lengths");
@@ -430,7 +430,7 @@ void test_invalid_mutation_probability_throws()
 {
   SilentStderr silence;
   std::mt19937 random_generator(3);
-  Chromosome chromosome(std::unique_ptr<BaseString>(makeBinaryString("10101100")));
+  Chromosome chromosome(makeBinaryString("10101100"));
 
   expect_throws<GANonFatalException>(
     [&chromosome, &random_generator]() { chromosome.mutate(2.0, &random_generator); },
@@ -440,7 +440,7 @@ void test_invalid_mutation_probability_throws()
 void test_non_binary_mutation_with_probability_one_stays_in_range()
 {
   std::mt19937 random_generator(4);
-  Chromosome chromosome(std::make_unique<BaseString>(5, 4), 0, 4);
+  Chromosome chromosome(BaseString(5, 4), 0, 4);
   chromosome.mutate(1.0, &random_generator);
 
   for (int i = 0 ; i < chromosome.length() ; i++)
@@ -453,7 +453,7 @@ void test_non_binary_mutation_with_probability_one_stays_in_range()
 void test_binary_mutation_with_probability_one_changes_only_bits()
 {
   std::mt19937 random_generator(5);
-  Chromosome chromosome(std::unique_ptr<BaseString>(makeBinaryString("000000")));
+  Chromosome chromosome(makeBinaryString("000000"));
   chromosome.mutate(1.0, &random_generator);
 
   for (int i = 0 ; i < chromosome.length() ; i++)
@@ -466,8 +466,8 @@ void test_binary_mutation_with_probability_one_changes_only_bits()
 void test_mate_without_crossover_clones_parents()
 {
   std::mt19937 random_generator(6);
-  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("11110000")));
-  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("00001111")));
+  Chromosome mother(makeBinaryString("11110000"));
+  Chromosome father(makeBinaryString("00001111"));
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
     mother.mate(father, 0.0, Chromosome::CrossoverType::SinglePoint, &random_generator);
 
@@ -480,8 +480,8 @@ void test_mate_without_crossover_clones_parents()
 void test_uniform_crossover_is_reachable_and_safe()
 {
   std::mt19937 random_generator(7);
-  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("11110000")));
-  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("00001111")));
+  Chromosome mother(makeBinaryString("11110000"));
+  Chromosome father(makeBinaryString("00001111"));
 
   for (int i = 0 ; i < 20 ; i++)
     {
@@ -500,8 +500,8 @@ void test_uniform_crossover_is_reachable_and_safe()
 void test_two_point_crossover_is_reachable_and_safe()
 {
   std::mt19937 random_generator(8);
-  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("11110000")));
-  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("00001111")));
+  Chromosome mother(makeBinaryString("11110000"));
+  Chromosome father(makeBinaryString("00001111"));
 
   for (int i = 0 ; i < 20 ; i++)
     {
@@ -521,8 +521,8 @@ void test_mate_rejects_mismatched_fixed_lengths()
 {
   SilentStderr silence;
   std::mt19937 random_generator(9);
-  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("1111")));
-  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("00001111")));
+  Chromosome mother(makeBinaryString("1111"));
+  Chromosome father(makeBinaryString("00001111"));
 
   expect_throws<GAFatalException>(
     [&mother, &father, &random_generator]() {
@@ -534,8 +534,8 @@ void test_mate_rejects_mismatched_fixed_lengths()
 void test_variable_length_mating_supports_different_lengths()
 {
   std::mt19937 random_generator(10);
-  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("1111")), 1, 2);
-  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("000011")), 1, 2);
+  Chromosome mother(makeBinaryString("1111"), 1, 2);
+  Chromosome father(makeBinaryString("000011"), 1, 2);
 
   for (int i = 0 ; i < 20 ; i++)
     {
@@ -552,8 +552,8 @@ void test_variable_length_mating_supports_different_lengths()
 void test_variable_length_uniform_crossover()
 {
   std::mt19937 random_generator(11);
-  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("1111")), 1, 2);
-  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("000011")), 1, 2);
+  Chromosome mother(makeBinaryString("1111"), 1, 2);
+  Chromosome father(makeBinaryString("000011"), 1, 2);
 
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
     mother.mate(father, 1.0, Chromosome::CrossoverType::Uniform, &random_generator);
@@ -568,8 +568,8 @@ void test_variable_length_uniform_crossover()
 void test_variable_length_uniform_crossover_with_longer_mother()
 {
   std::mt19937 random_generator(13);
-  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("111100")), 1, 2);
-  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("0000")), 1, 2);
+  Chromosome mother(makeBinaryString("111100"), 1, 2);
+  Chromosome father(makeBinaryString("0000"), 1, 2);
 
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
     mother.mate(father, 1.0, Chromosome::CrossoverType::Uniform, &random_generator);
@@ -585,8 +585,8 @@ void test_invalid_crossover_type_throws()
 {
   SilentStderr silence;
   std::mt19937 random_generator(12);
-  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("1111")));
-  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("0000")));
+  Chromosome mother(makeBinaryString("1111"));
+  Chromosome father(makeBinaryString("0000"));
 
   expect_throws<GANonFatalException>(
     [&mother, &father, &random_generator]() {
@@ -653,11 +653,9 @@ void test_population_zero_total_selection_falls_back_to_uniform()
 						    Population::FitnessMode::Evaluation,
 						    Population::VariableLengthMode::Fixed, 2));
   pop.initializePopulation();
-  double roulette[2] = {0.0, 0.0};
-  int selected = -1;
+  std::vector<double> roulette(2, 0.0);
+  const int selected = pop.selectParent(roulette);
 
-  expect_true(pop.selectParent(&selected, roulette) != 0,
-	      "Roulette selection should fall back to uniform choice when all weights are zero");
   expect_true(selected >= 0 && selected < pop.settings().numberOfIndividuals,
 	      "Uniform fallback selection should still return an in-range index");
 }
@@ -675,7 +673,7 @@ void test_windowed_fitness_is_positive_for_maximize()
   pop.initializePopulation();
   for (int i = 0 ; i < 3 ; i++)
     {
-      pop.populationTable[i].reset(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString(i == 0 ? "0" : "1"))));
+      pop.populationTable[i] = std::make_unique<Chromosome>(makeBinaryString(i == 0 ? "0" : "1"));
       pop.fitnessTable[i] = -1.0;
     }
   pop.populationInitialized = true;
@@ -700,7 +698,7 @@ void test_windowed_fitness_is_positive_for_minimize()
   pop.initializePopulation();
   for (int i = 0 ; i < 3 ; i++)
     {
-      pop.populationTable[i].reset(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString(i == 0 ? "0" : "1"))));
+      pop.populationTable[i] = std::make_unique<Chromosome>(makeBinaryString(i == 0 ? "0" : "1"));
       pop.fitnessTable[i] = -1.0;
     }
   pop.populationInitialized = true;
@@ -733,11 +731,11 @@ void test_fitness_table_selection()
 							   Population::FitnessMode::LinearNormalized,
 							   Population::VariableLengthMode::Fixed, 2));
 
-  expect_true(evaluation.selectFitnessWeights() == evaluation.fitnessTable.data(),
+  expect_true(&evaluation.selectFitnessWeights() == &evaluation.fitnessTable,
 	      "FitnessIsEvaluation should select the raw fitness table");
-  expect_true(windowed.selectFitnessWeights() == windowed.windowedFitnessTable.data(),
+  expect_true(&windowed.selectFitnessWeights() == &windowed.windowedFitnessTable,
 	      "WindowedFitness should select the windowed fitness table");
-  expect_true(normalized.selectFitnessWeights() == normalized.linearNormalizedfitnessTable.data(),
+  expect_true(&normalized.selectFitnessWeights() == &normalized.linearNormalizedfitnessTable,
 	      "LinearNormalizedFitness should select the normalized fitness table");
 }
 
@@ -745,8 +743,8 @@ void prepare_population(InspectablePopulation& pop, const std::string& first_bit
 			const std::string& second_bits)
 {
   pop.initializePopulation();
-  pop.populationTable[0].reset(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString(first_bits))));
-  pop.populationTable[1].reset(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString(second_bits))));
+  pop.populationTable[0] = std::make_unique<Chromosome>(makeBinaryString(first_bits));
+  pop.populationTable[1] = std::make_unique<Chromosome>(makeBinaryString(second_bits));
   for (int i = 0 ; i < pop.settings().numberOfIndividuals ; i++)
     {
       pop.fitnessTable[i] = -1.0;
@@ -766,8 +764,8 @@ void test_population_selection_and_replacement_branches()
 							Population::FitnessMode::Evaluation,
 							Population::VariableLengthMode::Fixed, 2));
   prepare_population(min_pop, "1111", "0000");
-  int selected = -1;
-  Chromosome *chosen = min_pop.selectParent(&selected, min_pop.selectFitnessWeights());
+  int selected = min_pop.selectParent(min_pop.selectFitnessWeights());
+  Chromosome *chosen = min_pop.populationTable[selected].get();
   expect_true(chosen != 0, "Minimize roulette selection should return a chromosome");
   expect_true(selected >= 0 && selected < min_pop.settings().numberOfIndividuals,
 	      "Minimize roulette selection should produce an in-range index");
@@ -781,12 +779,12 @@ void test_population_selection_and_replacement_branches()
   prepare_population(dup_not_allowed, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > bred = dup_not_allowed.breedPopulation(1);
   expect_true(bred.size() == 1, "DuplicatesNotAllowed breeding should still generate requested children");
-  expect_true(dup_not_allowed.containsChromosome(bred[0].get(), bred, 1),
+  expect_true(dup_not_allowed.containsChromosome(*bred[0], bred, 1),
 	      "containsChromosome should report a present chromosome");
 
   std::vector<std::unique_ptr<Chromosome> > replacements_max;
-  replacements_max.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1111"))));
-  replacements_max.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0000"))));
+  replacements_max.push_back(std::make_unique<Chromosome>(makeBinaryString("1111")));
+  replacements_max.push_back(std::make_unique<Chromosome>(makeBinaryString("0000")));
   int replaced_max = dup_not_allowed.insertNewPopulation(std::move(replacements_max), 2);
   expect_true(replaced_max >= 0, "insertNewPopulation should handle duplicates-not-allowed maximize path");
 
@@ -798,8 +796,8 @@ void test_population_selection_and_replacement_branches()
 								    Population::VariableLengthMode::Fixed, 2));
   prepare_population(dup_not_allowed_min, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > replacements_min;
-  replacements_min.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1111"))));
-  replacements_min.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0000"))));
+  replacements_min.push_back(std::make_unique<Chromosome>(makeBinaryString("1111")));
+  replacements_min.push_back(std::make_unique<Chromosome>(makeBinaryString("0000")));
   int replaced_min = dup_not_allowed_min.insertNewPopulation(std::move(replacements_min), 2);
   expect_true(replaced_min >= 0, "insertNewPopulation should handle duplicates-not-allowed minimize path");
 
@@ -811,8 +809,8 @@ void test_population_selection_and_replacement_branches()
 								    Population::VariableLengthMode::Fixed, 2));
   prepare_population(dup_not_allowed_new, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > replacements_new;
-  replacements_new.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0011"))));
-  replacements_new.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1100"))));
+  replacements_new.push_back(std::make_unique<Chromosome>(makeBinaryString("0011")));
+  replacements_new.push_back(std::make_unique<Chromosome>(makeBinaryString("1100")));
   int replaced_new = dup_not_allowed_new.insertNewPopulation(std::move(replacements_new), 2);
   expect_true(replaced_new > 0, "Duplicates-not-allowed maximize path should insert new chromosomes");
 
@@ -824,8 +822,8 @@ void test_population_selection_and_replacement_branches()
 										Population::VariableLengthMode::Fixed, 2));
   prepare_population(dup_not_allowed_new_min, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > replacements_new_min;
-  replacements_new_min.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0011"))));
-  replacements_new_min.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1100"))));
+  replacements_new_min.push_back(std::make_unique<Chromosome>(makeBinaryString("0011")));
+  replacements_new_min.push_back(std::make_unique<Chromosome>(makeBinaryString("1100")));
   int replaced_new_min = dup_not_allowed_new_min.insertNewPopulation(std::move(replacements_new_min), 2);
   expect_true(replaced_new_min > 0, "Duplicates-not-allowed minimize path should insert new chromosomes");
 
@@ -842,24 +840,22 @@ void test_population_append_replacement_helper()
 						    Population::VariableLengthMode::Fixed, 2));
 
   std::vector<std::unique_ptr<Chromosome> > replacement_list;
-  int generated = 0;
-
   expect_true(pop.appendReplacement(replacement_list,
-				    new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("1111"))),
-				    generated, 2, false),
+				    std::make_unique<Chromosome>(makeBinaryString("1111")),
+				    2, false),
 	      "appendReplacement should keep the first unique child");
   expect_true(!pop.appendReplacement(replacement_list,
-				     new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("1111"))),
-				     generated, 2, false),
+				     std::make_unique<Chromosome>(makeBinaryString("1111")),
+				     2, false),
 	      "appendReplacement should reject duplicate unique-only children");
   expect_true(pop.appendReplacement(replacement_list,
-				    new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("0000"))),
-				    generated, 2, false),
+				    std::make_unique<Chromosome>(makeBinaryString("0000")),
+				    2, false),
 	      "appendReplacement should keep a second unique child");
   expect_true(!pop.appendReplacement(replacement_list,
-				     new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("0011"))),
-				     generated, 2, true),
-	      "appendReplacement should delete overflow children when the replacement list is full");
+				     std::make_unique<Chromosome>(makeBinaryString("0011")),
+				     2, true),
+	      "appendReplacement should reject overflow children when the replacement list is full");
 }
 
 void test_population_insert_new_population_rejects_overflow()
@@ -874,9 +870,9 @@ void test_population_insert_new_population_rejects_overflow()
   prepare_population(pop, "1111", "0000");
 
   std::vector<std::unique_ptr<Chromosome> > replacements;
-  replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0011"))));
-  replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1100"))));
-  replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0101"))));
+  replacements.push_back(std::make_unique<Chromosome>(makeBinaryString("0011")));
+  replacements.push_back(std::make_unique<Chromosome>(makeBinaryString("1100")));
+  replacements.push_back(std::make_unique<Chromosome>(makeBinaryString("0101")));
 
   expect_throws<GAFatalException>(
     [&pop, &replacements]() mutable {
@@ -896,10 +892,9 @@ void test_population_selection_guard_and_random_fitness_modes()
 							   Population::FitnessMode::Evaluation,
 							   Population::VariableLengthMode::Fixed, 2));
   fractional.initializePopulation();
-  int selected = -1;
-  double roulette[2] = {0.4, 0.4};
+  std::vector<double> roulette(2, 0.4);
   expect_throws<GAFatalException>(
-    [&fractional, &selected, &roulette]() { fractional.selectParent(&selected, roulette); },
+    [&fractional, &roulette]() { fractional.selectParent(roulette); },
     "Roulette selection should throw when rounded weights produce an invalid index");
 
   InspectablePopulation windowed(make_population_options(Population::OperationMode::Maximize, 4, 4, 1, 0.0, 0.0,
@@ -909,9 +904,9 @@ void test_population_selection_guard_and_random_fitness_modes()
 							 Population::FitnessMode::Windowed,
 							 Population::VariableLengthMode::Fixed, 2));
   prepare_population(windowed, "1", "0");
-  selected = -1;
-  expect_true(windowed.selectParent(&selected, windowed.selectFitnessWeights()) != 0,
-	      "Windowed fitness selection should return a chromosome");
+  int selected = windowed.selectParent(windowed.selectFitnessWeights());
+  expect_true(selected >= 0 && selected < windowed.settings().numberOfIndividuals,
+	      "Windowed fitness selection should return an in-range parent index");
 
   InspectablePopulation normalized(make_population_options(Population::OperationMode::Maximize, 4, 4, 1, 0.0, 0.0,
 							   Population::ReproductionMode::AllowDuplicates,
@@ -920,9 +915,9 @@ void test_population_selection_guard_and_random_fitness_modes()
 							   Population::FitnessMode::LinearNormalized,
 							   Population::VariableLengthMode::Fixed, 2));
   prepare_population(normalized, "1", "0");
-  selected = -1;
-  expect_true(normalized.selectParent(&selected, normalized.selectFitnessWeights()) != 0,
-	      "Linear normalized fitness selection should return a chromosome");
+  selected = normalized.selectParent(normalized.selectFitnessWeights());
+  expect_true(selected >= 0 && selected < normalized.settings().numberOfIndividuals,
+	      "Linear normalized fitness selection should return an in-range parent index");
 
   InspectablePopulation random_selection(make_population_options(Population::OperationMode::Maximize, 2, 4, 4, 0.0, 0.0,
 								 Population::ReproductionMode::AllowDuplicates,
@@ -984,13 +979,12 @@ void test_population_invalid_enum_paths()
   bad_operation.settings_.operation = static_cast<Population::OperationMode>(99);
   expect_throws<GAFatalException>(
     [&bad_operation]() {
-      int selected = -1;
-      bad_operation.selectParent(&selected, bad_operation.selectFitnessWeights());
+      bad_operation.selectParent(bad_operation.selectFitnessWeights());
     },
     "Unsupported operation technique in selection should throw");
 
   std::vector<std::unique_ptr<Chromosome> > replacements;
-  replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1111"))));
+  replacements.push_back(std::make_unique<Chromosome>(makeBinaryString("1111")));
   expect_throws<GAFatalException>(
     [&bad_operation, &replacements]() mutable {
       bad_operation.insertNewPopulation(std::move(replacements), 1);
@@ -1006,7 +1000,7 @@ void test_population_invalid_enum_paths()
   prepare_population(bad_operation_dup, "1111", "0000");
   bad_operation_dup.settings_.operation = static_cast<Population::OperationMode>(99);
   std::vector<std::unique_ptr<Chromosome> > dup_replacements;
-  dup_replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0011"))));
+  dup_replacements.push_back(std::make_unique<Chromosome>(makeBinaryString("0011")));
   expect_throws<GAFatalException>(
     [&bad_operation_dup, &dup_replacements]() mutable {
       bad_operation_dup.insertNewPopulation(std::move(dup_replacements), 1);
@@ -1224,7 +1218,7 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
 						    Population::VariableLengthMode::Fixed, 2));
 
   std::unique_ptr<Chromosome> initial = pop.createInitialChromosome();
-  expect_true(initial.get() != NULL, "Default createInitialChromosome should produce a chromosome");
+  expect_true(initial.get() != nullptr, "Default createInitialChromosome should produce a chromosome");
   expect_true(initial->length() == pop.settings().geneticDiversity,
 	      "Default createInitialChromosome should use the configured diversity as chromosome length");
   for (int i = 0 ; i < initial->length() ; i++)
@@ -1234,12 +1228,12 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
 		  "Default createInitialChromosome should respect the configured base state range");
     }
 
-  std::unique_ptr<Chromosome> mother(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("111100"))));
-  std::unique_ptr<Chromosome> father(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("000011"))));
+  std::unique_ptr<Chromosome> mother = std::make_unique<Chromosome>(makeBinaryString("111100"));
+  std::unique_ptr<Chromosome> father = std::make_unique<Chromosome>(makeBinaryString("000011"));
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
     pop.mateChromosomes(*mother, *father);
 
-  expect_true(children.first.get() != NULL && children.second.get() != NULL,
+  expect_true(children.first.get() != nullptr && children.second.get() != nullptr,
 	      "Default mateChromosomes should produce two children");
   expect_true(children.first->equals(*father),
 	      "Default mateChromosomes should clone the father into the first child when crossover is disabled");

@@ -36,7 +36,7 @@ namespace
 {
 bool IsVerboseEnabled()
 {
-   return std::getenv("GAK_VERBOSE") != NULL;
+   return std::getenv("GAK_VERBOSE") != nullptr;
 }
 }
 
@@ -200,10 +200,9 @@ void Population::printFinalSummary(std::ostream& out, const RunResult& result)
    }
 }
 
-Chromosome *Population::selectRandomParent(int *selected)
+int Population::selectRandomParent()
 {
-   *selected = randomIndex(settings_.numberOfIndividuals);
-   return populationTable[*selected].get();
+   return randomIndex(settings_.numberOfIndividuals);
 }
 
 int Population::randomIndex(int upperBoundExclusive)
@@ -229,25 +228,26 @@ long Population::randomBelow(long upperBoundExclusive)
 }
 
 bool Population::appendReplacement(std::vector<std::unique_ptr<Chromosome> >& replacementList,
-                                   Chromosome *candidate,
-                                   int& numberGenerated,
+                                   std::unique_ptr<Chromosome> candidate,
                                    int numberToReplace,
                                    bool allowDuplicates)
 {
-   if (!allowDuplicates && containsChromosome(candidate,replacementList,numberGenerated))
+   if (!candidate)
    {
-      delete candidate;
       return false;
    }
 
-   if (numberGenerated < numberToReplace)
+   if (!allowDuplicates && containsChromosome(*candidate,replacementList,static_cast<int>(replacementList.size())))
    {
-      replacementList.push_back(std::unique_ptr<Chromosome>(candidate));
-      numberGenerated++;
+      return false;
+   }
+
+   if (static_cast<int>(replacementList.size()) < numberToReplace)
+   {
+      replacementList.push_back(std::move(candidate));
       return true;
    }
 
-   delete candidate;
    return false;
 }
 
@@ -384,12 +384,12 @@ void Population::evaluatePopulation()
 // Select a parrent based upon the total Fitness of the
 // population.
 //
-Chromosome *Population::selectParent(int *selected,double *rouletteTable)
+int Population::selectParent(const std::vector<double>& rouletteTable)
 {
   double totalFitness = 0;
   double maximumFitness;
   maximumFitness = 0;
-  *selected = -1;
+  int selected = -1;
    
   for ( int i = 0 ; i < settings_.numberOfIndividuals ; i++ )
     {
@@ -413,47 +413,45 @@ Chromosome *Population::selectParent(int *selected,double *rouletteTable)
      case Population::OperationMode::Maximize:
        if (totalFitness <= 0.0)
        {
-          *selected = randomIndex(settings_.numberOfIndividuals);
-          return populationTable[*selected].get();
+          return randomIndex(settings_.numberOfIndividuals);
        }
        selectValue = randomBelow(static_cast<long int>(std::rint(totalFitness)));
        while (selectValue >= 0)
 	 {
-	   selectValue -= static_cast<long int>(std::rint(rouletteTable[++(*selected)]));
+	   selectValue -= static_cast<long int>(std::rint(rouletteTable[++selected]));
 	 }
        break;
      case Population::OperationMode::Minimize:
        if (invertedTotalFitness <= 0.0)
        {
-          *selected = randomIndex(settings_.numberOfIndividuals);
-          return populationTable[*selected].get();
+          return randomIndex(settings_.numberOfIndividuals);
        }
        selectValue = randomBelow(static_cast<long int>(std::rint(invertedTotalFitness)));
        while (selectValue >= 0)
 	 {
-	   selectValue -= static_cast<long int>(std::rint(invertedrouletteTable[++(*selected)]));
+	   selectValue -= static_cast<long int>(std::rint(invertedrouletteTable[++selected]));
 	 }
        break;
      default:
        throw GAFatalException(__FILE__,__LINE__,"Unsupported operation technique");
      }
-   if (*selected < 0 || *selected >= settings_.numberOfIndividuals)
+   if (selected < 0 || selected >= settings_.numberOfIndividuals)
    {
       throw GAFatalException(__FILE__,__LINE__,"Roulette selection produced an invalid index");
    }
-   return populationTable[*selected].get();
+   return selected;
 }
 
-double *Population::selectFitnessWeights()
+const std::vector<double>& Population::selectFitnessWeights()
 {
    switch (settings_.fitness)
    {
    case Population::FitnessMode::Evaluation:
-      return fitnessTable.data();
+      return fitnessTable;
    case Population::FitnessMode::Windowed:
-      return windowedFitnessTable.data();
+      return windowedFitnessTable;
    case Population::FitnessMode::LinearNormalized:
-      return linearNormalizedfitnessTable.data();
+      return linearNormalizedfitnessTable;
    default:
       throw GAFatalException(__FILE__,__LINE__,"Unsupported fitness technique");
    }
@@ -470,22 +468,21 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
 #ifdef VVERBOSE
 	    fprintf(stderr,"Adding to replacement list.. duplicates %s permitted\n",settings_.reproduction == Population::ReproductionMode::DisallowDuplicates ? "NOT" : "");
 #endif 
-  int numberGenerated = 0;
   switch (settings_.parentSelection)
    {
    case Population::ParentSelectionMode::RouletteWheel:
    case Population::ParentSelectionMode::Random:
-      while (numberGenerated < numberToReplace)
+      while (static_cast<int>(replacementList.size()) < numberToReplace)
       {
-	 int selected = -1;
-	 Chromosome *father = (settings_.parentSelection == Population::ParentSelectionMode::RouletteWheel)
-	    ? selectParent(&selected,selectFitnessWeights())
-	    : selectRandomParent(&selected);
-	 Chromosome *mother = (settings_.parentSelection == Population::ParentSelectionMode::RouletteWheel)
-	    ? selectParent(&selected,selectFitnessWeights())
-	    : selectRandomParent(&selected);
+	 const std::vector<double>& fitnessWeights = selectFitnessWeights();
+	 const int fatherIndex = (settings_.parentSelection == Population::ParentSelectionMode::RouletteWheel)
+	    ? selectParent(fitnessWeights)
+	    : selectRandomParent();
+	 const int motherIndex = (settings_.parentSelection == Population::ParentSelectionMode::RouletteWheel)
+	    ? selectParent(fitnessWeights)
+	    : selectRandomParent();
          std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-            mateChromosomes(*mother, *father);
+            mateChromosomes(*populationTable[motherIndex], *populationTable[fatherIndex]);
          mutateChromosome(*children.first);
          mutateChromosome(*children.second);
 	 //
@@ -496,20 +493,20 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
 	 switch (settings_.reproduction)
 	 {
 	 case Population::ReproductionMode::AllowDuplicates:
-	    appendReplacement(replacementList,children.first.release(),numberGenerated,numberToReplace,true);
+	    appendReplacement(replacementList,std::move(children.first),numberToReplace,true);
 	    //
 	    // Keep the daugter if necessary to complete the
 	    // replacement for the next generation.
 	    //
-	    appendReplacement(replacementList,children.second.release(),numberGenerated,numberToReplace,true);
+	    appendReplacement(replacementList,std::move(children.second),numberToReplace,true);
 	    break;
 	 case Population::ReproductionMode::DisallowDuplicates:
-	    appendReplacement(replacementList,children.first.release(),numberGenerated,numberToReplace,false);
+	    appendReplacement(replacementList,std::move(children.first),numberToReplace,false);
 	    //
 	    // Keep the daugter if necessary to complete the
 	    // replacement for the next generation.
 	    //
-	    appendReplacement(replacementList,children.second.release(),numberGenerated,numberToReplace,false);
+	    appendReplacement(replacementList,std::move(children.second),numberToReplace,false);
 	    break;
 	 }
       }
@@ -539,13 +536,13 @@ void Population::mutateChromosome(Chromosome& chromosome)
    chromosome.mutate(settings_.bitMutationRate, &randomGenerator);
 }
 
-bool Population::containsChromosome(const Chromosome *candidate,
+bool Population::containsChromosome(const Chromosome& candidate,
                                     const std::vector<std::unique_ptr<Chromosome> >& pop,
                                     int populationLength) const
 {
    for ( int i = 0 ; i < populationLength ; i++ )
    {
-      if (candidate->equals(*pop[i]))
+      if (candidate.equals(*pop[i]))
       {
 	 return true;
       }
@@ -575,7 +572,7 @@ int Population::insertNewPopulation(std::vector<std::unique_ptr<Chromosome> > re
    {
       const int index = replacementSlotIndex(i);
       if (settings_.reproduction == Population::ReproductionMode::DisallowDuplicates &&
-          containsChromosome(replacementList[i].get(),populationTable,settings_.numberOfIndividuals))
+          containsChromosome(*replacementList[i],populationTable,settings_.numberOfIndividuals))
       {
          continue;
       }
