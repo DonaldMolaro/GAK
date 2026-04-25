@@ -1,16 +1,4 @@
-//
-// Genetic Algorithm Implementation.
-//
-// Author:
-//        Donald Molaro
-//
-// Genesis:        Sept 1994
-//
-// Changed from a bitstring class to an symbolic
-// class.
-//
-#ifndef __GA_Base_hh__
-#define __GA_Base_hh__
+#pragma once
 
 #include <iosfwd>
 #include <string>
@@ -63,5 +51,3 @@ public:
   void clearBitForTesting(int i) { clearBit(i); }
 #endif
 };
-
-#endif

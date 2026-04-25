@@ -1,8 +1,7 @@
-#ifndef __GA_Genetic_hh__
-#define __GA_Genetic_hh__
+#pragma once
+
 
 #include "base.hh"
 #include "chromosome.hh"
 #include "population.hh"
 
-#endif

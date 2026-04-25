@@ -1,5 +1,5 @@
-#ifndef __GA_Population_hh__
-#define __GA_Population_hh__
+#pragma once
+
 #include <cstddef>
 #include <iosfwd>
 #include <memory>
@@ -177,4 +177,3 @@ public:
    // Compatibility wrapper around `execute()` that prints progress/summaries.
    void run();
 };
-#endif

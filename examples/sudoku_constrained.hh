@@ -1,5 +1,5 @@
-#ifndef __GA_SudokuConstrained_hh__
-#define __GA_SudokuConstrained_hh__
+#pragma once
+
 
 #include <random>
 #include <iosfwd>
@@ -42,4 +42,3 @@ private:
    std::vector<std::vector<int> > missingDigitsByRow_;
 };
 
-#endif

@@ -1,5 +1,5 @@
-#ifndef __GA_Alpha_hh__
-#define __GA_Alpha_hh__
+#pragma once
+
 #include "population.hh"
 
 class Alpha : public Population
@@ -12,4 +12,3 @@ public:
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
    int RandomAlgorithm();
 };
-#endif

@@ -1,5 +1,5 @@
-#ifndef __GA_Dome_hh__
-#define __GA_Dome_hh__
+#pragma once
+
 #include "population.hh"
 
 class Dome : public Population
@@ -11,4 +11,3 @@ public:
    double evaluateFitness(const BaseString& genes) override;
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
 };
-#endif

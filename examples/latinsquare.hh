@@ -1,5 +1,5 @@
-#ifndef __GA_LatinSquare_hh__
-#define __GA_LatinSquare_hh__
+#pragma once
+
 
 #include "population.hh"
 
@@ -15,4 +15,3 @@ private:
    int squareSize(const BaseString& genes) const;
 };
 
-#endif

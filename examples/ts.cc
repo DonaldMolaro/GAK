@@ -1,15 +1,4 @@
-/*
- * Traveling salesman problem solved with a high order GA.
- * Donald Molaro - Copyright 1997.
- *
- * file            ts.cc
- *
- * Implements the virtual functions required for a complete population object.
- * required functions are the fitness function, which tells how well a particular
- * chromosome string will work & the fitness print function which can print out 
- * a chromosome string.
- *
- */
+// Traveling salesman example built on the GA population engine.
 #include <cstdio>
 #include <cmath>
 #include <iostream>

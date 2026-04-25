@@ -1,5 +1,5 @@
-#if !defined(EXCEPT_H)
-#define EXCEPT_H
+#pragma once
+
 
 #include <iosfwd>
 #include <string>
@@ -46,4 +46,3 @@ class GANonFatalException : public GAException
     GAException(file,line,reason) {}
 };
 
-#endif

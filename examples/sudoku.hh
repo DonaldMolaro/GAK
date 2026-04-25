@@ -1,5 +1,5 @@
-#ifndef __GA_Sudoku_hh__
-#define __GA_Sudoku_hh__
+#pragma once
+
 
 #include <iosfwd>
 
@@ -26,4 +26,3 @@ private:
    int givenConsistencyScore(const BaseString& genes) const;
 };
 
-#endif

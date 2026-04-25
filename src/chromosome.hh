@@ -1,13 +1,5 @@
-//
-// Genetic Algorithm Implementation.
-//
-// Author:
-//        Donald Molaro
-//
-// Genesis:        Sept 1994
-//
-#ifndef __GA_Chromosome_hh__
-#define __GA_Chromosome_hh__
+#pragma once
+
 #include "base.hh"
 
 #include <iosfwd>
@@ -65,4 +57,3 @@ public:
   bool equals(const Chromosome& candidate) const;
   void print(std::ostream &ostr) const     { genes().printBits(ostr); ostr << '\n'; }
 };
-#endif

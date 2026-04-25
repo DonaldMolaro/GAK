@@ -1,16 +1,7 @@
-/*
- * Traveling salesman problem solved with a high order GA.
- * Donald Molaro - Copyright 1997.
- * Image Integration Inc.
- *
- * file            ts.hh
- *
- * Implements the traveling salesman class, with an inheritance to
- * the population object.
- */
+#pragma once
 
-#ifndef __GA_TS_hh__
-#define __GA_TS_hh__
+// Traveling salesman example built on the GA population engine.
+
 #include "population.hh"
 #include <random>
 #include <utility>
@@ -37,4 +28,3 @@ private:
    std::vector<int> yCoordinates;
    std::mt19937 randomGenerator;
 };
-#endif

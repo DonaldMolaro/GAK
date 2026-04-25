@@ -1,5 +1,5 @@
-#ifndef __GA_NQueens_hh__
-#define __GA_NQueens_hh__
+#pragma once
+
 
 #include "population.hh"
 
@@ -12,4 +12,3 @@ public:
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
 };
 
-#endif

@@ -1,5 +1,5 @@
-#ifndef __GA_Knapsack_hh__
-#define __GA_Knapsack_hh__
+#pragma once
+
 
 #include <vector>
 
@@ -20,4 +20,3 @@ private:
    static const int kValues[kItemCount];
 };
 
-#endif
