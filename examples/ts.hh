@@ -40,8 +40,8 @@ public:
       int gridS = 0
       );
   
-   double FitnessFunction(BaseString *b) override;
-   void FitnessPrint(BaseString *b) override;
+   double FitnessFunction(const BaseString& b) override;
+   void FitnessPrint(const BaseString& b) override;
 private:
    using Coordinate = std::pair<int, int>;
 

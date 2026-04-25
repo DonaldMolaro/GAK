@@ -48,7 +48,7 @@ Alpha::Alpha(
 {
 }
 
-double Alpha::FitnessFunction(BaseString *b)
+double Alpha::FitnessFunction(const BaseString& b)
 {
    //
    // Fitness is the total squared distance that each 
@@ -67,18 +67,18 @@ double Alpha::FitnessFunction(BaseString *b)
       }
    }
 #else
-   for ( int i = 0 ; i < b->length() ; i++ )
+   for ( int i = 0 ; i < b.length() ; i++ )
    {
-      for ( int j = i ; j < b->length() ; j++ )
+      for ( int j = i ; j < b.length() ; j++ )
       {
-	 if (b->test(i) < b->test(j)) res++;
+	 if (b.test(i) < b.test(j)) res++;
       }
    }
-   for ( int i = b->length()-1 ; i >= 0; i-- )
+   for ( int i = b.length()-1 ; i >= 0; i-- )
    {
       for ( int j = i ; j >= 0 ; j-- )
       {
-	 if (b->test(i) > b->test(j)) res++;
+	 if (b.test(i) > b.test(j)) res++;
       }
    }
 /*
@@ -103,13 +103,13 @@ double Alpha::FitnessFunction(BaseString *b)
 };
 
 
-void Alpha::FitnessPrint(BaseString *b)
+void Alpha::FitnessPrint(const BaseString& b)
 {
-   for ( int i = 0 ; i < b->length() ; i++ )
+   for ( int i = 0 ; i < b.length() ; i++ )
    {
 //      assert(b->test(i) >= 0);
 //      assert(b->test(i) < 26);
-      fprintf(stderr,"%c",b->test(i) + 'a');
+      fprintf(stderr,"%c",b.test(i) + 'a');
    }
    fprintf(stderr," ::");
 }
@@ -125,7 +125,7 @@ int Alpha::RandomAlgorithim()
    {
       current->set(i,value_distribution(generator));
    }
-   int fitness = FitnessFunction(current.get());
+   int fitness = FitnessFunction(*current);
    int iter = 0;
    while (fitness < 650)
    {
@@ -136,13 +136,13 @@ int Alpha::RandomAlgorithim()
       int index = index_distribution(generator);
       int value = value_distribution(generator);
       next->set(index,value);
-      int nextFit = FitnessFunction(next.get());
+      int nextFit = FitnessFunction(*next);
       if (nextFit > fitness)
       {
 	 current = std::move(next);
 	 next = std::make_unique<BaseString>(13,13);
 	 fitness = nextFit;
-	 FitnessPrint(current.get());
+	 FitnessPrint(*current);
 	 fprintf(stderr,"Iteration %d New Fitness %d\n",iter,fitness);
       }
       if (( iter % 1000 ) == 0)

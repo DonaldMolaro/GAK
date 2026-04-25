@@ -217,12 +217,12 @@ public:
   {
   }
 
-  double FitnessFunction(BaseString *b) override
+  double FitnessFunction(const BaseString& b) override
   {
-    return b->test(0);
+    return b.test(0);
   }
 
-  void FitnessPrint(BaseString *) override
+  void FitnessPrint(const BaseString&) override
   {
   }
 };
@@ -239,14 +239,14 @@ public:
   using Population::mateChromosomes;
   using Population::mutateChromosome;
 
-  double FitnessFunction(BaseString *b) override
+  double FitnessFunction(const BaseString& b) override
   {
-    return b->test(0);
+    return b.test(0);
   }
 
-  void FitnessPrint(BaseString *b) override
+  void FitnessPrint(const BaseString& b) override
   {
-    std::fprintf(stderr, "Chromosome:%d\n", b->test(0));
+    std::fprintf(stderr, "Chromosome:%d\n", b.test(0));
   }
 };
 
@@ -710,7 +710,7 @@ void test_population_decode()
   bits.set(2);
   bits.set(3);
 
-  expect_true(pop.decode(&bits, 0, 4) == 11, "Decode should interpret bits in big-endian order");
+  expect_true(pop.decode(bits, 0, 4) == 11, "Decode should interpret bits in big-endian order");
 }
 
 void test_population_random_helpers()

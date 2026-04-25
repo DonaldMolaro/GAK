@@ -167,7 +167,7 @@ void test_dome_fitness()
                          Population::VariableLengthMode::Fixed, 2));
   BaseString *origin = makeBinaryString(std::string(32, '0'));
 
-  expect_true(dome.FitnessFunction(origin) == 100,
+  expect_true(dome.FitnessFunction(*origin) == 100,
               "Dome fitness at the origin should be 100");
 
   delete origin;
@@ -179,7 +179,7 @@ void test_f6_fitness_is_positive()
   F6 f6(make_options(Population::OperationMode::Maximize, 44,
                      Population::VariableLengthMode::Fixed, 2));
   BaseString *origin = makeBinaryString(std::string(44, '0'));
-  const double fitness = f6.FitnessFunction(origin);
+  const double fitness = f6.FitnessFunction(*origin);
 
   expect_true(fitness >= 1.0, "F6 fitness should stay positive");
 
@@ -194,9 +194,9 @@ void test_spell_fitness_matches_target_word()
   BaseString *target = makeSymbolicString("egghead");
   BaseString *wrong = makeSymbolicString("aaaaaaa");
 
-  expect_true(spell.FitnessFunction(target) == 7,
+  expect_true(spell.FitnessFunction(*target) == 7,
               "Spell fitness should reward the target word");
-  expect_true(spell.FitnessFunction(wrong) < spell.FitnessFunction(target),
+  expect_true(spell.FitnessFunction(*wrong) < spell.FitnessFunction(*target),
               "Spell fitness should rank the target word above a wrong word");
 
   delete target;
@@ -216,7 +216,7 @@ void test_alpha_prefers_sorted_alphabet()
       reversed->set(i, 12 - i);
     }
 
-  expect_true(alpha.FitnessFunction(sorted) > alpha.FitnessFunction(reversed),
+  expect_true(alpha.FitnessFunction(*sorted) > alpha.FitnessFunction(*reversed),
               "Alpha fitness should prefer sorted sequences");
 
   delete sorted;
@@ -254,7 +254,7 @@ void test_traveling_salesman_construction_and_validation()
     {
       route.set(i, i);
     }
-  expect_true(tsp.FitnessFunction(&route) > 0.0,
+  expect_true(tsp.FitnessFunction(route) > 0.0,
               "TravelingSalesman route fitness should be positive");
 
   expect_throws<GAFatalException>(
@@ -264,6 +264,23 @@ void test_traveling_salesman_construction_and_validation()
                                                 Population::VariableLengthMode::Variable, 5), 2);
     },
     "TravelingSalesman should reject grids that cannot hold unique cities");
+}
+
+void test_traveling_salesman_fixed_seed_is_reproducible()
+{
+  SilentOutput silence;
+  Population::Options options = make_options(Population::OperationMode::Minimize, 5,
+                                             Population::VariableLengthMode::Variable, 5);
+  options.useFixedRandomSeed = true;
+  options.randomSeed = 314159U;
+
+  TravelingSalesman first(options, 10);
+  TravelingSalesman second(options, 10);
+
+  expect_true(first.xCoordinates == second.xCoordinates,
+              "TravelingSalesman should generate the same X coordinates for a fixed seed");
+  expect_true(first.yCoordinates == second.yCoordinates,
+              "TravelingSalesman should generate the same Y coordinates for a fixed seed");
 }
 
 void test_nqueens_rewards_non_attacking_layouts()
@@ -281,9 +298,9 @@ void test_nqueens_rewards_non_attacking_layouts()
       bad->set(i, 0);
     }
 
-  expect_true(queens.FitnessFunction(solution) == 28,
+  expect_true(queens.FitnessFunction(*solution) == 28,
               "NQueens should score a solved 8-queen layout with all non-attacking pairs");
-  expect_true(queens.FitnessFunction(solution) > queens.FitnessFunction(bad),
+  expect_true(queens.FitnessFunction(*solution) > queens.FitnessFunction(*bad),
               "NQueens should rank a solved layout above a conflicting one");
 
   delete solution;
@@ -299,9 +316,9 @@ void test_knapsack_prefers_feasible_high_value_selections()
   BaseString *feasible = makeBinaryString("111101100000");
   BaseString *overweight = makeBinaryString("111111111111");
 
-  expect_true(knapsack.FitnessFunction(feasible) > 0.0,
+  expect_true(knapsack.FitnessFunction(*feasible) > 0.0,
               "Knapsack should assign positive fitness to a feasible selection");
-  expect_true(knapsack.FitnessFunction(feasible) > knapsack.FitnessFunction(overweight),
+  expect_true(knapsack.FitnessFunction(*feasible) > knapsack.FitnessFunction(*overweight),
               "Knapsack should penalize overweight selections");
 
   delete feasible;
@@ -328,9 +345,9 @@ void test_latin_square_rewards_unique_rows_and_columns()
       bad->set(i, 0);
     }
 
-  expect_true(latin_square.FitnessFunction(solution) == 32,
+  expect_true(latin_square.FitnessFunction(*solution) == 32,
               "LatinSquare should score a solved 4x4 latin square at the maximum");
-  expect_true(latin_square.FitnessFunction(solution) > latin_square.FitnessFunction(bad),
+  expect_true(latin_square.FitnessFunction(*solution) > latin_square.FitnessFunction(*bad),
               "LatinSquare should rank a solved square above a degenerate one");
 
   delete solution;
@@ -382,9 +399,9 @@ void test_sudoku_rewards_valid_solution_and_givens()
       bad->set(i, 0);
     }
 
-  expect_true(sudoku.FitnessFunction(solution) == 513,
+  expect_true(sudoku.FitnessFunction(*solution) == 513,
               "Sudoku should score a solved board at the maximum");
-  expect_true(sudoku.FitnessFunction(solution) > sudoku.FitnessFunction(bad),
+  expect_true(sudoku.FitnessFunction(*solution) > sudoku.FitnessFunction(*bad),
               "Sudoku should rank a valid solved board above a degenerate one");
 
   delete solution;
@@ -513,6 +530,23 @@ void test_constrained_sudoku_run_path()
               "Constrained Sudoku execute should complete a run without throwing");
 }
 
+void test_constrained_sudoku_fixed_seed_is_reproducible()
+{
+  SilentOutput silence;
+  Population::Options options = make_options(Population::OperationMode::Maximize, 81,
+                                             Population::VariableLengthMode::Fixed, 9);
+  options.useFixedRandomSeed = true;
+  options.randomSeed = 271828U;
+
+  InspectableSudokuConstrained first(options);
+  InspectableSudokuConstrained second(options);
+  std::unique_ptr<Chromosome> first_board = first.createInitialChromosome();
+  std::unique_ptr<Chromosome> second_board = second.createInitialChromosome();
+
+  expect_true(first_board->compare(second_board.get()),
+              "Constrained Sudoku should generate the same initial chromosome for a fixed seed");
+}
+
 }  // namespace
 
 int main()
@@ -522,6 +556,7 @@ int main()
   test_spell_fitness_matches_target_word();
   test_alpha_prefers_sorted_alphabet();
   test_traveling_salesman_construction_and_validation();
+  test_traveling_salesman_fixed_seed_is_reproducible();
   test_nqueens_rewards_non_attacking_layouts();
   test_knapsack_prefers_feasible_high_value_selections();
   test_latin_square_rewards_unique_rows_and_columns();
@@ -530,6 +565,7 @@ int main()
   test_sudoku_run_path();
   test_constrained_sudoku_preserves_row_structure_and_givens();
   test_constrained_sudoku_run_path();
+  test_constrained_sudoku_fixed_seed_is_reproducible();
 
   if (g_failures != 0)
     {

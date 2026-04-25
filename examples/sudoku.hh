@@ -24,8 +24,8 @@ public:
       int baseStates
       );
 
-   double FitnessFunction(BaseString *b) override;
-   void FitnessPrint(BaseString *b) override;
+   double FitnessFunction(const BaseString& b) override;
+   void FitnessPrint(const BaseString& b) override;
 
 private:
    static const int kBoardSize = 9;
@@ -34,10 +34,10 @@ private:
    static const int kPuzzle[kCellCount];
 
    void validateConfiguration(const Population::Configuration& configuration) const;
-   int uniquenessScoreForRow(BaseString *b, int row) const;
-   int uniquenessScoreForColumn(BaseString *b, int column) const;
-   int uniquenessScoreForBox(BaseString *b, int boxRow, int boxColumn) const;
-   int givenConsistencyScore(BaseString *b) const;
+   int uniquenessScoreForRow(const BaseString& b, int row) const;
+   int uniquenessScoreForColumn(const BaseString& b, int column) const;
+   int uniquenessScoreForBox(const BaseString& b, int boxRow, int boxColumn) const;
+   int givenConsistencyScore(const BaseString& b) const;
 };
 
 #endif

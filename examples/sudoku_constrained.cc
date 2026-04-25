@@ -30,9 +30,7 @@ SudokuConstrained::SudokuConstrained(const Population::Configuration& configurat
    : Population(configuration)
 {
    validateConfiguration(configuration);
-   std::time_t currenttime;
-   std::time(&currenttime);
-   randomGenerator_.seed(static_cast<unsigned int>(currenttime));
+   randomGenerator_.seed(randomSeed());
 
    mutableColumnsByRow_.resize(kBoardSize);
    missingDigitsByRow_.resize(kBoardSize);
@@ -105,13 +103,13 @@ void SudokuConstrained::validateConfiguration(const Population::Configuration& c
    }
 }
 
-int SudokuConstrained::uniquenessScoreForColumn(BaseString *b, int column) const
+int SudokuConstrained::uniquenessScoreForColumn(const BaseString& b, int column) const
 {
    std::vector<int> seen(kBoardSize, 0);
    int score = 0;
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
-      const int value = b->test((row * kBoardSize) + column);
+      const int value = b.test((row * kBoardSize) + column);
       if (value < 0 || value >= kBoardSize)
       {
          throw GAFatalException(__FILE__,__LINE__,"SudokuConstrained encountered an out-of-range symbol");
@@ -125,7 +123,7 @@ int SudokuConstrained::uniquenessScoreForColumn(BaseString *b, int column) const
    return score;
 }
 
-int SudokuConstrained::uniquenessScoreForBox(BaseString *b, int boxRow, int boxColumn) const
+int SudokuConstrained::uniquenessScoreForBox(const BaseString& b, int boxRow, int boxColumn) const
 {
    std::vector<int> seen(kBoardSize, 0);
    int score = 0;
@@ -135,7 +133,7 @@ int SudokuConstrained::uniquenessScoreForBox(BaseString *b, int boxRow, int boxC
       {
          const int row = (boxRow * kSubgridSize) + rowOffset;
          const int column = (boxColumn * kSubgridSize) + columnOffset;
-         const int value = b->test((row * kBoardSize) + column);
+         const int value = b.test((row * kBoardSize) + column);
          if (value < 0 || value >= kBoardSize)
          {
             throw GAFatalException(__FILE__,__LINE__,"SudokuConstrained encountered an out-of-range symbol");
@@ -150,7 +148,7 @@ int SudokuConstrained::uniquenessScoreForBox(BaseString *b, int boxRow, int boxC
    return score;
 }
 
-int SudokuConstrained::givenConsistencyScore(BaseString *b) const
+int SudokuConstrained::givenConsistencyScore(const BaseString& b) const
 {
    int score = 0;
    for ( int cell = 0 ; cell < kCellCount ; cell++ )
@@ -160,7 +158,7 @@ int SudokuConstrained::givenConsistencyScore(BaseString *b) const
          continue;
       }
 
-      if ((b->test(cell) + 1) == kPuzzle[cell])
+      if ((b.test(cell) + 1) == kPuzzle[cell])
       {
          score += kBoardSize;
       }
@@ -168,13 +166,13 @@ int SudokuConstrained::givenConsistencyScore(BaseString *b) const
    return score;
 }
 
-double SudokuConstrained::FitnessFunction(BaseString *b)
+double SudokuConstrained::FitnessFunction(const BaseString& b)
 {
    int score = givenConsistencyScore(b);
 
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
-      if (rowIsValidPermutation(b, row))
+      if (rowIsValidPermutation(&b, row))
       {
          score += kBoardSize;
       }
@@ -196,14 +194,14 @@ double SudokuConstrained::FitnessFunction(BaseString *b)
    return score;
 }
 
-void SudokuConstrained::FitnessPrint(BaseString *b)
+void SudokuConstrained::FitnessPrint(const BaseString& b)
 {
    fprintf(stderr, "Constraint-aware Sudoku candidate:\n");
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
       for ( int column = 0 ; column < kBoardSize ; column++ )
       {
-         fprintf(stderr, "%d", b->test((row * kBoardSize) + column) + 1);
+         fprintf(stderr, "%d", b.test((row * kBoardSize) + column) + 1);
          if (column == 2 || column == 5)
          {
             fprintf(stderr, " | ");

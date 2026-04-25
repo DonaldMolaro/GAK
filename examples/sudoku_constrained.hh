@@ -28,8 +28,8 @@ public:
       int baseStates
       );
 
-   double FitnessFunction(BaseString *b) override;
-   void FitnessPrint(BaseString *b) override;
+   double FitnessFunction(const BaseString& b) override;
+   void FitnessPrint(const BaseString& b) override;
 
 protected:
    std::unique_ptr<Chromosome> createInitialChromosome() override;
@@ -46,9 +46,9 @@ private:
    using RowColumns = std::vector<int>;
 
    void validateConfiguration(const Population::Configuration& configuration) const;
-   int uniquenessScoreForColumn(BaseString *b, int column) const;
-   int uniquenessScoreForBox(BaseString *b, int boxRow, int boxColumn) const;
-   int givenConsistencyScore(BaseString *b) const;
+   int uniquenessScoreForColumn(const BaseString& b, int column) const;
+   int uniquenessScoreForBox(const BaseString& b, int boxRow, int boxColumn) const;
+   int givenConsistencyScore(const BaseString& b) const;
    std::unique_ptr<BaseString> cloneBoard(const BaseString *source) const;
    void fillRowFromParent(BaseString *destination, const BaseString *source, int row) const;
    void initializeRow(BaseString *board, int row);

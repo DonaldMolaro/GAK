@@ -170,14 +170,14 @@ public:
       int PbaseStates                          = 2);
    virtual ~Population();
    // Subclasses provide the problem-specific score for a chromosome.
-   virtual double FitnessFunction(BaseString *b)=0;
+   virtual double FitnessFunction(const BaseString& b)=0;
    // Subclasses provide a human-readable rendering of a chromosome.
-   virtual void FitnessPrint(BaseString *b)=0;
+   virtual void FitnessPrint(const BaseString& b)=0;
    const Configuration& configuration() const noexcept { return config_; }
    unsigned int randomSeed() const noexcept { return activeRandomSeed_; }
    void setRandomSeed(unsigned int seed);
    // Decode a contiguous range of genes as a base-2 integer.
-   int decode(BaseString *b,int start,int end);
+   int decode(const BaseString& b,int start,int end) const;
    // Run the GA silently and return a structured summary.
    [[nodiscard]] RunResult execute(bool captureGenerationSummaries = false);
    // Compatibility wrapper around `execute()` that prints progress/summaries.

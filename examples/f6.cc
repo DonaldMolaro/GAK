@@ -52,7 +52,7 @@ double F6::sqr(double x)
    return x * x;
 }
 
-double F6::FitnessFunction(BaseString *b)
+double F6::FitnessFunction(const BaseString& b)
 {
    double x1 = (double)decode(b,0,22);
    double y1 = (double)decode(b,22,44);
@@ -72,7 +72,7 @@ double F6::FitnessFunction(BaseString *b)
 
 }
 
-void F6::FitnessPrint(BaseString *b)
+void F6::FitnessPrint(const BaseString& b)
 {
    double x1 = (double)decode(b,0,22);
    double y1 = (double)decode(b,22,44);
@@ -83,7 +83,6 @@ void F6::FitnessPrint(BaseString *b)
    
    fprintf(stderr,"X ( %3.8f ) Y ( %3.8f ) ",x3,y3);
 }
-
 
 
 

@@ -71,13 +71,13 @@ void Sudoku::validateConfiguration(const Population::Configuration& configuratio
    }
 }
 
-int Sudoku::uniquenessScoreForRow(BaseString *b, int row) const
+int Sudoku::uniquenessScoreForRow(const BaseString& b, int row) const
 {
    std::vector<int> seen(kBoardSize, 0);
    int score = 0;
    for ( int column = 0 ; column < kBoardSize ; column++ )
    {
-      const int value = b->test((row * kBoardSize) + column);
+      const int value = b.test((row * kBoardSize) + column);
       if (value < 0 || value >= kBoardSize)
       {
          throw GAFatalException(__FILE__,__LINE__,"Sudoku encountered an out-of-range symbol");
@@ -91,13 +91,13 @@ int Sudoku::uniquenessScoreForRow(BaseString *b, int row) const
    return score;
 }
 
-int Sudoku::uniquenessScoreForColumn(BaseString *b, int column) const
+int Sudoku::uniquenessScoreForColumn(const BaseString& b, int column) const
 {
    std::vector<int> seen(kBoardSize, 0);
    int score = 0;
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
-      const int value = b->test((row * kBoardSize) + column);
+      const int value = b.test((row * kBoardSize) + column);
       if (value < 0 || value >= kBoardSize)
       {
          throw GAFatalException(__FILE__,__LINE__,"Sudoku encountered an out-of-range symbol");
@@ -111,7 +111,7 @@ int Sudoku::uniquenessScoreForColumn(BaseString *b, int column) const
    return score;
 }
 
-int Sudoku::uniquenessScoreForBox(BaseString *b, int boxRow, int boxColumn) const
+int Sudoku::uniquenessScoreForBox(const BaseString& b, int boxRow, int boxColumn) const
 {
    std::vector<int> seen(kBoardSize, 0);
    int score = 0;
@@ -121,7 +121,7 @@ int Sudoku::uniquenessScoreForBox(BaseString *b, int boxRow, int boxColumn) cons
       {
          const int row = (boxRow * kSubgridSize) + rowOffset;
          const int column = (boxColumn * kSubgridSize) + columnOffset;
-         const int value = b->test((row * kBoardSize) + column);
+         const int value = b.test((row * kBoardSize) + column);
          if (value < 0 || value >= kBoardSize)
          {
             throw GAFatalException(__FILE__,__LINE__,"Sudoku encountered an out-of-range symbol");
@@ -136,7 +136,7 @@ int Sudoku::uniquenessScoreForBox(BaseString *b, int boxRow, int boxColumn) cons
    return score;
 }
 
-int Sudoku::givenConsistencyScore(BaseString *b) const
+int Sudoku::givenConsistencyScore(const BaseString& b) const
 {
    int score = 0;
    for ( int cell = 0 ; cell < kCellCount ; cell++ )
@@ -146,7 +146,7 @@ int Sudoku::givenConsistencyScore(BaseString *b) const
          continue;
       }
 
-      if ((b->test(cell) + 1) == kPuzzle[cell])
+      if ((b.test(cell) + 1) == kPuzzle[cell])
       {
          score += kBoardSize;
       }
@@ -154,7 +154,7 @@ int Sudoku::givenConsistencyScore(BaseString *b) const
    return score;
 }
 
-double Sudoku::FitnessFunction(BaseString *b)
+double Sudoku::FitnessFunction(const BaseString& b)
 {
    int score = givenConsistencyScore(b);
 
@@ -179,14 +179,14 @@ double Sudoku::FitnessFunction(BaseString *b)
    return score;
 }
 
-void Sudoku::FitnessPrint(BaseString *b)
+void Sudoku::FitnessPrint(const BaseString& b)
 {
    fprintf(stderr, "Sudoku candidate:\n");
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
       for ( int column = 0 ; column < kBoardSize ; column++ )
       {
-         fprintf(stderr, "%d", b->test((row * kBoardSize) + column) + 1);
+         fprintf(stderr, "%d", b.test((row * kBoardSize) + column) + 1);
          if (column == 2 || column == 5)
          {
             fprintf(stderr, " | ");

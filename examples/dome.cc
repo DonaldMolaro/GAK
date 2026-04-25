@@ -53,7 +53,7 @@ double Dome::sqr(double x)
    return x * x;
 }
 
-double Dome::FitnessFunction(BaseString *b)
+double Dome::FitnessFunction(const BaseString& b)
 {
    int x1 = decode(b, 0,16);
    int y1 = decode(b,16,32);
@@ -65,7 +65,7 @@ double Dome::FitnessFunction(BaseString *b)
 };
 
 
-void Dome::FitnessPrint(BaseString *b)
+void Dome::FitnessPrint(const BaseString& b)
 {
    int x1 = decode(b,0,16);
    int y1 = decode(b,16,32);

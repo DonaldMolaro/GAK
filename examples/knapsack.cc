@@ -46,14 +46,14 @@ Knapsack::Knapsack(
 {
 }
 
-double Knapsack::FitnessFunction(BaseString *b)
+double Knapsack::FitnessFunction(const BaseString& b)
 {
    int weight = 0;
    int value = 0;
 
-   for ( int item = 0 ; item < b->length() ; item++ )
+   for ( int item = 0 ; item < b.length() ; item++ )
    {
-      if (b->test(item))
+      if (b.test(item))
       {
          weight += kWeights[item];
          value += kValues[item];
@@ -70,15 +70,15 @@ double Knapsack::FitnessFunction(BaseString *b)
    return value > penalty ? value - penalty : 0;
 }
 
-void Knapsack::FitnessPrint(BaseString *b)
+void Knapsack::FitnessPrint(const BaseString& b)
 {
    int weight = 0;
    int value = 0;
 
    fprintf(stderr, "Items:");
-   for ( int item = 0 ; item < b->length() ; item++ )
+   for ( int item = 0 ; item < b.length() ; item++ )
    {
-      if (b->test(item))
+      if (b.test(item))
       {
          fprintf(stderr, " %d", item);
          weight += kWeights[item];

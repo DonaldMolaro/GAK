@@ -53,9 +53,7 @@ TravelingSalesman::TravelingSalesman(const Population::Configuration& configurat
       throw GAFatalException(__FILE__,__LINE__,"TravelingSalesman grid is too small for unique city coordinates");
    }
 
-   std::time_t currenttime;
-   std::time(&currenttime);
-   randomGenerator.seed(static_cast<unsigned int>(currenttime));
+   randomGenerator.seed(randomSeed());
 
    initializeCityCoordinates();
 
@@ -97,22 +95,22 @@ TravelingSalesman::TravelingSalesman(
 {
 }
 
-double TravelingSalesman::FitnessFunction(BaseString *b)
+double TravelingSalesman::FitnessFunction(const BaseString& b)
 {
    const double PENALTYLENGTH = 250.0;
    std::vector<int> visited(numCities, 0);
 
    double length = 0.0;
 
-   for ( int i = 0 ; i < b->length()-1 ; i++ )
+   for ( int i = 0 ; i < b.length()-1 ; i++ )
    {
-      visited[b->test(i)] = 1;
-      visited[b->test(i+1)] = 1;
+      visited[b.test(i)] = 1;
+      visited[b.test(i+1)] = 1;
 
       double clength = 
 	 std::sqrt(
-	   Square(static_cast<double>(xCoordinates[b->test(i)]) - static_cast<double>(xCoordinates[b->test(i+1)]))
-	    + Square(static_cast<double>(yCoordinates[b->test(i)]) - static_cast<double>(yCoordinates[b->test(i+1)]))
+	   Square(static_cast<double>(xCoordinates[b.test(i)]) - static_cast<double>(xCoordinates[b.test(i+1)]))
+	    + Square(static_cast<double>(yCoordinates[b.test(i)]) - static_cast<double>(yCoordinates[b.test(i+1)]))
 	    );
       
       if (clength == 0) clength = PENALTYLENGTH;
@@ -129,11 +127,11 @@ double TravelingSalesman::FitnessFunction(BaseString *b)
 }
 
 
-void TravelingSalesman::FitnessPrint(BaseString *b)
+void TravelingSalesman::FitnessPrint(const BaseString& b)
 {
-   for ( int i = 0 ; i < b->length() ; i++ )
+   for ( int i = 0 ; i < b.length() ; i++ )
    {
-      fprintf(stderr,"%c",b->test(i) + 'a');
+      fprintf(stderr,"%c",b.test(i) + 'a');
    }
    fprintf(stderr," ::");
 }

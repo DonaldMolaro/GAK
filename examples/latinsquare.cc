@@ -61,17 +61,17 @@ LatinSquare::LatinSquare(
 {
 }
 
-int LatinSquare::squareSize(const BaseString *b) const
+int LatinSquare::squareSize(const BaseString& b) const
 {
-   const int size = static_cast<int>(std::sqrt(static_cast<double>(b->length())));
-   if ((size * size) != b->length())
+   const int size = static_cast<int>(std::sqrt(static_cast<double>(b.length())));
+   if ((size * size) != b.length())
    {
       throw GAFatalException(__FILE__,__LINE__,"LatinSquare expects square chromosome instances");
    }
    return size;
 }
 
-double LatinSquare::FitnessFunction(BaseString *b)
+double LatinSquare::FitnessFunction(const BaseString& b)
 {
    const int size = squareSize(b);
    int score = 0;
@@ -81,7 +81,7 @@ double LatinSquare::FitnessFunction(BaseString *b)
       std::vector<int> seen(size, 0);
       for ( int column = 0 ; column < size ; column++ )
       {
-        const int value = b->test((row * size) + column);
+        const int value = b.test((row * size) + column);
          if (value < 0 || value >= size)
          {
             throw GAFatalException(__FILE__,__LINE__,"LatinSquare encountered an out-of-range symbol");
@@ -99,7 +99,7 @@ double LatinSquare::FitnessFunction(BaseString *b)
       std::vector<int> seen(size, 0);
       for ( int row = 0 ; row < size ; row++ )
       {
-        const int value = b->test((row * size) + column);
+        const int value = b.test((row * size) + column);
          if (value < 0 || value >= size)
          {
             throw GAFatalException(__FILE__,__LINE__,"LatinSquare encountered an out-of-range symbol");
@@ -115,7 +115,7 @@ double LatinSquare::FitnessFunction(BaseString *b)
    return score;
 }
 
-void LatinSquare::FitnessPrint(BaseString *b)
+void LatinSquare::FitnessPrint(const BaseString& b)
 {
    const int size = squareSize(b);
    fprintf(stderr, "Latin square (%dx%d):\n", size, size);
@@ -123,7 +123,7 @@ void LatinSquare::FitnessPrint(BaseString *b)
    {
       for ( int column = 0 ; column < size ; column++ )
       {
-         fprintf(stderr, "%d", b->test((row * size) + column));
+         fprintf(stderr, "%d", b.test((row * size) + column));
          if (column + 1 < size)
          {
             fprintf(stderr, " ");

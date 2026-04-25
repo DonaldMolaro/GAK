@@ -24,7 +24,7 @@ public:
       int baseStates
       );
   
-   double FitnessFunction(BaseString *b) override;
-   void FitnessPrint(BaseString *b) override;
+   double FitnessFunction(const BaseString& b) override;
+   void FitnessPrint(const BaseString& b) override;
 };
 #endif
