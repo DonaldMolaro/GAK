@@ -48,7 +48,7 @@ double LatinSquare::evaluateFitness(const BaseString& genes)
       std::vector<int> seen(size, 0);
       for ( int column = 0 ; column < size ; column++ )
       {
-        const int value = genes.test((row * size) + column);
+        const int value = genes.valueAt((row * size) + column);
          if (value < 0 || value >= size)
          {
             throw GAFatalException(__FILE__,__LINE__,"LatinSquare encountered an out-of-range symbol");
@@ -66,7 +66,7 @@ double LatinSquare::evaluateFitness(const BaseString& genes)
       std::vector<int> seen(size, 0);
       for ( int row = 0 ; row < size ; row++ )
       {
-        const int value = genes.test((row * size) + column);
+        const int value = genes.valueAt((row * size) + column);
          if (value < 0 || value >= size)
          {
             throw GAFatalException(__FILE__,__LINE__,"LatinSquare encountered an out-of-range symbol");
@@ -90,7 +90,7 @@ void LatinSquare::printCandidate(const BaseString& genes, std::ostream& out)
    {
       for ( int column = 0 ; column < size ; column++ )
       {
-         out << genes.test((row * size) + column);
+         out << genes.valueAt((row * size) + column);
          if (column + 1 < size)
          {
             out << ' ';

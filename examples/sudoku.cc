@@ -45,7 +45,7 @@ int Sudoku::uniquenessScoreForRow(const BaseString& genes, int row) const
    int score = 0;
    for ( int column = 0 ; column < kBoardSize ; column++ )
    {
-      const int value = genes.test((row * kBoardSize) + column);
+      const int value = genes.valueAt((row * kBoardSize) + column);
       if (value < 0 || value >= kBoardSize)
       {
          throw GAFatalException(__FILE__,__LINE__,"Sudoku encountered an out-of-range symbol");
@@ -65,7 +65,7 @@ int Sudoku::uniquenessScoreForColumn(const BaseString& genes, int column) const
    int score = 0;
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
-      const int value = genes.test((row * kBoardSize) + column);
+      const int value = genes.valueAt((row * kBoardSize) + column);
       if (value < 0 || value >= kBoardSize)
       {
          throw GAFatalException(__FILE__,__LINE__,"Sudoku encountered an out-of-range symbol");
@@ -89,7 +89,7 @@ int Sudoku::uniquenessScoreForBox(const BaseString& genes, int boxRow, int boxCo
       {
          const int row = (boxRow * kSubgridSize) + rowOffset;
          const int column = (boxColumn * kSubgridSize) + columnOffset;
-         const int value = genes.test((row * kBoardSize) + column);
+         const int value = genes.valueAt((row * kBoardSize) + column);
          if (value < 0 || value >= kBoardSize)
          {
             throw GAFatalException(__FILE__,__LINE__,"Sudoku encountered an out-of-range symbol");
@@ -114,7 +114,7 @@ int Sudoku::givenConsistencyScore(const BaseString& genes) const
          continue;
       }
 
-      if ((genes.test(cell) + 1) == kPuzzle[cell])
+      if ((genes.valueAt(cell) + 1) == kPuzzle[cell])
       {
          score += kBoardSize;
       }
@@ -154,7 +154,7 @@ void Sudoku::printCandidate(const BaseString& genes, std::ostream& out)
    {
       for ( int column = 0 ; column < kBoardSize ; column++ )
       {
-         out << (genes.test((row * kBoardSize) + column) + 1);
+         out << (genes.valueAt((row * kBoardSize) + column) + 1);
          if (column == 2 || column == 5)
          {
             out << " | ";

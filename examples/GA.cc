@@ -194,10 +194,6 @@ void usage(std::ostream& out)
 
 int main(int argc,char *argv[])
 {
-   //
-   // An example of algabraic optimization using
-   // a generic algorithim.
-   //
   if (argc != 2)
   {
     usage(std::cerr);
@@ -223,35 +219,20 @@ int main(int argc,char *argv[])
     case 'a':
       {
 	Alpha alpha(make_alpha_options());
-	//alpha.RandomAlgorithm();
 	alpha.run();
       }
       break;
     case 'S':
     case 's':
       {
-      //
-      // An example of symbolic optimization
-      // using variable length chromosomes.
-      //
 	Spell spell(make_spell_options());
 	spell.run();
       }
       break;
     case 'T':
     case 't':
-      /*
-       * Traveling salesman problem solved with a high order GA.
-       * Donald Molaro - Copyright 1997.
-       *
-       * Construts the population object, and set's it running.
-       *
-       */
       {
 	TravelingSalesman travelingSalesman(make_traveling_salesman_options(), 500);
-	//
-	// Let the population go.
-	//
 	travelingSalesman.run();
       }
       break;

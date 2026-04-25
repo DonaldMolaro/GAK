@@ -144,8 +144,8 @@ BaseString makeBinaryString(const std::string& bits)
   BaseString b(bits.length(), 2);
   for (int i = 0 ; i < (int)bits.length() ; i++)
     {
-      if (bits[i] == '1') b.set(i);
-      else b.clear(i);
+      if (bits[i] == '1') b.setValue(i);
+      else b.clearValue(i);
     }
   return b;
 }
@@ -173,7 +173,7 @@ public:
 
   double evaluateFitness(const BaseString& b) override
   {
-    return b.test(0);
+    return b.valueAt(0);
   }
 
   void printCandidate(const BaseString&, std::ostream&) override
@@ -195,12 +195,12 @@ public:
 
   double evaluateFitness(const BaseString& b) override
   {
-    return b.test(0);
+    return b.valueAt(0);
   }
 
   void printCandidate(const BaseString& b, std::ostream& out) override
   {
-    out << "Chromosome:" << b.test(0) << '\n';
+    out << "Chromosome:" << b.valueAt(0) << '\n';
   }
 };
 
@@ -236,33 +236,40 @@ Population::Settings make_population_options(Population::OperationMode operation
 void test_base_string()
 {
   BaseString binary(4, 2);
-  binary.clear(0);
-  binary.set(1);
-  binary.clear(2);
-  binary.set(3);
+  binary.clearValue(0);
+  binary.setValue(1);
+  binary.clearValue(2);
+  binary.setValue(3);
 
   expect_true(binary.length() == 4, "BaseString length should match constructor");
-  expect_true(binary.test(0) == 0, "Binary base 0 should be cleared");
-  expect_true(binary.test(1) == 1, "Binary base 1 should be set");
-  expect_true(binary.test(2) == 0, "Binary base 2 should be cleared");
-  expect_true(binary.test(3) == 1, "Binary base 3 should be set");
+  expect_true(binary.states() == 2, "BaseString should report its state count");
+  expect_true(binary.bitsPerValue() == 1, "Binary BaseString should use one bit per value");
+  expect_true(binary.bitCount() == 4, "Binary BaseString should report its packed bit length");
+  expect_true(binary.valueAt(0) == 0, "Binary base 0 should be cleared");
+  expect_true(binary.valueAt(1) == 1, "Binary base 1 should be set");
+  expect_true(binary.valueAt(2) == 0, "Binary base 2 should be cleared");
+  expect_true(binary.valueAt(3) == 1, "Binary base 3 should be set");
 
   BaseString symbolic(3, 5);
-  symbolic.set(0, 4);
-  symbolic.set(1, 2);
-  symbolic.clear(2);
+  symbolic.setValue(0, 4);
+  symbolic.setValue(1, 2);
+  symbolic.clearValue(2);
 
   BaseString byte_aligned(4, 4);
-  byte_aligned.set(0, 3);
-  byte_aligned.set(1, 2);
-  byte_aligned.set(2, 1);
-  byte_aligned.clear(3);
+  byte_aligned.setValue(0, 3);
+  byte_aligned.setValue(1, 2);
+  byte_aligned.setValue(2, 1);
+  byte_aligned.clearValue(3);
 
-  expect_true(symbolic.test(0) == 4, "Symbolic base should preserve assigned values");
-  expect_true(symbolic.test(1) == 2, "Symbolic base should preserve non-binary states");
-  expect_true(symbolic.test(2) == 0, "Clear should reset symbolic base to zero");
-  expect_true(byte_aligned.test(0) == 3, "Byte-aligned symbolic bases should store values correctly");
-  expect_true(byte_aligned.test(3) == 0, "Byte-aligned clear should preserve zero values");
+  expect_true(symbolic.valueAt(0) == 4, "Symbolic base should preserve assigned values");
+  expect_true(symbolic.valueAt(1) == 2, "Symbolic base should preserve non-binary states");
+  expect_true(symbolic.valueAt(2) == 0, "Clear should reset symbolic base to zero");
+  expect_true(byte_aligned.valueAt(0) == 3, "Byte-aligned symbolic bases should store values correctly");
+  expect_true(byte_aligned.valueAt(3) == 0, "Byte-aligned clear should preserve zero values");
+
+  symbolic.swapValues(0, 1);
+  expect_true(symbolic.valueAt(0) == 2 && symbolic.valueAt(1) == 4,
+              "swapValues should exchange symbolic gene values");
 }
 
 void test_population_options_round_trip()
@@ -326,13 +333,13 @@ void test_base_string_error_paths()
 
   BaseString binary(2, 2);
   expect_throws<GAFatalException>(
-    [&binary]() { binary.test(3); },
+    [&binary]() { binary.valueAt(3); },
     "Out-of-range test should throw");
   expect_throws<GAFatalException>(
-    [&binary]() { binary.set(3); },
+    [&binary]() { binary.setValue(3); },
     "Out-of-range set should throw");
   expect_throws<GAFatalException>(
-    [&binary]() { binary.clear(3); },
+    [&binary]() { binary.clearValue(3); },
     "Out-of-range clear should throw");
 
   expect_throws<GAFatalException>(
@@ -348,27 +355,34 @@ void test_base_string_error_paths()
 
 void test_base_string_print_helpers()
 {
+  SilentStderr silence;
   BaseString binary(4, 2);
-  binary.set(0);
-  binary.clear(1);
-  binary.set(2);
-  binary.clear(3);
+  binary.setValue(0);
+  binary.clearValue(1);
+  binary.setValue(2);
+  binary.clearValue(3);
 
   std::ostringstream bits_out;
   binary.printBits(bits_out);
   expect_true(bits_out.str() == "1010", "printBits should render the packed bit string");
+  expect_true(binary.bitString() == "1010", "bitString should return the packed bit representation");
 
   BaseString symbolic(3, 3);
-  symbolic.set(0, 0);
-  symbolic.set(1, 1);
-  symbolic.set(2, 2);
-  char zero[] = "a";
-  char one[] = "b";
-  char two[] = "c";
-  char *values[] = { zero, one, two };
+  symbolic.setValue(0, 0);
+  symbolic.setValue(1, 1);
+  symbolic.setValue(2, 2);
+  std::vector<std::string> values;
+  values.push_back("a");
+  values.push_back("b");
+  values.push_back("c");
   std::ostringstream text_out;
-  symbolic.print(values, text_out);
-  expect_true(text_out.str() == "abc", "print should render symbolic values");
+  symbolic.printSymbols(values, text_out);
+  expect_true(text_out.str() == "abc", "printSymbols should render symbolic values");
+
+  values.pop_back();
+  expect_throws<GAFatalException>(
+    [&symbolic, &values, &text_out]() { symbolic.printSymbols(values, text_out); },
+    "printSymbols should reject incomplete symbol tables");
 }
 
 void test_exception_helpers()
@@ -417,7 +431,7 @@ void test_chromosome_constructor_and_compare_paths()
   expect_true(!left.equals(symbolic), "equals should return false for mismatched lengths");
   for (int i = 0 ; i < symbolic.length() ; i++)
     {
-      int value = symbolic.genes().test(i);
+      int value = symbolic.genes().valueAt(i);
       expect_true(value >= 0 && value < 4, "Non-binary constructor should initialize values in range");
     }
 
@@ -445,7 +459,7 @@ void test_non_binary_mutation_with_probability_one_stays_in_range()
 
   for (int i = 0 ; i < chromosome.length() ; i++)
     {
-      int value = chromosome.genes().test(i);
+      int value = chromosome.genes().valueAt(i);
       expect_true(value >= 0 && value < 4, "Non-binary mutation should keep values within range");
     }
 }
@@ -458,7 +472,7 @@ void test_binary_mutation_with_probability_one_changes_only_bits()
 
   for (int i = 0 ; i < chromosome.length() ; i++)
     {
-      int value = chromosome.genes().test(i);
+      int value = chromosome.genes().valueAt(i);
       expect_true(value == 0 || value == 1, "Binary mutation should keep values binary");
     }
 }
@@ -605,10 +619,10 @@ void test_population_decode()
 						    Population::FitnessMode::Evaluation,
 						    Population::VariableLengthMode::Fixed, 2));
   BaseString bits(4, 2);
-  bits.set(0);
-  bits.clear(1);
-  bits.set(2);
-  bits.set(3);
+  bits.setValue(0);
+  bits.clearValue(1);
+  bits.setValue(2);
+  bits.setValue(3);
 
   expect_true(pop.decode(bits, 0, 4) == 11, "Decode should interpret bits in big-endian order");
 }
@@ -1223,7 +1237,7 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
 	      "Default createInitialChromosome should use the configured diversity as chromosome length");
   for (int i = 0 ; i < initial->length() ; i++)
     {
-      int value = initial->genes().test(i);
+      int value = initial->genes().valueAt(i);
       expect_true(value == 0 || value == 1,
 		  "Default createInitialChromosome should respect the configured base state range");
     }
@@ -1243,7 +1257,7 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
   pop.mutateChromosome(*children.first);
   for (int i = 0 ; i < children.first->length() ; i++)
     {
-      int value = children.first->genes().test(i);
+      int value = children.first->genes().valueAt(i);
       expect_true(value == 0 || value == 1,
 		  "Default mutateChromosome should keep binary genes in range");
     }
@@ -1262,7 +1276,7 @@ void test_delete_all_but_best_runs()
 
   expect_true(pop.populationInitialized == true, "Population should initialize during run");
   expect_true(!pop.populationTable.empty(), "Population should retain its table after run");
-  expect_true(pop.populationTable[pop.settings().numberOfIndividuals - 1].get()->genes().test(0) == 1,
+  expect_true(pop.populationTable[pop.settings().numberOfIndividuals - 1].get()->genes().valueAt(0) == 1,
 	      "Best chromosome should remain present after DeleteAllButBest runs");
 }
 

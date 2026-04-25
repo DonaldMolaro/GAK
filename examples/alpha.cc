@@ -15,66 +15,29 @@ Alpha::Alpha(const Population::Settings& settings)
 
 double Alpha::evaluateFitness(const BaseString& genes)
 {
-   //
-   // Fitness is the total squared distance that each 
-   // element in the BaseString is wrong by.
-   //
-   // ok for each element in the correct order.
-   // 
    int res = 0;
-#if 0
-   for ( int i = 0 ; i < b->length() ; i++ )
-   {
-      if (i == b->test(i)) res += i;
-      for ( int j = i ; j < b->length() ; j++ )
-      {
-	 if (b->test(i) < b->test(j)) res++;
-      }
-   }
-#else
    for ( int i = 0 ; i < genes.length() ; i++ )
    {
       for ( int j = i ; j < genes.length() ; j++ )
       {
-	 if (genes.test(i) < genes.test(j)) res++;
+	 if (genes.valueAt(i) < genes.valueAt(j)) res++;
       }
    }
    for ( int i = genes.length()-1 ; i >= 0; i-- )
    {
       for ( int j = i ; j >= 0 ; j-- )
       {
-	 if (genes.test(i) > genes.test(j)) res++;
+	 if (genes.valueAt(i) > genes.valueAt(j)) res++;
       }
    }
-/*
-   for (   i = 0 ; i < b->length()-1 ; i++ )
-   {
-      if (b->test(i) == b->test(i+1)+1)
-      {
-	 res++;
-      }
-   }
-   for (   i = b->length()-1 ; i >= 1; i-- )
-   {
-      if (b->test(i) == b->test(i-1)-1)
-      {
-	 res++;
-      }
-   }
-*/
-#endif
-   //
    return res;
-};
-
+}
 
 void Alpha::printCandidate(const BaseString& genes, std::ostream& out)
 {
    for ( int i = 0 ; i < genes.length() ; i++ )
    {
-//      assert(b->test(i) >= 0);
-//      assert(b->test(i) < 26);
-      out << static_cast<char>(genes.test(i) + 'a');
+      out << static_cast<char>(genes.valueAt(i) + 'a');
    }
    out << " ::";
 }
@@ -88,7 +51,7 @@ int Alpha::RandomAlgorithm()
    BaseString next(13,13);
    for ( int i = 0 ; i < 13 ; i++ )
    {
-      current.set(i,value_distribution(generator));
+      current.setValue(i,value_distribution(generator));
    }
    int fitness = evaluateFitness(current);
    int iter = 0;
@@ -96,11 +59,11 @@ int Alpha::RandomAlgorithm()
    {
       for ( int i = 0 ; i < 13 ; i++ )
       {
-	 next.set(i,current.test(i));
+	 next.setValue(i,current.valueAt(i));
       }
       int index = index_distribution(generator);
       int value = value_distribution(generator);
-      next.set(index,value);
+      next.setValue(index,value);
       int nextFit = evaluateFitness(next);
       if (nextFit > fitness)
       {

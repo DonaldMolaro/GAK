@@ -67,13 +67,13 @@ double TravelingSalesman::evaluateFitness(const BaseString& genes)
 
    for ( int i = 0 ; i < genes.length()-1 ; i++ )
    {
-      visited[genes.test(i)] = 1;
-      visited[genes.test(i+1)] = 1;
+      visited[genes.valueAt(i)] = 1;
+      visited[genes.valueAt(i+1)] = 1;
 
       double clength = 
 	 std::sqrt(
-	   Square(static_cast<double>(xCoordinates[genes.test(i)]) - static_cast<double>(xCoordinates[genes.test(i+1)]))
-	    + Square(static_cast<double>(yCoordinates[genes.test(i)]) - static_cast<double>(yCoordinates[genes.test(i+1)]))
+	   Square(static_cast<double>(xCoordinates[genes.valueAt(i)]) - static_cast<double>(xCoordinates[genes.valueAt(i+1)]))
+	    + Square(static_cast<double>(yCoordinates[genes.valueAt(i)]) - static_cast<double>(yCoordinates[genes.valueAt(i+1)]))
 	    );
       
       if (clength == 0) clength = PENALTYLENGTH;
@@ -94,7 +94,7 @@ void TravelingSalesman::printCandidate(const BaseString& genes, std::ostream& ou
 {
    for ( int i = 0 ; i < genes.length() ; i++ )
    {
-      out << static_cast<char>(genes.test(i) + 'a');
+      out << static_cast<char>(genes.valueAt(i) + 'a');
    }
    out << " ::";
 }

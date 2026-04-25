@@ -20,8 +20,8 @@ double NQueens::evaluateFitness(const BaseString& genes)
    {
       for ( int otherColumn = column + 1 ; otherColumn < boardSize ; otherColumn++ )
       {
-         const int row = genes.test(column);
-         const int otherRow = genes.test(otherColumn);
+         const int row = genes.valueAt(column);
+         const int otherRow = genes.valueAt(otherColumn);
          const bool sameRow = row == otherRow;
          const bool sameDiagonal = std::abs(row - otherRow) == (otherColumn - column);
          if (!sameRow && !sameDiagonal)
@@ -39,7 +39,7 @@ void NQueens::printCandidate(const BaseString& genes, std::ostream& out)
    out << "Queens:";
    for ( int column = 0 ; column < genes.length() ; column++ )
    {
-      out << ' ' << genes.test(column);
+      out << ' ' << genes.valueAt(column);
    }
    out << '\n';
 
@@ -47,7 +47,7 @@ void NQueens::printCandidate(const BaseString& genes, std::ostream& out)
    {
       for ( int column = 0 ; column < genes.length() ; column++ )
       {
-         out << (genes.test(column) == row ? 'Q' : '.');
+         out << (genes.valueAt(column) == row ? 'Q' : '.');
       }
       out << '\n';
    }

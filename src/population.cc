@@ -465,9 +465,6 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
 {
    std::vector<std::unique_ptr<Chromosome> > replacementList;
    replacementList.reserve(numberToReplace);
-#ifdef VVERBOSE
-	    fprintf(stderr,"Adding to replacement list.. duplicates %s permitted\n",settings_.reproduction == Population::ReproductionMode::DisallowDuplicates ? "NOT" : "");
-#endif 
   switch (settings_.parentSelection)
    {
    case Population::ParentSelectionMode::RouletteWheel:
@@ -557,12 +554,6 @@ bool Population::containsChromosome(const Chromosome& candidate,
 //
 int Population::insertNewPopulation(std::vector<std::unique_ptr<Chromosome> > replacementList,int numToReplace)
 {
-   //
-   // Assume population table is sorted by fitness.
-   //
-#ifdef VVERBOSE
-   fprintf(stderr,"Replacing population.. duplicates %s permitted\n",settings_.reproduction == Population::ReproductionMode::DisallowDuplicates ? "NOT" : "");
-#endif 
    if (numToReplace > settings_.numberOfIndividuals)
    {
       throw GAFatalException(__FILE__,__LINE__,"Cannot replace more individuals than exist in the population");
@@ -618,7 +609,7 @@ int Population::decode(const BaseString& b,int start,int end) const
    for ( int i = start ; i < end ; i++ )
    {
       res <<= 1;
-      if ( b.test(i) )
+      if ( b.valueAt(i) )
       {
 	 res += 1;   
       }
