@@ -96,13 +96,13 @@ double TravelingSalesman::FitnessFunction(const BaseString& b)
 }
 
 
-void TravelingSalesman::FitnessPrint(const BaseString& b)
+void TravelingSalesman::FitnessPrint(const BaseString& b, std::ostream& out)
 {
    for ( int i = 0 ; i < b.length() ; i++ )
    {
-      fprintf(stderr,"%c",b.test(i) + 'a');
+      out << static_cast<char>(b.test(i) + 'a');
    }
-   fprintf(stderr," ::");
+   out << " ::";
 }
 
 bool TravelingSalesman::hasCityCoordinate(int allocated, const Coordinate& coordinate) const

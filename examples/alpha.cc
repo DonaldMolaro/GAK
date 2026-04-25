@@ -74,15 +74,15 @@ double Alpha::FitnessFunction(const BaseString& b)
 };
 
 
-void Alpha::FitnessPrint(const BaseString& b)
+void Alpha::FitnessPrint(const BaseString& b, std::ostream& out)
 {
    for ( int i = 0 ; i < b.length() ; i++ )
    {
 //      assert(b->test(i) >= 0);
 //      assert(b->test(i) < 26);
-      fprintf(stderr,"%c",b.test(i) + 'a');
+      out << static_cast<char>(b.test(i) + 'a');
    }
-   fprintf(stderr," ::");
+   out << " ::";
 }
 
 int Alpha::RandomAlgorithim()
@@ -113,12 +113,12 @@ int Alpha::RandomAlgorithim()
 	 current = std::move(next);
 	 next = std::make_unique<BaseString>(13,13);
 	 fitness = nextFit;
-	 FitnessPrint(*current);
-	 fprintf(stderr,"Iteration %d New Fitness %d\n",iter,fitness);
+	 FitnessPrint(*current, std::cerr);
+	 std::cerr << "Iteration " << iter << " New Fitness " << fitness << '\n';
       }
       if (( iter % 1000 ) == 0)
       {
-	 fprintf(stderr,"Iteration %d\n",iter);
+	 std::cerr << "Iteration " << iter << '\n';
       }
       iter++;
    }

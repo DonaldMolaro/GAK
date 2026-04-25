@@ -108,11 +108,11 @@ private:
    int replacementSlotIndex(int offset) const;
    PopulationSummary buildPopulationSummary() const;
    RunResult executeInternal(bool captureGenerationSummaries);
-   void printConfigurationSummary() const;
-   void printGenerationProgress(const GenerationReport& report, bool printSummary);
-   void reportRun(const RunResult& result, bool printGenerationSummaries);
-   void printPopulationSummary(const PopulationSummary& summary);
-   void printFinalSummary(const RunResult& result);
+   void printConfigurationSummary(std::ostream& out) const;
+   void printGenerationProgress(std::ostream& out, const GenerationReport& report, bool printSummary);
+   void reportRun(std::ostream& out, const RunResult& result, bool printGenerationSummaries);
+   void printPopulationSummary(std::ostream& out, const PopulationSummary& summary);
+   void printFinalSummary(std::ostream& out, const RunResult& result);
    Chromosome *selectRandomParent(int *selected);
    bool containsChromosome(const Chromosome *candidate,
                            const std::vector<std::unique_ptr<Chromosome> >& population,
@@ -150,7 +150,7 @@ public:
    // Subclasses provide the problem-specific score for a chromosome.
    virtual double FitnessFunction(const BaseString& b)=0;
    // Subclasses provide a human-readable rendering of a chromosome.
-   virtual void FitnessPrint(const BaseString& b)=0;
+   virtual void FitnessPrint(const BaseString& b, std::ostream& out)=0;
    const Configuration& configuration() const noexcept { return config_; }
    unsigned int randomSeed() const noexcept { return activeRandomSeed_; }
    void setRandomSeed(unsigned int seed);

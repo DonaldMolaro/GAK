@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstdio>
+#include <ostream>
 
 #include "base.hh"
 #include "population.hh"
@@ -38,21 +39,21 @@ double NQueens::FitnessFunction(const BaseString& b)
    return nonAttackingPairs;
 }
 
-void NQueens::FitnessPrint(const BaseString& b)
+void NQueens::FitnessPrint(const BaseString& b, std::ostream& out)
 {
-   fprintf(stderr, "Queens:");
+   out << "Queens:";
    for ( int column = 0 ; column < b.length() ; column++ )
    {
-      fprintf(stderr, " %d", b.test(column));
+      out << ' ' << b.test(column);
    }
-   fprintf(stderr, "\n");
+   out << '\n';
 
    for ( int row = 0 ; row < b.length() ; row++ )
    {
       for ( int column = 0 ; column < b.length() ; column++ )
       {
-         fprintf(stderr, "%c", b.test(column) == row ? 'Q' : '.');
+         out << (b.test(column) == row ? 'Q' : '.');
       }
-      fprintf(stderr, "\n");
+      out << '\n';
    }
 }

@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstdio>
+#include <ostream>
 #include <vector>
 
 #include "base.hh"
@@ -86,20 +87,20 @@ double LatinSquare::FitnessFunction(const BaseString& b)
    return score;
 }
 
-void LatinSquare::FitnessPrint(const BaseString& b)
+void LatinSquare::FitnessPrint(const BaseString& b, std::ostream& out)
 {
    const int size = squareSize(b);
-   fprintf(stderr, "Latin square (%dx%d):\n", size, size);
+   out << "Latin square (" << size << "x" << size << "):\n";
    for ( int row = 0 ; row < size ; row++ )
    {
       for ( int column = 0 ; column < size ; column++ )
       {
-         fprintf(stderr, "%d", b.test((row * size) + column));
+         out << b.test((row * size) + column);
          if (column + 1 < size)
          {
-            fprintf(stderr, " ");
+            out << ' ';
          }
       }
-      fprintf(stderr, "\n");
+      out << '\n';
    }
 }

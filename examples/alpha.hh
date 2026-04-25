@@ -10,7 +10,7 @@ public:
    explicit Alpha(const Population::Configuration& configuration);
 
    double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b) override;
+   void FitnessPrint(const BaseString& b, std::ostream& out) override;
    int RandomAlgorithim();
 };
 #endif

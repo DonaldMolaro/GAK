@@ -12,7 +12,7 @@ public:
    explicit Knapsack(const Population::Configuration& configuration);
 
    double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b) override;
+   void FitnessPrint(const BaseString& b, std::ostream& out) override;
 
 private:
    static const int kCapacity = 35;

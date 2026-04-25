@@ -2,6 +2,7 @@
 #define __GA_SudokuConstrained_hh__
 
 #include <random>
+#include <iosfwd>
 #include <utility>
 #include <vector>
 
@@ -14,7 +15,7 @@ public:
    explicit SudokuConstrained(const Population::Configuration& configuration);
 
    double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b) override;
+   void FitnessPrint(const BaseString& b, std::ostream& out) override;
 
 protected:
    std::unique_ptr<Chromosome> createInitialChromosome() override;

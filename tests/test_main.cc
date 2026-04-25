@@ -176,7 +176,7 @@ public:
     return b.test(0);
   }
 
-  void FitnessPrint(const BaseString&) override
+  void FitnessPrint(const BaseString&, std::ostream&) override
   {
   }
 };
@@ -198,9 +198,9 @@ public:
     return b.test(0);
   }
 
-  void FitnessPrint(const BaseString& b) override
+  void FitnessPrint(const BaseString& b, std::ostream& out) override
   {
-    std::fprintf(stderr, "Chromosome:%d\n", b.test(0));
+    out << "Chromosome:" << b.test(0) << '\n';
   }
 };
 

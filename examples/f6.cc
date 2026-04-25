@@ -43,7 +43,7 @@ double F6::FitnessFunction(const BaseString& b)
 
 }
 
-void F6::FitnessPrint(const BaseString& b)
+void F6::FitnessPrint(const BaseString& b, std::ostream& out)
 {
    double x1 = (double)decode(b,0,22);
    double y1 = (double)decode(b,22,44);
@@ -52,9 +52,8 @@ void F6::FitnessPrint(const BaseString& b)
    double x3 = x2 - 100.000;   
    double y3 = y2 - 100.000;
    
-   fprintf(stderr,"X ( %3.8f ) Y ( %3.8f ) ",x3,y3);
+   out << "X ( " << x3 << " ) Y ( " << y3 << " ) ";
 }
-
 
 
 

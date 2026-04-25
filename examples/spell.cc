@@ -63,7 +63,7 @@ double Spell::FitnessFunction(const BaseString& b)
 };
 
 
-void Spell::FitnessPrint(const BaseString& b)
+void Spell::FitnessPrint(const BaseString& b, std::ostream& out)
 {
    for ( int i = 0 ; i < b.length() ; i++ )
    {
@@ -71,8 +71,7 @@ void Spell::FitnessPrint(const BaseString& b)
       assert(b->test(i) >= 0);
       assert(b->test(i) < 26);
 */
-      fprintf(stderr,"%c",b.test(i) + 'a');
+      out << static_cast<char>(b.test(i) + 'a');
    }
-   fprintf(stderr," ::");
+   out << " ::";
 }
-

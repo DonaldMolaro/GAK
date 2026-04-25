@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <ctime>
+#include <ostream>
 #include <vector>
 
 #include "base.hh"
@@ -165,27 +166,27 @@ double SudokuConstrained::FitnessFunction(const BaseString& b)
    return score;
 }
 
-void SudokuConstrained::FitnessPrint(const BaseString& b)
+void SudokuConstrained::FitnessPrint(const BaseString& b, std::ostream& out)
 {
-   fprintf(stderr, "Constraint-aware Sudoku candidate:\n");
+   out << "Constraint-aware Sudoku candidate:\n";
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
       for ( int column = 0 ; column < kBoardSize ; column++ )
       {
-         fprintf(stderr, "%d", b.test((row * kBoardSize) + column) + 1);
+         out << (b.test((row * kBoardSize) + column) + 1);
          if (column == 2 || column == 5)
          {
-            fprintf(stderr, " | ");
+            out << " | ";
          }
          else if (column + 1 < kBoardSize)
          {
-            fprintf(stderr, " ");
+            out << ' ';
          }
       }
-      fprintf(stderr, "\n");
+      out << '\n';
       if (row == 2 || row == 5)
       {
-         fprintf(stderr, "------+-------+------\n");
+         out << "------+-------+------\n";
       }
    }
 }

@@ -23,6 +23,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <iomanip>
 #include <iostream>
 #include <stdexcept>
 #include <utility>
@@ -165,22 +166,26 @@ Population::PopulationSummary Population::buildPopulationSummary() const
    return summary;
 }
 
-void Population::printConfigurationSummary() const
+void Population::printConfigurationSummary(std::ostream& out) const
 {
-   fprintf(stderr,"Operation             :: %s\n", config_.operation == Population::OperationMode::Minimize ? "Minimize" : "Maximize");
-   fprintf(stderr,"Number of Individuals :: %d\n",config_.numberOfIndividuals);
-   fprintf(stderr,"Number of Trails      :: %d\n",config_.numberOfTrials);
-   fprintf(stderr,"Genectic Diversity    :: %d\n",config_.geneticDiversity);
-   fprintf(stderr,"Mutation Rate         :: %5.4f\n",config_.bitMutationRate);
-   fprintf(stderr,"Cross Over Rate       :: %4.3f\n",config_.crossOverRate);
-   fprintf(stderr,"Duplicate Reproduction:: %s\n", config_.reproduction == Population::ReproductionMode::DisallowDuplicates ? "NOT Ok." : " Ok.");
-   fprintf(stderr,"Variable              :: %s\n", config_.variableLength == Population::VariableLengthMode::Fixed ? "NOT Ok." : " Ok.");
-   fprintf(stderr,"Random Seed           :: %u%s\n",
-           activeRandomSeed_,
-           config_.useFixedRandomSeed ? " (configured)" : " (generated)");
+   out << "Operation             :: "
+       << (config_.operation == Population::OperationMode::Minimize ? "Minimize" : "Maximize") << '\n';
+   out << "Number of Individuals :: " << config_.numberOfIndividuals << '\n';
+   out << "Number of Trails      :: " << config_.numberOfTrials << '\n';
+   out << "Genectic Diversity    :: " << config_.geneticDiversity << '\n';
+   out << "Mutation Rate         :: " << std::fixed << std::setprecision(4)
+       << config_.bitMutationRate << '\n';
+   out << "Cross Over Rate       :: " << std::fixed << std::setprecision(3)
+       << config_.crossOverRate << '\n' << std::defaultfloat;
+   out << "Duplicate Reproduction:: "
+       << (config_.reproduction == Population::ReproductionMode::DisallowDuplicates ? "NOT Ok." : " Ok.") << '\n';
+   out << "Variable              :: "
+       << (config_.variableLength == Population::VariableLengthMode::Fixed ? "NOT Ok." : " Ok.") << '\n';
+   out << "Random Seed           :: " << activeRandomSeed_
+       << (config_.useFixedRandomSeed ? " (configured)" : " (generated)") << '\n';
 }
 
-void Population::printPopulationSummary(const PopulationSummary& summary)
+void Population::printPopulationSummary(std::ostream& out, const PopulationSummary& summary)
 {
    const int summaryCount = static_cast<int>(summary.mostFit.size());
    if (summaryCount <= 0)
@@ -189,40 +194,41 @@ void Population::printPopulationSummary(const PopulationSummary& summary)
    }
 
    if (config_.operation == Population::OperationMode::Maximize)
-      fprintf(stderr,"Best %d Members are:\n",summaryCount);
+      out << "Best " << summaryCount << " Members are:\n";
    else
-      fprintf(stderr,"Worst %d Members are:\n",summaryCount);
+      out << "Worst " << summaryCount << " Members are:\n";
 
    for ( int i = 0 ; i < summaryCount ; i++ )
    {
-      FitnessPrint(populationTable[(config_.numberOfIndividuals - 1) - i].get()->chromosomeString());
-      fprintf(stderr,"(F = %3.8f)\n",summary.mostFit[i]);
+      FitnessPrint(populationTable[(config_.numberOfIndividuals - 1) - i].get()->chromosomeString(), out);
+      out << "(F = " << std::fixed << std::setprecision(8) << summary.mostFit[i]
+          << ")\n" << std::defaultfloat;
    }
 
    if (config_.operation == Population::OperationMode::Maximize)
-      fprintf(stderr,"Worst %d Members are:\n",summaryCount);
+      out << "Worst " << summaryCount << " Members are:\n";
    else
-      fprintf(stderr,"Best %d Members are:\n",summaryCount);
+      out << "Best " << summaryCount << " Members are:\n";
 
    for ( int i = 0 ; i < summaryCount ; i++ )
    {
-      FitnessPrint(populationTable[i].get()->chromosomeString());
-      fprintf(stderr,"(F = %3.8f)\n",summary.leastFit[i]);
+      FitnessPrint(populationTable[i].get()->chromosomeString(), out);
+      out << "(F = " << std::fixed << std::setprecision(8) << summary.leastFit[i]
+          << ")\n" << std::defaultfloat;
    }
 }
 
-void Population::printGenerationProgress(const GenerationReport& report, bool printSummary)
+void Population::printGenerationProgress(std::ostream& out, const GenerationReport& report, bool printSummary)
 {
-   fprintf(stderr,"Generation %d Number of Evaluations %d \n",
-           report.generation,
-           report.evaluations);
+   out << "Generation " << report.generation
+       << " Number of Evaluations " << report.evaluations << " \n";
    if (printSummary)
    {
-      printPopulationSummary(report.summary);
+      printPopulationSummary(out, report.summary);
    }
 }
 
-void Population::printFinalSummary(const RunResult& result)
+void Population::printFinalSummary(std::ostream& out, const RunResult& result)
 {
    const int summaryCount = static_cast<int>(result.finalSummary.mostFit.size());
    switch(config_.operation)
@@ -230,15 +236,17 @@ void Population::printFinalSummary(const RunResult& result)
       case Population::OperationMode::Maximize:
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
-	 FitnessPrint(populationTable[(config_.numberOfIndividuals - 1) - i].get()->chromosomeString());
-	 fprintf(stderr,"%f\n",result.finalSummary.mostFit[i]);
+	 FitnessPrint(populationTable[(config_.numberOfIndividuals - 1) - i].get()->chromosomeString(), out);
+	 out << std::fixed << std::setprecision(6) << result.finalSummary.mostFit[i]
+             << '\n' << std::defaultfloat;
       }
       break;
       case Population::OperationMode::Minimize:
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
-	 FitnessPrint(populationTable[i].get()->chromosomeString());
-	 fprintf(stderr,"%f\n",result.finalSummary.leastFit[i]);
+	 FitnessPrint(populationTable[i].get()->chromosomeString(), out);
+	 out << std::fixed << std::setprecision(6) << result.finalSummary.leastFit[i]
+             << '\n' << std::defaultfloat;
       }
       break;
       default:
@@ -346,13 +354,13 @@ Population::RunResult Population::execute(bool captureGenerationSummaries)
    return executeInternal(captureGenerationSummaries);
 }
 
-void Population::reportRun(const RunResult& result, bool printGenerationSummaries)
+void Population::reportRun(std::ostream& out, const RunResult& result, bool printGenerationSummaries)
 {
    if (printGenerationSummaries)
    {
       for (std::size_t i = 0 ; i < result.generationReports.size() ; i++ )
       {
-         printGenerationProgress(result.generationReports[i], true);
+         printGenerationProgress(out, result.generationReports[i], true);
       }
    }
    else
@@ -362,10 +370,10 @@ void Population::reportRun(const RunResult& result, bool printGenerationSummarie
          result.evaluations,
          PopulationSummary()
       };
-      printGenerationProgress(finalProgress, false);
+      printGenerationProgress(out, finalProgress, false);
    }
 
-   printFinalSummary(result);
+   printFinalSummary(out, result);
 }
 
 void Population::run()
@@ -373,10 +381,10 @@ void Population::run()
    const bool verbose = IsVerboseEnabled();
    if (verbose)
    {
-      printConfigurationSummary();
+      printConfigurationSummary(std::cerr);
    }
    RunResult result = execute(verbose);
-   reportRun(result, verbose);
+   reportRun(std::cerr, result, verbose);
 }
 //
 // Start Population with randomly generated population.

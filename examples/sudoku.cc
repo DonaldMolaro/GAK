@@ -1,6 +1,8 @@
 #include <cstdio>
 #include <vector>
 
+#include <ostream>
+
 #include "base.hh"
 #include "except.hh"
 #include "population.hh"
@@ -150,27 +152,27 @@ double Sudoku::FitnessFunction(const BaseString& b)
    return score;
 }
 
-void Sudoku::FitnessPrint(const BaseString& b)
+void Sudoku::FitnessPrint(const BaseString& b, std::ostream& out)
 {
-   fprintf(stderr, "Sudoku candidate:\n");
+   out << "Sudoku candidate:\n";
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
       for ( int column = 0 ; column < kBoardSize ; column++ )
       {
-         fprintf(stderr, "%d", b.test((row * kBoardSize) + column) + 1);
+         out << (b.test((row * kBoardSize) + column) + 1);
          if (column == 2 || column == 5)
          {
-            fprintf(stderr, " | ");
+            out << " | ";
          }
          else if (column + 1 < kBoardSize)
          {
-            fprintf(stderr, " ");
+            out << ' ';
          }
       }
-      fprintf(stderr, "\n");
+      out << '\n';
       if (row == 2 || row == 5)
       {
-         fprintf(stderr, "------+-------+------\n");
+         out << "------+-------+------\n";
       }
    }
 }

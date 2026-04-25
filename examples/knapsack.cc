@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <ostream>
 
 #include "base.hh"
 #include "population.hh"
@@ -41,20 +42,20 @@ double Knapsack::FitnessFunction(const BaseString& b)
    return value > penalty ? value - penalty : 0;
 }
 
-void Knapsack::FitnessPrint(const BaseString& b)
+void Knapsack::FitnessPrint(const BaseString& b, std::ostream& out)
 {
    int weight = 0;
    int value = 0;
 
-   fprintf(stderr, "Items:");
+   out << "Items:";
    for ( int item = 0 ; item < b.length() ; item++ )
    {
       if (b.test(item))
       {
-         fprintf(stderr, " %d", item);
+         out << ' ' << item;
          weight += kWeights[item];
          value += kValues[item];
       }
    }
-   fprintf(stderr, " | weight=%d/%d value=%d", weight, kCapacity, value);
+   out << " | weight=" << weight << '/' << kCapacity << " value=" << value;
 }

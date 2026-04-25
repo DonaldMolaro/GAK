@@ -35,7 +35,7 @@ double Dome::FitnessFunction(const BaseString& b)
 };
 
 
-void Dome::FitnessPrint(const BaseString& b)
+void Dome::FitnessPrint(const BaseString& b, std::ostream& out)
 {
    int x1 = decode(b,0,16);
    int y1 = decode(b,16,32);
@@ -43,5 +43,5 @@ void Dome::FitnessPrint(const BaseString& b)
    double x2 = ((double)x1) / 100.0;
    double y2 = ((double)y1) / 100.0;
    
-   fprintf(stderr,"X ( %6.2f ) Y ( %6.2f ) ",x2,y2);
+   out << "X ( " << x2 << " ) Y ( " << y2 << " ) ";
 }

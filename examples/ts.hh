@@ -25,7 +25,7 @@ public:
                      int gridS = 0);
   
    double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b) override;
+   void FitnessPrint(const BaseString& b, std::ostream& out) override;
 private:
    using Coordinate = std::pair<int, int>;
 

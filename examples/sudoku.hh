@@ -1,6 +1,8 @@
 #ifndef __GA_Sudoku_hh__
 #define __GA_Sudoku_hh__
 
+#include <iosfwd>
+
 #include "population.hh"
 
 class Sudoku : public Population
@@ -10,7 +12,7 @@ public:
    explicit Sudoku(const Population::Configuration& configuration);
 
    double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b) override;
+   void FitnessPrint(const BaseString& b, std::ostream& out) override;
 
 private:
    static const int kBoardSize = 9;
