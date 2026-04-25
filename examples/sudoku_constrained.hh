@@ -11,17 +11,16 @@
 class SudokuConstrained : public Population
 {
 public:
-   explicit SudokuConstrained(const Population::Options& options);
-   explicit SudokuConstrained(const Population::Configuration& configuration);
+   explicit SudokuConstrained(const Population::Settings& settings);
 
-   double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b, std::ostream& out) override;
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) override;
 
 protected:
    std::unique_ptr<Chromosome> createInitialChromosome() override;
    std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-      mateChromosomes(Chromosome *mother, Chromosome *father) override;
-   void mutateChromosome(Chromosome *chromosome) override;
+      mateChromosomes(Chromosome& mother, Chromosome& father) override;
+   void mutateChromosome(Chromosome& chromosome) override;
 
 private:
    static const int kBoardSize = 9;
@@ -31,10 +30,10 @@ private:
 
    using RowColumns = std::vector<int>;
 
-   void validateConfiguration(const Population::Configuration& configuration) const;
-   int uniquenessScoreForColumn(const BaseString& b, int column) const;
-   int uniquenessScoreForBox(const BaseString& b, int boxRow, int boxColumn) const;
-   int givenConsistencyScore(const BaseString& b) const;
+   void validateSettings(const Population::Settings& settings) const;
+   int uniquenessScoreForColumn(const BaseString& genes, int column) const;
+   int uniquenessScoreForBox(const BaseString& genes, int boxRow, int boxColumn) const;
+   int givenConsistencyScore(const BaseString& genes) const;
    std::unique_ptr<BaseString> cloneBoard(const BaseString *source) const;
    void fillRowFromParent(BaseString *destination, const BaseString *source, int row) const;
    void initializeRow(BaseString *board, int row);

@@ -150,7 +150,7 @@ BaseString *makeBinaryString(const std::string& bits)
   return b;
 }
 
-Population::Options make_population_options(Population::OperationMode operation,
+Population::Settings make_population_options(Population::OperationMode operation,
 					    int individuals,
 					    int trials,
 					    int diversity,
@@ -166,17 +166,17 @@ Population::Options make_population_options(Population::OperationMode operation,
 class InspectablePopulation : public Population
 {
 public:
-  explicit InspectablePopulation(const Options& options)
-    : Population(options)
+  explicit InspectablePopulation(const Settings& settings)
+    : Population(settings)
   {
   }
 
-  double FitnessFunction(const BaseString& b) override
+  double evaluateFitness(const BaseString& b) override
   {
     return b.test(0);
   }
 
-  void FitnessPrint(const BaseString&, std::ostream&) override
+  void printCandidate(const BaseString&, std::ostream&) override
   {
   }
 };
@@ -184,8 +184,8 @@ public:
 class DefaultHookPopulation : public Population
 {
 public:
-  explicit DefaultHookPopulation(const Options& options)
-    : Population(options)
+  explicit DefaultHookPopulation(const Settings& settings)
+    : Population(settings)
   {
   }
 
@@ -193,18 +193,18 @@ public:
   using Population::mateChromosomes;
   using Population::mutateChromosome;
 
-  double FitnessFunction(const BaseString& b) override
+  double evaluateFitness(const BaseString& b) override
   {
     return b.test(0);
   }
 
-  void FitnessPrint(const BaseString& b, std::ostream& out) override
+  void printCandidate(const BaseString& b, std::ostream& out) override
   {
     out << "Chromosome:" << b.test(0) << '\n';
   }
 };
 
-Population::Options make_population_options(Population::OperationMode operation,
+Population::Settings make_population_options(Population::OperationMode operation,
 					    int individuals,
 					    int trials,
 					    int diversity,
@@ -217,7 +217,7 @@ Population::Options make_population_options(Population::OperationMode operation,
 					    Population::VariableLengthMode variable_length,
 					    int states)
 {
-  Population::Options options;
+  Population::Settings options;
   options.operation = operation;
   options.numberOfIndividuals = individuals;
   options.numberOfTrials = trials;
@@ -267,69 +267,46 @@ void test_base_string()
 
 void test_population_options_round_trip()
 {
-  Population::Configuration configuration;
-  configuration.operation = Population::OperationMode::Minimize;
-  configuration.numberOfIndividuals = 17;
-  configuration.numberOfTrials = 99;
-  configuration.geneticDiversity = 23;
-  configuration.bitMutationRate = 0.125;
-  configuration.crossOverRate = 0.75;
-  configuration.reproduction = Population::ReproductionMode::DisallowDuplicates;
-  configuration.parentSelection = Population::ParentSelectionMode::Random;
-  configuration.deletion = Population::DeletionMode::DeleteQuarter;
-  configuration.fitness = Population::FitnessMode::LinearNormalized;
-  configuration.variableLength = Population::VariableLengthMode::Variable;
-  configuration.baseStates = 7;
-  configuration.useFixedRandomSeed = true;
-  configuration.randomSeed = 4242;
+  Population::Settings settings;
+  settings.operation = Population::OperationMode::Minimize;
+  settings.numberOfIndividuals = 17;
+  settings.numberOfTrials = 99;
+  settings.geneticDiversity = 23;
+  settings.bitMutationRate = 0.125;
+  settings.crossOverRate = 0.75;
+  settings.reproduction = Population::ReproductionMode::DisallowDuplicates;
+  settings.parentSelection = Population::ParentSelectionMode::Random;
+  settings.deletion = Population::DeletionMode::DeleteQuarter;
+  settings.fitness = Population::FitnessMode::LinearNormalized;
+  settings.variableLength = Population::VariableLengthMode::Variable;
+  settings.baseStates = 7;
+  settings.useFixedRandomSeed = true;
+  settings.randomSeed = 4242U;
 
-  Population::Options options = configuration.toOptions();
-  Population::Configuration round_trip = options.toConfiguration();
-
-  expect_true(options.operation == Population::OperationMode::Minimize,
-              "Configuration::toOptions should convert operation");
-  expect_true(options.reproduction == Population::ReproductionMode::DisallowDuplicates,
-              "Configuration::toOptions should convert reproduction");
-  expect_true(options.parentSelection == Population::ParentSelectionMode::Random,
-              "Configuration::toOptions should convert parent selection");
-  expect_true(options.deletion == Population::DeletionMode::DeleteQuarter,
-              "Configuration::toOptions should convert deletion mode");
-  expect_true(options.fitness == Population::FitnessMode::LinearNormalized,
-              "Configuration::toOptions should convert fitness mode");
-  expect_true(options.variableLength == Population::VariableLengthMode::Variable,
-              "Configuration::toOptions should convert variable-length mode");
-  expect_true(options.useFixedRandomSeed,
-              "Configuration::toOptions should preserve seeded-run mode");
-  expect_true(options.randomSeed == 4242U,
-              "Configuration::toOptions should preserve the configured random seed");
-  expect_true(round_trip.numberOfIndividuals == configuration.numberOfIndividuals,
-              "Options round trip should preserve individual count");
-  expect_true(round_trip.numberOfTrials == configuration.numberOfTrials,
-              "Options round trip should preserve trial count");
-  expect_true(round_trip.geneticDiversity == configuration.geneticDiversity,
-              "Options round trip should preserve diversity");
-  expect_true(round_trip.bitMutationRate == configuration.bitMutationRate,
-              "Options round trip should preserve mutation rate");
-  expect_true(round_trip.crossOverRate == configuration.crossOverRate,
-              "Options round trip should preserve crossover rate");
-  expect_true(round_trip.baseStates == configuration.baseStates,
-              "Options round trip should preserve base state count");
-  expect_true(round_trip.useFixedRandomSeed == configuration.useFixedRandomSeed,
-              "Options round trip should preserve fixed-seed mode");
-  expect_true(round_trip.randomSeed == configuration.randomSeed,
-              "Options round trip should preserve configured random seed");
-  expect_true(round_trip.operation == configuration.operation,
-              "Options round trip should preserve legacy operation");
-  expect_true(round_trip.reproduction == configuration.reproduction,
-              "Options round trip should preserve legacy reproduction");
-  expect_true(round_trip.parentSelection == configuration.parentSelection,
-              "Options round trip should preserve legacy parent selection");
-  expect_true(round_trip.deletion == configuration.deletion,
-              "Options round trip should preserve legacy deletion");
-  expect_true(round_trip.fitness == configuration.fitness,
-              "Options round trip should preserve legacy fitness");
-  expect_true(round_trip.variableLength == configuration.variableLength,
-              "Options round trip should preserve legacy variable-length setting");
+  expect_true(settings.operation == Population::OperationMode::Minimize,
+              "Settings should preserve operation");
+  expect_true(settings.reproduction == Population::ReproductionMode::DisallowDuplicates,
+              "Settings should preserve reproduction");
+  expect_true(settings.parentSelection == Population::ParentSelectionMode::Random,
+              "Settings should preserve parent selection");
+  expect_true(settings.deletion == Population::DeletionMode::DeleteQuarter,
+              "Settings should preserve deletion mode");
+  expect_true(settings.fitness == Population::FitnessMode::LinearNormalized,
+              "Settings should preserve fitness mode");
+  expect_true(settings.variableLength == Population::VariableLengthMode::Variable,
+              "Settings should preserve variable-length mode");
+  expect_true(settings.numberOfIndividuals == 17,
+              "Settings should preserve individual count");
+  expect_true(settings.numberOfTrials == 99,
+              "Settings should preserve trial count");
+  expect_true(settings.geneticDiversity == 23,
+              "Settings should preserve diversity");
+  expect_true(settings.baseStates == 7,
+              "Settings should preserve base state count");
+  expect_true(settings.useFixedRandomSeed,
+              "Settings should preserve fixed-seed mode");
+  expect_true(settings.randomSeed == 4242U,
+              "Settings should preserve the configured random seed");
 }
 
 void test_base_string_error_paths()
@@ -417,9 +394,9 @@ void test_mutation_rate_zero_preserves_chromosome()
   Chromosome chromosome(std::unique_ptr<BaseString>(makeBinaryString("10101100")));
   Chromosome original(std::unique_ptr<BaseString>(makeBinaryString("10101100")));
 
-  chromosome.SingleBitMutate(0.0, &random_generator);
+  chromosome.mutate(0.0, &random_generator);
 
-  expect_true(chromosome.compare(&original), "Mutation rate 0 should leave chromosome unchanged");
+  expect_true(chromosome.equals(original), "Mutation rate 0 should leave chromosome unchanged");
 }
 
 void test_chromosome_constructor_and_compare_paths()
@@ -436,11 +413,11 @@ void test_chromosome_constructor_and_compare_paths()
   Chromosome left(std::unique_ptr<BaseString>(makeBinaryString("1010")));
   Chromosome right(std::unique_ptr<BaseString>(makeBinaryString("0101")));
   Chromosome symbolic(5, 0, 4, &random_generator);
-  expect_true(!left.compare(&right), "compare should return false for different chromosomes");
-  expect_true(!left.compare(&symbolic), "compare should return false for mismatched lengths");
-  for (int i = 0 ; i < symbolic.ChromosomeLen() ; i++)
+  expect_true(!left.equals(right), "equals should return false for different chromosomes");
+  expect_true(!left.equals(symbolic), "equals should return false for mismatched lengths");
+  for (int i = 0 ; i < symbolic.length() ; i++)
     {
-      int value = symbolic.chromosomeString().test(i);
+      int value = symbolic.genes().test(i);
       expect_true(value >= 0 && value < 4, "Non-binary constructor should initialize values in range");
     }
 
@@ -456,7 +433,7 @@ void test_invalid_mutation_probability_throws()
   Chromosome chromosome(std::unique_ptr<BaseString>(makeBinaryString("10101100")));
 
   expect_throws<GANonFatalException>(
-    [&chromosome, &random_generator]() { chromosome.SingleBitMutate(2.0, &random_generator); },
+    [&chromosome, &random_generator]() { chromosome.mutate(2.0, &random_generator); },
     "Impossible mutation probability should throw a non-fatal exception");
 }
 
@@ -464,11 +441,11 @@ void test_non_binary_mutation_with_probability_one_stays_in_range()
 {
   std::mt19937 random_generator(4);
   Chromosome chromosome(std::make_unique<BaseString>(5, 4), 0, 4);
-  chromosome.SingleBitMutate(1.0, &random_generator);
+  chromosome.mutate(1.0, &random_generator);
 
-  for (int i = 0 ; i < chromosome.ChromosomeLen() ; i++)
+  for (int i = 0 ; i < chromosome.length() ; i++)
     {
-      int value = chromosome.chromosomeString().test(i);
+      int value = chromosome.genes().test(i);
       expect_true(value >= 0 && value < 4, "Non-binary mutation should keep values within range");
     }
 }
@@ -477,11 +454,11 @@ void test_binary_mutation_with_probability_one_changes_only_bits()
 {
   std::mt19937 random_generator(5);
   Chromosome chromosome(std::unique_ptr<BaseString>(makeBinaryString("000000")));
-  chromosome.SingleBitMutate(1.0, &random_generator);
+  chromosome.mutate(1.0, &random_generator);
 
-  for (int i = 0 ; i < chromosome.ChromosomeLen() ; i++)
+  for (int i = 0 ; i < chromosome.length() ; i++)
     {
-      int value = chromosome.chromosomeString().test(i);
+      int value = chromosome.genes().test(i);
       expect_true(value == 0 || value == 1, "Binary mutation should keep values binary");
     }
 }
@@ -492,12 +469,12 @@ void test_mate_without_crossover_clones_parents()
   Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("11110000")));
   Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("00001111")));
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-    mother.mate(father, 0.0, Chromosome::SinglePoint, &random_generator);
+    mother.mate(father, 0.0, Chromosome::CrossoverType::SinglePoint, &random_generator);
 
   expect_true(children.first.get() != 0, "Mate should create a son");
   expect_true(children.second.get() != 0, "Mate should create a daughter");
-  expect_true(children.first->compare(&father), "Son should clone father when crossover rate is zero");
-  expect_true(children.second->compare(&mother), "Daughter should clone mother when crossover rate is zero");
+  expect_true(children.first->equals(father), "Son should clone father when crossover rate is zero");
+  expect_true(children.second->equals(mother), "Daughter should clone mother when crossover rate is zero");
 }
 
 void test_uniform_crossover_is_reachable_and_safe()
@@ -509,13 +486,13 @@ void test_uniform_crossover_is_reachable_and_safe()
   for (int i = 0 ; i < 20 ; i++)
     {
       std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-        mother.mate(father, 1.0, Chromosome::Uniform, &random_generator);
+        mother.mate(father, 1.0, Chromosome::CrossoverType::Uniform, &random_generator);
 
       expect_true(children.first.get() != 0, "Uniform crossover should produce a son");
       expect_true(children.second.get() != 0, "Uniform crossover should produce a daughter");
-      expect_true(children.first->ChromosomeLen() == father.ChromosomeLen(),
+      expect_true(children.first->length() == father.length(),
 		  "Uniform crossover should preserve fixed-length son length");
-      expect_true(children.second->ChromosomeLen() == mother.ChromosomeLen(),
+      expect_true(children.second->length() == mother.length(),
 		  "Uniform crossover should preserve fixed-length daughter length");
     }
 }
@@ -529,13 +506,13 @@ void test_two_point_crossover_is_reachable_and_safe()
   for (int i = 0 ; i < 20 ; i++)
     {
       std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-        mother.mate(father, 1.0, Chromosome::TwoPoint, &random_generator);
+        mother.mate(father, 1.0, Chromosome::CrossoverType::TwoPoint, &random_generator);
 
       expect_true(children.first.get() != 0, "Two-point crossover should produce a son");
       expect_true(children.second.get() != 0, "Two-point crossover should produce a daughter");
-      expect_true(children.first->ChromosomeLen() == father.ChromosomeLen(),
+      expect_true(children.first->length() == father.length(),
 		  "Fixed-length two-point crossover should preserve son length");
-      expect_true(children.second->ChromosomeLen() == mother.ChromosomeLen(),
+      expect_true(children.second->length() == mother.length(),
 		  "Fixed-length two-point crossover should preserve daughter length");
     }
 }
@@ -549,7 +526,7 @@ void test_mate_rejects_mismatched_fixed_lengths()
 
   expect_throws<GAFatalException>(
     [&mother, &father, &random_generator]() {
-      mother.mate(father, 1.0, Chromosome::SinglePoint, &random_generator);
+      mother.mate(father, 1.0, Chromosome::CrossoverType::SinglePoint, &random_generator);
     },
     "Fixed-length mating should reject mismatched parent lengths");
 }
@@ -563,12 +540,12 @@ void test_variable_length_mating_supports_different_lengths()
   for (int i = 0 ; i < 20 ; i++)
     {
       std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-        mother.mate(father, 1.0, Chromosome::SinglePoint, &random_generator);
+        mother.mate(father, 1.0, Chromosome::CrossoverType::SinglePoint, &random_generator);
 
       expect_true(children.first.get() != 0, "Variable-length mating should produce a son");
       expect_true(children.second.get() != 0, "Variable-length mating should produce a daughter");
-      expect_true(children.first->ChromosomeLen() >= 1, "Variable-length son should have a valid length");
-      expect_true(children.second->ChromosomeLen() >= 1, "Variable-length daughter should have a valid length");
+      expect_true(children.first->length() >= 1, "Variable-length son should have a valid length");
+      expect_true(children.second->length() >= 1, "Variable-length daughter should have a valid length");
     }
 }
 
@@ -579,12 +556,12 @@ void test_variable_length_uniform_crossover()
   Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("000011")), 1, 2);
 
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-    mother.mate(father, 1.0, Chromosome::Uniform, &random_generator);
+    mother.mate(father, 1.0, Chromosome::CrossoverType::Uniform, &random_generator);
 
   expect_true(children.first.get() != 0 && children.second.get() != 0, "Variable-length uniform crossover should produce children");
-  expect_true(children.first->ChromosomeLen() == father.ChromosomeLen(),
+  expect_true(children.first->length() == father.length(),
 	      "Variable-length uniform crossover should preserve son length");
-  expect_true(children.second->ChromosomeLen() == mother.ChromosomeLen(),
+  expect_true(children.second->length() == mother.length(),
 	      "Variable-length uniform crossover should preserve daughter length");
 }
 
@@ -595,12 +572,12 @@ void test_variable_length_uniform_crossover_with_longer_mother()
   Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("0000")), 1, 2);
 
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-    mother.mate(father, 1.0, Chromosome::Uniform, &random_generator);
+    mother.mate(father, 1.0, Chromosome::CrossoverType::Uniform, &random_generator);
 
   expect_true(children.first.get() != 0 && children.second.get() != 0, "Variable-length uniform crossover should handle longer mothers");
-  expect_true(children.first->ChromosomeLen() == father.ChromosomeLen(),
+  expect_true(children.first->length() == father.length(),
 	      "Longer-mother uniform crossover should preserve son length");
-  expect_true(children.second->ChromosomeLen() == mother.ChromosomeLen(),
+  expect_true(children.second->length() == mother.length(),
 	      "Longer-mother uniform crossover should preserve daughter length");
 }
 
@@ -613,7 +590,7 @@ void test_invalid_crossover_type_throws()
 
   expect_throws<GANonFatalException>(
     [&mother, &father, &random_generator]() {
-      mother.mate(father, 1.0, static_cast<Chromosome::CrossOverType>(99), &random_generator);
+      mother.mate(father, 1.0, static_cast<Chromosome::CrossoverType>(99), &random_generator);
     },
     "Unsupported crossover type should throw");
 }
@@ -681,7 +658,7 @@ void test_population_zero_total_selection_falls_back_to_uniform()
 
   expect_true(pop.selectParent(&selected, roulette) != 0,
 	      "Roulette selection should fall back to uniform choice when all weights are zero");
-  expect_true(selected >= 0 && selected < pop.configuration().numberOfIndividuals,
+  expect_true(selected >= 0 && selected < pop.settings().numberOfIndividuals,
 	      "Uniform fallback selection should still return an in-range index");
 }
 
@@ -770,7 +747,7 @@ void prepare_population(InspectablePopulation& pop, const std::string& first_bit
   pop.initializePopulation();
   pop.populationTable[0].reset(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString(first_bits))));
   pop.populationTable[1].reset(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString(second_bits))));
-  for (int i = 0 ; i < pop.configuration().numberOfIndividuals ; i++)
+  for (int i = 0 ; i < pop.settings().numberOfIndividuals ; i++)
     {
       pop.fitnessTable[i] = -1.0;
     }
@@ -792,7 +769,7 @@ void test_population_selection_and_replacement_branches()
   int selected = -1;
   Chromosome *chosen = min_pop.selectParent(&selected, min_pop.selectFitnessWeights());
   expect_true(chosen != 0, "Minimize roulette selection should return a chromosome");
-  expect_true(selected >= 0 && selected < min_pop.configuration().numberOfIndividuals,
+  expect_true(selected >= 0 && selected < min_pop.settings().numberOfIndividuals,
 	      "Minimize roulette selection should produce an in-range index");
 
   InspectablePopulation dup_not_allowed(make_population_options(Population::OperationMode::Maximize, 2, 2, 4, 0.0, 0.0,
@@ -969,7 +946,7 @@ void test_population_invalid_enum_paths()
 							   Population::DeletionMode::DeleteAll,
 							   Population::FitnessMode::Evaluation,
 							   Population::VariableLengthMode::Fixed, 2));
-  bad_delete.config_.deletion = static_cast<Population::DeletionMode>(99);
+  bad_delete.settings_.deletion = static_cast<Population::DeletionMode>(99);
   expect_throws<GAFatalException>(
     [&bad_delete]() { bad_delete.run(); },
     "Unsupported deletion technique should throw");
@@ -980,7 +957,7 @@ void test_population_invalid_enum_paths()
 							    Population::DeletionMode::DeleteAll,
 							    Population::FitnessMode::Evaluation,
 							    Population::VariableLengthMode::Fixed, 2));
-  bad_fitness.config_.fitness = static_cast<Population::FitnessMode>(99);
+  bad_fitness.settings_.fitness = static_cast<Population::FitnessMode>(99);
   expect_throws<GAFatalException>(
     [&bad_fitness]() { bad_fitness.selectFitnessWeights(); },
     "Unsupported fitness technique should throw");
@@ -991,7 +968,7 @@ void test_population_invalid_enum_paths()
 							   Population::DeletionMode::DeleteAll,
 							   Population::FitnessMode::Evaluation,
 							   Population::VariableLengthMode::Fixed, 2));
-  bad_parent.config_.parentSelection = static_cast<Population::ParentSelectionMode>(99);
+  bad_parent.settings_.parentSelection = static_cast<Population::ParentSelectionMode>(99);
   prepare_population(bad_parent, "1111", "0000");
   expect_throws<GAFatalException>(
     [&bad_parent]() { bad_parent.breedPopulation(1); },
@@ -1004,7 +981,7 @@ void test_population_invalid_enum_paths()
 							      Population::FitnessMode::Evaluation,
 							      Population::VariableLengthMode::Fixed, 2));
   prepare_population(bad_operation, "1111", "0000");
-  bad_operation.config_.operation = static_cast<Population::OperationMode>(99);
+  bad_operation.settings_.operation = static_cast<Population::OperationMode>(99);
   expect_throws<GAFatalException>(
     [&bad_operation]() {
       int selected = -1;
@@ -1027,7 +1004,7 @@ void test_population_invalid_enum_paths()
 								  Population::FitnessMode::Evaluation,
 								  Population::VariableLengthMode::Fixed, 2));
   prepare_population(bad_operation_dup, "1111", "0000");
-  bad_operation_dup.config_.operation = static_cast<Population::OperationMode>(99);
+  bad_operation_dup.settings_.operation = static_cast<Population::OperationMode>(99);
   std::vector<std::unique_ptr<Chromosome> > dup_replacements;
   dup_replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0011"))));
   expect_throws<GAFatalException>(
@@ -1122,7 +1099,7 @@ void test_population_execute_returns_structured_result()
   expect_true(!result.usedConfiguredSeed,
 	      "execute should report when the seed came from explicit runtime injection");
   expect_true(result.generationsCompleted >= 1, "execute should report completed generations");
-  expect_true(result.evaluations >= pop.configuration().numberOfIndividuals,
+  expect_true(result.evaluations >= pop.settings().numberOfIndividuals,
 	      "execute should report total evaluations");
   expect_true(!result.generationReports.empty(),
 	      "execute(true) should capture per-generation reports");
@@ -1189,7 +1166,7 @@ void test_population_fixed_seed_makes_runs_reproducible()
 {
   SilentStderr silence;
 
-  Population::Options options = make_population_options(Population::OperationMode::Maximize, 6, 20, 4, 0.05, 0.65,
+  Population::Settings options = make_population_options(Population::OperationMode::Maximize, 6, 20, 4, 0.05, 0.65,
 							Population::ReproductionMode::AllowDuplicates,
 							Population::ParentSelectionMode::RouletteWheel,
 							Population::DeletionMode::DeleteAll,
@@ -1248,11 +1225,11 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
 
   std::unique_ptr<Chromosome> initial = pop.createInitialChromosome();
   expect_true(initial.get() != NULL, "Default createInitialChromosome should produce a chromosome");
-  expect_true(initial->ChromosomeLen() == pop.configuration().geneticDiversity,
+  expect_true(initial->length() == pop.settings().geneticDiversity,
 	      "Default createInitialChromosome should use the configured diversity as chromosome length");
-  for (int i = 0 ; i < initial->ChromosomeLen() ; i++)
+  for (int i = 0 ; i < initial->length() ; i++)
     {
-      int value = initial->chromosomeString().test(i);
+      int value = initial->genes().test(i);
       expect_true(value == 0 || value == 1,
 		  "Default createInitialChromosome should respect the configured base state range");
     }
@@ -1260,19 +1237,19 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
   std::unique_ptr<Chromosome> mother(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("111100"))));
   std::unique_ptr<Chromosome> father(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("000011"))));
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-    pop.mateChromosomes(mother.get(), father.get());
+    pop.mateChromosomes(*mother, *father);
 
   expect_true(children.first.get() != NULL && children.second.get() != NULL,
 	      "Default mateChromosomes should produce two children");
-  expect_true(children.first->compare(father.get()),
+  expect_true(children.first->equals(*father),
 	      "Default mateChromosomes should clone the father into the first child when crossover is disabled");
-  expect_true(children.second->compare(mother.get()),
+  expect_true(children.second->equals(*mother),
 	      "Default mateChromosomes should clone the mother into the second child when crossover is disabled");
 
-  pop.mutateChromosome(children.first.get());
-  for (int i = 0 ; i < children.first->ChromosomeLen() ; i++)
+  pop.mutateChromosome(*children.first);
+  for (int i = 0 ; i < children.first->length() ; i++)
     {
-      int value = children.first->chromosomeString().test(i);
+      int value = children.first->genes().test(i);
       expect_true(value == 0 || value == 1,
 		  "Default mutateChromosome should keep binary genes in range");
     }
@@ -1291,7 +1268,7 @@ void test_delete_all_but_best_runs()
 
   expect_true(pop.populationInitialized == true, "Population should initialize during run");
   expect_true(!pop.populationTable.empty(), "Population should retain its table after run");
-  expect_true(pop.populationTable[pop.configuration().numberOfIndividuals - 1].get()->chromosomeString().test(0) == 1,
+  expect_true(pop.populationTable[pop.settings().numberOfIndividuals - 1].get()->genes().test(0) == 1,
 	      "Best chromosome should remain present after DeleteAllButBest runs");
 }
 

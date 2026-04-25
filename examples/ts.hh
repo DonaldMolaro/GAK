@@ -19,13 +19,11 @@
 class TravelingSalesman : public Population
 {
 public:
-   TravelingSalesman(const Population::Options& options,
-                     int gridS = 0);
-   TravelingSalesman(const Population::Configuration& configuration,
-                     int gridS = 0);
+   TravelingSalesman(const Population::Settings& settings,
+                     int gridSize = 0);
   
-   double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b, std::ostream& out) override;
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) override;
 private:
    using Coordinate = std::pair<int, int>;
 

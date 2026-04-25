@@ -4,17 +4,12 @@
 #include "population.hh"
 #include "spell.hh"
 
-Spell::Spell(const Population::Options& options)
-   : Spell(options.toConfiguration())
+Spell::Spell(const Population::Settings& settings)
+   : Population(settings)
 {
 }
 
-Spell::Spell(const Population::Configuration& configuration)
-   : Population(configuration)
-{
-}
-
-double Spell::FitnessFunction(const BaseString& b)
+double Spell::evaluateFitness(const BaseString& genes)
 {
    //
    // Fitness is the total squared distance that each 
@@ -24,30 +19,30 @@ double Spell::FitnessFunction(const BaseString& b)
    //
    // ok for each element in the correct order.
    // 
-   for ( int i = 0 ; i < b.length() ; i++ )
+   for ( int i = 0 ; i < genes.length() ; i++ )
    {
       switch(i)
       {
       case 0:
-	 if (b.test(i) == 'e' - 'a') res++;
+	 if (genes.test(i) == 'e' - 'a') res++;
 	 break;
       case 1:
-	 if (b.test(i) == 'g' - 'a') res++;
+	 if (genes.test(i) == 'g' - 'a') res++;
 	 break;
       case 2:
-	 if (b.test(i) == 'g' - 'a') res++;
+	 if (genes.test(i) == 'g' - 'a') res++;
 	 break;
       case 3:
-	 if (b.test(i) == 'h' - 'a') res++;
+	 if (genes.test(i) == 'h' - 'a') res++;
 	 break;
       case 4:
-	 if (b.test(i) == 'e' - 'a') res++;
+	 if (genes.test(i) == 'e' - 'a') res++;
 	 break;
       case 5:
-	 if (b.test(i) == 'a' - 'a') res++;
+	 if (genes.test(i) == 'a' - 'a') res++;
 	 break;
       case 6:
-	 if (b.test(i) == 'd' - 'a') res++;
+	 if (genes.test(i) == 'd' - 'a') res++;
 	 break;
       default:
 	 if (res > 1) res--;
@@ -59,15 +54,15 @@ double Spell::FitnessFunction(const BaseString& b)
 };
 
 
-void Spell::FitnessPrint(const BaseString& b, std::ostream& out)
+void Spell::printCandidate(const BaseString& genes, std::ostream& out)
 {
-   for ( int i = 0 ; i < b.length() ; i++ )
+   for ( int i = 0 ; i < genes.length() ; i++ )
    {
 /*
       assert(b->test(i) >= 0);
       assert(b->test(i) < 26);
 */
-      out << static_cast<char>(b.test(i) + 'a');
+      out << static_cast<char>(genes.test(i) + 'a');
    }
    out << " ::";
 }

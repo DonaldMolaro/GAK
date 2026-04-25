@@ -8,11 +8,10 @@
 class Knapsack : public Population
 {
 public:
-   explicit Knapsack(const Population::Options& options);
-   explicit Knapsack(const Population::Configuration& configuration);
+   explicit Knapsack(const Population::Settings& settings);
 
-   double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b, std::ostream& out) override;
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) override;
 
 private:
    static const int kCapacity = 35;

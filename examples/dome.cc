@@ -5,13 +5,8 @@
 #include "population.hh"
 #include "dome.hh"
 
-Dome::Dome(const Population::Options& options)
-   : Dome(options.toConfiguration())
-{
-}
-
-Dome::Dome(const Population::Configuration& configuration)
-   : Population(configuration)
+Dome::Dome(const Population::Settings& settings)
+   : Population(settings)
 {
 }
 
@@ -20,10 +15,10 @@ double Dome::sqr(double x)
    return x * x;
 }
 
-double Dome::FitnessFunction(const BaseString& b)
+double Dome::evaluateFitness(const BaseString& genes)
 {
-   int x1 = decode(b, 0,16);
-   int y1 = decode(b,16,32);
+   int x1 = decode(genes, 0,16);
+   int y1 = decode(genes,16,32);
    double x2 = static_cast<double>(x1) / 100.0;
    double y2 = static_cast<double>(y1) / 100.0;
 
@@ -32,10 +27,10 @@ double Dome::FitnessFunction(const BaseString& b)
 };
 
 
-void Dome::FitnessPrint(const BaseString& b, std::ostream& out)
+void Dome::printCandidate(const BaseString& genes, std::ostream& out)
 {
-   int x1 = decode(b,0,16);
-   int y1 = decode(b,16,32);
+   int x1 = decode(genes,0,16);
+   int y1 = decode(genes,16,32);
 
    double x2 = static_cast<double>(x1) / 100.0;
    double y2 = static_cast<double>(y1) / 100.0;

@@ -16,17 +16,17 @@
 class Chromosome
 {
 public:
-  enum CrossOverType { SinglePoint,TwoPoint,Uniform };
+  enum class CrossoverType { SinglePoint, TwoPoint, Uniform };
 private:
   using BaseStringPtr = std::unique_ptr<BaseString>;
   using ChromosomePtr = std::unique_ptr<Chromosome>;
   static int randomBit(std::mt19937& randomGenerator);
   static int randomIndex(std::mt19937& randomGenerator, int upperBoundExclusive);
-  int  ChromosomeLength;
-  int  variableLength;
-  int  baseStates;
-  std::unique_ptr<BaseString> ChromosomeString;
-  int testCrossOverRate(std::mt19937& randomGenerator, double crossOverRate);
+  int chromosomeLength;
+  bool variableLength;
+  int baseStates;
+  std::unique_ptr<BaseString> chromosomeString_;
+  bool shouldCrossover(std::mt19937& randomGenerator, double crossoverRate);
   static BaseStringPtr cloneBaseString(const BaseString *source, int baseStates);
   std::pair<BaseStringPtr, BaseStringPtr> singlePointCrossOver(const BaseString *mother,
                                                                const BaseString *father,
@@ -39,27 +39,28 @@ private:
                                                            std::mt19937& randomGenerator);
 public:
   // Default is a 32-gene binary chromosome with fixed length.
-  Chromosome(unsigned int ChromosomeLength = 32,
-	     unsigned int vlength = 0,
+  Chromosome(unsigned int chromosomeLength = 32,
+	     bool variableLength = false,
 	     unsigned int numStates = 2,
 	     std::mt19937* randomGenerator = nullptr); 
    
   Chromosome(std::unique_ptr<BaseString> b,
-	     unsigned int vlength = 0,
+	     bool variableLength = false,
 	     unsigned int numStates = 2);
 
   ~Chromosome() = default;
-  int ChromosomeLen() const                { return ChromosomeLength; }
-  BaseString& chromosomeString()           { return *ChromosomeString; }
-  const BaseString& chromosomeString() const { return *ChromosomeString; }
+  int length() const                       { return chromosomeLength; }
+  bool isVariableLength() const            { return variableLength; }
+  BaseString& genes()                      { return *chromosomeString_; }
+  const BaseString& genes() const          { return *chromosomeString_; }
   // Apply the built-in point mutation operator across the chromosome.
-  void SingleBitMutate(double probability = 0.008, std::mt19937* randomGenerator = nullptr);
+  void mutate(double probability = 0.008, std::mt19937* randomGenerator = nullptr);
   // Produce two children using one of the built-in crossover strategies.
   std::pair<ChromosomePtr, ChromosomePtr> mate(Chromosome& father,
-                                               double crossOverRate = 0.65,
-                                               CrossOverType crossType = SinglePoint,
+                                               double crossoverRate = 0.65,
+                                               CrossoverType crossoverType = CrossoverType::SinglePoint,
                                                std::mt19937* randomGenerator = nullptr);
-  bool compare(const Chromosome *candidate) const;
-  void print(std::ostream &ostr) const     { chromosomeString().printBits(ostr); ostr << '\n'; }
+  bool equals(const Chromosome& candidate) const;
+  void print(std::ostream &ostr) const     { genes().printBits(ostr); ostr << '\n'; }
 };
 #endif

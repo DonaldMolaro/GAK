@@ -6,10 +6,9 @@ class F6 : public Population
 {
    double sqr ( double x );
 public:
-   explicit F6(const Population::Options& options);
-   explicit F6(const Population::Configuration& configuration);
+   explicit F6(const Population::Settings& settings);
 
-   double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b, std::ostream& out) override;
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) override;
 };
 #endif

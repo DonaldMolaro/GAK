@@ -9,17 +9,12 @@
 #include "population.hh"
 #include "alpha.hh"
 
-Alpha::Alpha(const Population::Options& options)
-   : Alpha(options.toConfiguration())
+Alpha::Alpha(const Population::Settings& settings)
+   : Population(settings)
 {
 }
 
-Alpha::Alpha(const Population::Configuration& configuration)
-   : Population(configuration)
-{
-}
-
-double Alpha::FitnessFunction(const BaseString& b)
+double Alpha::evaluateFitness(const BaseString& genes)
 {
    //
    // Fitness is the total squared distance that each 
@@ -38,18 +33,18 @@ double Alpha::FitnessFunction(const BaseString& b)
       }
    }
 #else
-   for ( int i = 0 ; i < b.length() ; i++ )
+   for ( int i = 0 ; i < genes.length() ; i++ )
    {
-      for ( int j = i ; j < b.length() ; j++ )
+      for ( int j = i ; j < genes.length() ; j++ )
       {
-	 if (b.test(i) < b.test(j)) res++;
+	 if (genes.test(i) < genes.test(j)) res++;
       }
    }
-   for ( int i = b.length()-1 ; i >= 0; i-- )
+   for ( int i = genes.length()-1 ; i >= 0; i-- )
    {
       for ( int j = i ; j >= 0 ; j-- )
       {
-	 if (b.test(i) > b.test(j)) res++;
+	 if (genes.test(i) > genes.test(j)) res++;
       }
    }
 /*
@@ -74,13 +69,13 @@ double Alpha::FitnessFunction(const BaseString& b)
 };
 
 
-void Alpha::FitnessPrint(const BaseString& b, std::ostream& out)
+void Alpha::printCandidate(const BaseString& genes, std::ostream& out)
 {
-   for ( int i = 0 ; i < b.length() ; i++ )
+   for ( int i = 0 ; i < genes.length() ; i++ )
    {
 //      assert(b->test(i) >= 0);
 //      assert(b->test(i) < 26);
-      out << static_cast<char>(b.test(i) + 'a');
+      out << static_cast<char>(genes.test(i) + 'a');
    }
    out << " ::";
 }
@@ -96,7 +91,7 @@ int Alpha::RandomAlgorithm()
    {
       current->set(i,value_distribution(generator));
    }
-   int fitness = FitnessFunction(*current);
+   int fitness = evaluateFitness(*current);
    int iter = 0;
    while (fitness < 650)
    {
@@ -107,13 +102,13 @@ int Alpha::RandomAlgorithm()
       int index = index_distribution(generator);
       int value = value_distribution(generator);
       next->set(index,value);
-      int nextFit = FitnessFunction(*next);
+      int nextFit = evaluateFitness(*next);
       if (nextFit > fitness)
       {
 	 current = std::move(next);
 	 next = std::make_unique<BaseString>(13,13);
 	 fitness = nextFit;
-	 FitnessPrint(*current, std::cerr);
+	 printCandidate(*current, std::cerr);
 	 std::cerr << "Iteration " << iter << " New Fitness " << fitness << '\n';
       }
       if (( iter % 1000 ) == 0)

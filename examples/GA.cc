@@ -14,9 +14,9 @@
 
 namespace
 {
-Population::Options make_dome_options()
+Population::Settings make_dome_options()
 {
-  Population::Options options;
+  Population::Settings options;
   options.operation = Population::OperationMode::Minimize;
   options.numberOfIndividuals = 100;
   options.numberOfTrials = 4000;
@@ -32,17 +32,17 @@ Population::Options make_dome_options()
   return options;
 }
 
-Population::Options make_f6_options()
+Population::Settings make_f6_options()
 {
-  Population::Options options = make_dome_options();
+  Population::Settings options = make_dome_options();
   options.numberOfTrials = 5000;
   options.geneticDiversity = 44;
   return options;
 }
 
-Population::Options make_alpha_options()
+Population::Settings make_alpha_options()
 {
-  Population::Options options;
+  Population::Settings options;
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 1000;
   options.numberOfTrials = 160000;
@@ -58,9 +58,9 @@ Population::Options make_alpha_options()
   return options;
 }
 
-Population::Options make_spell_options()
+Population::Settings make_spell_options()
 {
-  Population::Options options;
+  Population::Settings options;
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 100;
   options.numberOfTrials = 8000;
@@ -76,9 +76,9 @@ Population::Options make_spell_options()
   return options;
 }
 
-Population::Options make_traveling_salesman_options()
+Population::Settings make_traveling_salesman_options()
 {
-  Population::Options options;
+  Population::Settings options;
   options.operation = Population::OperationMode::Minimize;
   options.numberOfIndividuals = 500;
   options.numberOfTrials = 200000;
@@ -94,9 +94,9 @@ Population::Options make_traveling_salesman_options()
   return options;
 }
 
-Population::Options make_nqueens_options()
+Population::Settings make_nqueens_options()
 {
-  Population::Options options;
+  Population::Settings options;
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 250;
   options.numberOfTrials = 15000;
@@ -112,9 +112,9 @@ Population::Options make_nqueens_options()
   return options;
 }
 
-Population::Options make_knapsack_options()
+Population::Settings make_knapsack_options()
 {
-  Population::Options options;
+  Population::Settings options;
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 150;
   options.numberOfTrials = 12000;
@@ -130,9 +130,9 @@ Population::Options make_knapsack_options()
   return options;
 }
 
-Population::Options make_latin_square_options()
+Population::Settings make_latin_square_options()
 {
-  Population::Options options;
+  Population::Settings options;
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 250;
   options.numberOfTrials = 15000;
@@ -148,9 +148,9 @@ Population::Options make_latin_square_options()
   return options;
 }
 
-Population::Options make_sudoku_options()
+Population::Settings make_sudoku_options()
 {
-  Population::Options options;
+  Population::Settings options;
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 400;
   options.numberOfTrials = 20000;
@@ -166,9 +166,9 @@ Population::Options make_sudoku_options()
   return options;
 }
 
-Population::Options make_constrained_sudoku_options()
+Population::Settings make_constrained_sudoku_options()
 {
-  Population::Options options = make_sudoku_options();
+  Population::Settings options = make_sudoku_options();
   options.numberOfIndividuals = 250;
   options.numberOfTrials = 12000;
   options.bitMutationRate = 0.05;

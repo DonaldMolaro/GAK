@@ -102,7 +102,7 @@ private:
 class InspectableSudokuConstrained : public SudokuConstrained
 {
 public:
-  explicit InspectableSudokuConstrained(const Population::Options& options)
+  explicit InspectableSudokuConstrained(const Population::Settings& options)
     : SudokuConstrained(options)
   {
   }
@@ -139,12 +139,12 @@ BaseString *makeSymbolicString(const std::string& letters)
   return b;
 }
 
-Population::Options make_options(Population::OperationMode operation,
+Population::Settings make_options(Population::OperationMode operation,
                                  int diversity,
                                  Population::VariableLengthMode variable_length,
                                  int base_states)
 {
-  Population::Options options;
+  Population::Settings options;
   options.operation = operation;
   options.numberOfIndividuals = 6;
   options.numberOfTrials = 12;
@@ -167,7 +167,7 @@ void test_dome_fitness()
                          Population::VariableLengthMode::Fixed, 2));
   BaseString *origin = makeBinaryString(std::string(32, '0'));
 
-  expect_true(dome.FitnessFunction(*origin) == 100,
+  expect_true(dome.evaluateFitness(*origin) == 100,
               "Dome fitness at the origin should be 100");
 
   delete origin;
@@ -179,7 +179,7 @@ void test_f6_fitness_is_positive()
   F6 f6(make_options(Population::OperationMode::Maximize, 44,
                      Population::VariableLengthMode::Fixed, 2));
   BaseString *origin = makeBinaryString(std::string(44, '0'));
-  const double fitness = f6.FitnessFunction(*origin);
+  const double fitness = f6.evaluateFitness(*origin);
 
   expect_true(fitness >= 1.0, "F6 fitness should stay positive");
 
@@ -194,9 +194,9 @@ void test_spell_fitness_matches_target_word()
   BaseString *target = makeSymbolicString("egghead");
   BaseString *wrong = makeSymbolicString("aaaaaaa");
 
-  expect_true(spell.FitnessFunction(*target) == 7,
+  expect_true(spell.evaluateFitness(*target) == 7,
               "Spell fitness should reward the target word");
-  expect_true(spell.FitnessFunction(*wrong) < spell.FitnessFunction(*target),
+  expect_true(spell.evaluateFitness(*wrong) < spell.evaluateFitness(*target),
               "Spell fitness should rank the target word above a wrong word");
 
   delete target;
@@ -216,7 +216,7 @@ void test_alpha_prefers_sorted_alphabet()
       reversed->set(i, 12 - i);
     }
 
-  expect_true(alpha.FitnessFunction(*sorted) > alpha.FitnessFunction(*reversed),
+  expect_true(alpha.evaluateFitness(*sorted) > alpha.evaluateFitness(*reversed),
               "Alpha fitness should prefer sorted sequences");
 
   delete sorted;
@@ -254,7 +254,7 @@ void test_traveling_salesman_construction_and_validation()
     {
       route.set(i, i);
     }
-  expect_true(tsp.FitnessFunction(route) > 0.0,
+  expect_true(tsp.evaluateFitness(route) > 0.0,
               "TravelingSalesman route fitness should be positive");
 
   expect_throws<GAFatalException>(
@@ -269,7 +269,7 @@ void test_traveling_salesman_construction_and_validation()
 void test_traveling_salesman_fixed_seed_is_reproducible()
 {
   SilentOutput silence;
-  Population::Options options = make_options(Population::OperationMode::Minimize, 5,
+  Population::Settings options = make_options(Population::OperationMode::Minimize, 5,
                                              Population::VariableLengthMode::Variable, 5);
   options.useFixedRandomSeed = true;
   options.randomSeed = 314159U;
@@ -298,9 +298,9 @@ void test_nqueens_rewards_non_attacking_layouts()
       bad->set(i, 0);
     }
 
-  expect_true(queens.FitnessFunction(*solution) == 28,
+  expect_true(queens.evaluateFitness(*solution) == 28,
               "NQueens should score a solved 8-queen layout with all non-attacking pairs");
-  expect_true(queens.FitnessFunction(*solution) > queens.FitnessFunction(*bad),
+  expect_true(queens.evaluateFitness(*solution) > queens.evaluateFitness(*bad),
               "NQueens should rank a solved layout above a conflicting one");
 
   delete solution;
@@ -316,9 +316,9 @@ void test_knapsack_prefers_feasible_high_value_selections()
   BaseString *feasible = makeBinaryString("111101100000");
   BaseString *overweight = makeBinaryString("111111111111");
 
-  expect_true(knapsack.FitnessFunction(*feasible) > 0.0,
+  expect_true(knapsack.evaluateFitness(*feasible) > 0.0,
               "Knapsack should assign positive fitness to a feasible selection");
-  expect_true(knapsack.FitnessFunction(*feasible) > knapsack.FitnessFunction(*overweight),
+  expect_true(knapsack.evaluateFitness(*feasible) > knapsack.evaluateFitness(*overweight),
               "Knapsack should penalize overweight selections");
 
   delete feasible;
@@ -345,9 +345,9 @@ void test_latin_square_rewards_unique_rows_and_columns()
       bad->set(i, 0);
     }
 
-  expect_true(latin_square.FitnessFunction(*solution) == 32,
+  expect_true(latin_square.evaluateFitness(*solution) == 32,
               "LatinSquare should score a solved 4x4 latin square at the maximum");
-  expect_true(latin_square.FitnessFunction(*solution) > latin_square.FitnessFunction(*bad),
+  expect_true(latin_square.evaluateFitness(*solution) > latin_square.evaluateFitness(*bad),
               "LatinSquare should rank a solved square above a degenerate one");
 
   delete solution;
@@ -357,7 +357,7 @@ void test_latin_square_rewards_unique_rows_and_columns()
 void test_latin_square_run_path()
 {
   SilentOutput silence;
-  Population::Options options = make_options(Population::OperationMode::Maximize, 16,
+  Population::Settings options = make_options(Population::OperationMode::Maximize, 16,
                                              Population::VariableLengthMode::Fixed, 4);
   options.numberOfIndividuals = 24;
   options.numberOfTrials = 80;
@@ -399,9 +399,9 @@ void test_sudoku_rewards_valid_solution_and_givens()
       bad->set(i, 0);
     }
 
-  expect_true(sudoku.FitnessFunction(*solution) == 513,
+  expect_true(sudoku.evaluateFitness(*solution) == 513,
               "Sudoku should score a solved board at the maximum");
-  expect_true(sudoku.FitnessFunction(*solution) > sudoku.FitnessFunction(*bad),
+  expect_true(sudoku.evaluateFitness(*solution) > sudoku.evaluateFitness(*bad),
               "Sudoku should rank a valid solved board above a degenerate one");
 
   delete solution;
@@ -411,7 +411,7 @@ void test_sudoku_rewards_valid_solution_and_givens()
 void test_sudoku_run_path()
 {
   SilentOutput silence;
-  Population::Options options = make_options(Population::OperationMode::Maximize, 81,
+  Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
                                              Population::VariableLengthMode::Fixed, 9);
   options.numberOfIndividuals = 36;
   options.numberOfTrials = 100;
@@ -431,7 +431,7 @@ void test_sudoku_run_path()
 void test_constrained_sudoku_preserves_row_structure_and_givens()
 {
   SilentOutput silence;
-  Population::Options options = make_options(Population::OperationMode::Maximize, 81,
+  Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
                                              Population::VariableLengthMode::Fixed, 9);
   options.bitMutationRate = 0.05;
   options.crossOverRate = 0.80;
@@ -470,31 +470,31 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
     {
       if (givens[cell] != 0)
         {
-          expect_true(first->chromosomeString().test(cell) + 1 == givens[cell],
+          expect_true(first->genes().test(cell) + 1 == givens[cell],
                       "Constrained Sudoku initialization should preserve givens");
-          expect_true(second->chromosomeString().test(cell) + 1 == givens[cell],
+          expect_true(second->genes().test(cell) + 1 == givens[cell],
                       "Constrained Sudoku initialization should preserve givens across all individuals");
         }
     }
 
   for (int row = 0 ; row < 9 ; row++)
     {
-      expect_true(row_is_permutation(&first->chromosomeString(), row),
+      expect_true(row_is_permutation(&first->genes(), row),
                   "Constrained Sudoku initialization should make each row a permutation");
-      expect_true(row_is_permutation(&second->chromosomeString(), row),
+      expect_true(row_is_permutation(&second->genes(), row),
                   "Constrained Sudoku initialization should make each row a permutation for every individual");
     }
 
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-    sudoku.mateChromosomes(first.get(), second.get());
-  sudoku.mutateChromosome(children.first.get());
-  sudoku.mutateChromosome(children.second.get());
+    sudoku.mateChromosomes(*first, *second);
+  sudoku.mutateChromosome(*children.first);
+  sudoku.mutateChromosome(*children.second);
 
   for (int row = 0 ; row < 9 ; row++)
     {
-      expect_true(row_is_permutation(&children.first->chromosomeString(), row),
+      expect_true(row_is_permutation(&children.first->genes(), row),
                   "Constrained Sudoku crossover/mutation should preserve row permutations");
-      expect_true(row_is_permutation(&children.second->chromosomeString(), row),
+      expect_true(row_is_permutation(&children.second->genes(), row),
                   "Constrained Sudoku crossover/mutation should preserve row permutations in both children");
     }
 
@@ -502,9 +502,9 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
     {
       if (givens[cell] != 0)
         {
-          expect_true(children.first->chromosomeString().test(cell) + 1 == givens[cell],
+          expect_true(children.first->genes().test(cell) + 1 == givens[cell],
                       "Constrained Sudoku operators should keep givens locked in the first child");
-          expect_true(children.second->chromosomeString().test(cell) + 1 == givens[cell],
+          expect_true(children.second->genes().test(cell) + 1 == givens[cell],
                       "Constrained Sudoku operators should keep givens locked in the second child");
         }
     }
@@ -513,7 +513,7 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
 void test_constrained_sudoku_run_path()
 {
   SilentOutput silence;
-  Population::Options options = make_options(Population::OperationMode::Maximize, 81,
+  Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
                                              Population::VariableLengthMode::Fixed, 9);
   options.numberOfIndividuals = 40;
   options.numberOfTrials = 140;
@@ -533,7 +533,7 @@ void test_constrained_sudoku_run_path()
 void test_constrained_sudoku_fixed_seed_is_reproducible()
 {
   SilentOutput silence;
-  Population::Options options = make_options(Population::OperationMode::Maximize, 81,
+  Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
                                              Population::VariableLengthMode::Fixed, 9);
   options.useFixedRandomSeed = true;
   options.randomSeed = 271828U;
@@ -543,7 +543,7 @@ void test_constrained_sudoku_fixed_seed_is_reproducible()
   std::unique_ptr<Chromosome> first_board = first.createInitialChromosome();
   std::unique_ptr<Chromosome> second_board = second.createInitialChromosome();
 
-  expect_true(first_board->compare(second_board.get()),
+  expect_true(first_board->equals(*second_board),
               "Constrained Sudoku should generate the same initial chromosome for a fixed seed");
 }
 

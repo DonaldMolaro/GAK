@@ -20,37 +20,32 @@ const int Sudoku::kPuzzle[Sudoku::kCellCount] = {
    0, 0, 0, 0, 8, 0, 0, 7, 9
 };
 
-Sudoku::Sudoku(const Population::Options& options)
-   : Sudoku(options.toConfiguration())
+Sudoku::Sudoku(const Population::Settings& settings)
+   : Population(settings)
 {
+   validateSettings(settings);
 }
 
-Sudoku::Sudoku(const Population::Configuration& configuration)
-   : Population(configuration)
+void Sudoku::validateSettings(const Population::Settings& settings) const
 {
-   validateConfiguration(configuration);
-}
-
-void Sudoku::validateConfiguration(const Population::Configuration& configuration) const
-{
-   if (configuration.geneticDiversity != kCellCount)
+   if (settings.geneticDiversity != kCellCount)
    {
       throw GAFatalException(__FILE__,__LINE__,"Sudoku expects 81 genes");
    }
 
-   if (configuration.baseStates != kBoardSize)
+   if (settings.baseStates != kBoardSize)
    {
       throw GAFatalException(__FILE__,__LINE__,"Sudoku expects 9 symbol states");
    }
 }
 
-int Sudoku::uniquenessScoreForRow(const BaseString& b, int row) const
+int Sudoku::uniquenessScoreForRow(const BaseString& genes, int row) const
 {
    std::vector<int> seen(kBoardSize, 0);
    int score = 0;
    for ( int column = 0 ; column < kBoardSize ; column++ )
    {
-      const int value = b.test((row * kBoardSize) + column);
+      const int value = genes.test((row * kBoardSize) + column);
       if (value < 0 || value >= kBoardSize)
       {
          throw GAFatalException(__FILE__,__LINE__,"Sudoku encountered an out-of-range symbol");
@@ -64,13 +59,13 @@ int Sudoku::uniquenessScoreForRow(const BaseString& b, int row) const
    return score;
 }
 
-int Sudoku::uniquenessScoreForColumn(const BaseString& b, int column) const
+int Sudoku::uniquenessScoreForColumn(const BaseString& genes, int column) const
 {
    std::vector<int> seen(kBoardSize, 0);
    int score = 0;
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
-      const int value = b.test((row * kBoardSize) + column);
+      const int value = genes.test((row * kBoardSize) + column);
       if (value < 0 || value >= kBoardSize)
       {
          throw GAFatalException(__FILE__,__LINE__,"Sudoku encountered an out-of-range symbol");
@@ -84,7 +79,7 @@ int Sudoku::uniquenessScoreForColumn(const BaseString& b, int column) const
    return score;
 }
 
-int Sudoku::uniquenessScoreForBox(const BaseString& b, int boxRow, int boxColumn) const
+int Sudoku::uniquenessScoreForBox(const BaseString& genes, int boxRow, int boxColumn) const
 {
    std::vector<int> seen(kBoardSize, 0);
    int score = 0;
@@ -94,7 +89,7 @@ int Sudoku::uniquenessScoreForBox(const BaseString& b, int boxRow, int boxColumn
       {
          const int row = (boxRow * kSubgridSize) + rowOffset;
          const int column = (boxColumn * kSubgridSize) + columnOffset;
-         const int value = b.test((row * kBoardSize) + column);
+         const int value = genes.test((row * kBoardSize) + column);
          if (value < 0 || value >= kBoardSize)
          {
             throw GAFatalException(__FILE__,__LINE__,"Sudoku encountered an out-of-range symbol");
@@ -109,7 +104,7 @@ int Sudoku::uniquenessScoreForBox(const BaseString& b, int boxRow, int boxColumn
    return score;
 }
 
-int Sudoku::givenConsistencyScore(const BaseString& b) const
+int Sudoku::givenConsistencyScore(const BaseString& genes) const
 {
    int score = 0;
    for ( int cell = 0 ; cell < kCellCount ; cell++ )
@@ -119,7 +114,7 @@ int Sudoku::givenConsistencyScore(const BaseString& b) const
          continue;
       }
 
-      if ((b.test(cell) + 1) == kPuzzle[cell])
+      if ((genes.test(cell) + 1) == kPuzzle[cell])
       {
          score += kBoardSize;
       }
@@ -127,39 +122,39 @@ int Sudoku::givenConsistencyScore(const BaseString& b) const
    return score;
 }
 
-double Sudoku::FitnessFunction(const BaseString& b)
+double Sudoku::evaluateFitness(const BaseString& genes)
 {
-   int score = givenConsistencyScore(b);
+   int score = givenConsistencyScore(genes);
 
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
-      score += uniquenessScoreForRow(b, row);
+      score += uniquenessScoreForRow(genes, row);
    }
 
    for ( int column = 0 ; column < kBoardSize ; column++ )
    {
-      score += uniquenessScoreForColumn(b, column);
+      score += uniquenessScoreForColumn(genes, column);
    }
 
    for ( int boxRow = 0 ; boxRow < kSubgridSize ; boxRow++ )
    {
       for ( int boxColumn = 0 ; boxColumn < kSubgridSize ; boxColumn++ )
       {
-         score += uniquenessScoreForBox(b, boxRow, boxColumn);
+         score += uniquenessScoreForBox(genes, boxRow, boxColumn);
       }
    }
 
    return score;
 }
 
-void Sudoku::FitnessPrint(const BaseString& b, std::ostream& out)
+void Sudoku::printCandidate(const BaseString& genes, std::ostream& out)
 {
    out << "Sudoku candidate:\n";
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
       for ( int column = 0 ; column < kBoardSize ; column++ )
       {
-         out << (b.test((row * kBoardSize) + column) + 1);
+         out << (genes.test((row * kBoardSize) + column) + 1);
          if (column == 2 || column == 5)
          {
             out << " | ";

@@ -6,27 +6,22 @@
 #include "population.hh"
 #include "nqueens.hh"
 
-NQueens::NQueens(const Population::Options& options)
-   : NQueens(options.toConfiguration())
+NQueens::NQueens(const Population::Settings& settings)
+   : Population(settings)
 {
 }
 
-NQueens::NQueens(const Population::Configuration& configuration)
-   : Population(configuration)
+double NQueens::evaluateFitness(const BaseString& genes)
 {
-}
-
-double NQueens::FitnessFunction(const BaseString& b)
-{
-   const int boardSize = b.length();
+   const int boardSize = genes.length();
    int nonAttackingPairs = 0;
 
    for ( int column = 0 ; column < boardSize ; column++ )
    {
       for ( int otherColumn = column + 1 ; otherColumn < boardSize ; otherColumn++ )
       {
-         const int row = b.test(column);
-         const int otherRow = b.test(otherColumn);
+         const int row = genes.test(column);
+         const int otherRow = genes.test(otherColumn);
          const bool sameRow = row == otherRow;
          const bool sameDiagonal = std::abs(row - otherRow) == (otherColumn - column);
          if (!sameRow && !sameDiagonal)
@@ -39,20 +34,20 @@ double NQueens::FitnessFunction(const BaseString& b)
    return nonAttackingPairs;
 }
 
-void NQueens::FitnessPrint(const BaseString& b, std::ostream& out)
+void NQueens::printCandidate(const BaseString& genes, std::ostream& out)
 {
    out << "Queens:";
-   for ( int column = 0 ; column < b.length() ; column++ )
+   for ( int column = 0 ; column < genes.length() ; column++ )
    {
-      out << ' ' << b.test(column);
+      out << ' ' << genes.test(column);
    }
    out << '\n';
 
-   for ( int row = 0 ; row < b.length() ; row++ )
+   for ( int row = 0 ; row < genes.length() ; row++ )
    {
-      for ( int column = 0 ; column < b.length() ; column++ )
+      for ( int column = 0 ; column < genes.length() ; column++ )
       {
-         out << (b.test(column) == row ? 'Q' : '.');
+         out << (genes.test(column) == row ? 'Q' : '.');
       }
       out << '\n';
    }

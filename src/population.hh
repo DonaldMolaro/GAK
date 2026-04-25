@@ -12,7 +12,7 @@ class Chromosome;
 
 class Population {
 public:
-   struct Options;
+   struct Settings;
    struct GenerationReport;
    enum class OperationMode { Minimize, Maximize };
    enum class ReproductionMode { AllowDuplicates, DisallowDuplicates };
@@ -20,10 +20,9 @@ public:
    enum class DeletionMode { DeleteAll, DeleteAllButBest, DeleteHalf, DeleteQuarter, DeleteLast };
    enum class FitnessMode { Evaluation, Windowed, LinearNormalized };
    enum class VariableLengthMode { Fixed, Variable };
-   struct Configuration
+   struct Settings
    {
-      // Legacy-compatible configuration surface. New code should prefer
-      // `Options`, but this remains useful for bridging older callers.
+      // Supported configuration surface for populations and examples.
       OperationMode operation = OperationMode::Maximize;
       int numberOfIndividuals = 100;
       int numberOfTrials = 4000;
@@ -39,27 +38,6 @@ public:
       bool useFixedRandomSeed = false;
       unsigned int randomSeed = 0;
 
-      Options toOptions() const;
-   };
-   struct Options
-   {
-      // Preferred modern configuration surface for new code and examples.
-      OperationMode operation = OperationMode::Maximize;
-      int numberOfIndividuals = 100;
-      int numberOfTrials = 4000;
-      int geneticDiversity = 44;
-      double bitMutationRate = 0.008;
-      double crossOverRate = 0.65;
-      ReproductionMode reproduction = ReproductionMode::AllowDuplicates;
-      ParentSelectionMode parentSelection = ParentSelectionMode::RouletteWheel;
-      DeletionMode deletion = DeletionMode::DeleteAll;
-      FitnessMode fitness = FitnessMode::Evaluation;
-      VariableLengthMode variableLength = VariableLengthMode::Fixed;
-      int baseStates = 2;
-      bool useFixedRandomSeed = false;
-      unsigned int randomSeed = 0;
-
-      Configuration toConfiguration() const;
    };
    struct PopulationSummary
    {
@@ -93,7 +71,7 @@ private:
    std::vector<double> fitnessTable;
    std::vector<double> windowedFitnessTable;
    std::vector<double> linearNormalizedfitnessTable;
-   Configuration config_;
+   Settings settings_;
    std::mt19937 randomGenerator;
    unsigned int activeRandomSeed_;
    static const int kSummaryCount = 5;
@@ -108,7 +86,7 @@ private:
    int replacementSlotIndex(int offset) const;
    PopulationSummary buildPopulationSummary() const;
    RunResult executeInternal(bool captureGenerationSummaries);
-   void printConfigurationSummary(std::ostream& out) const;
+   void printSettingsSummary(std::ostream& out) const;
    void printGenerationProgress(std::ostream& out, const GenerationReport& report, bool printSummary);
    void reportRun(std::ostream& out, const RunResult& result, bool printGenerationSummaries);
    void printPopulationSummary(std::ostream& out, const PopulationSummary& summary);
@@ -137,25 +115,19 @@ protected:
    // Produce two children from a pair of parents. Override this when the
    // default generic crossover should be replaced with problem-aware mating.
    virtual std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-      mateChromosomes(Chromosome *mother, Chromosome *father);
+      mateChromosomes(Chromosome& mother, Chromosome& father);
    // Apply a mutation step to a chromosome. Override this when mutations need
    // to preserve invariants such as fixed givens or permutation validity.
-   virtual void mutateChromosome(Chromosome *chromosome);
+   virtual void mutateChromosome(Chromosome& chromosome);
 public:
-   // Construct a population from the preferred modern option set.
-   explicit Population(const Options& options);
-   // Construct a population from the legacy-compatible configuration object.
-   explicit Population(const Configuration& configuration);
+   explicit Population(const Settings& settings);
    virtual ~Population();
-   // Subclasses provide the problem-specific score for a chromosome.
-   virtual double FitnessFunction(const BaseString& b)=0;
-   // Subclasses provide a human-readable rendering of a chromosome.
-   virtual void FitnessPrint(const BaseString& b, std::ostream& out)=0;
-   const Configuration& configuration() const noexcept { return config_; }
+   virtual double evaluateFitness(const BaseString& genes)=0;
+   virtual void printCandidate(const BaseString& genes, std::ostream& out)=0;
+   const Settings& settings() const noexcept { return settings_; }
    unsigned int randomSeed() const noexcept { return activeRandomSeed_; }
    void setRandomSeed(unsigned int seed);
-   // Decode a contiguous range of genes as a base-2 integer.
-   int decode(const BaseString& b,int start,int end) const;
+   int decode(const BaseString& genes,int start,int end) const;
    // Run the GA silently and return a structured summary.
    [[nodiscard]] RunResult execute(bool captureGenerationSummaries = false);
    // Compatibility wrapper around `execute()` that prints progress/summaries.

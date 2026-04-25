@@ -8,11 +8,10 @@
 class Sudoku : public Population
 {
 public:
-   explicit Sudoku(const Population::Options& options);
-   explicit Sudoku(const Population::Configuration& configuration);
+   explicit Sudoku(const Population::Settings& settings);
 
-   double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b, std::ostream& out) override;
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) override;
 
 private:
    static const int kBoardSize = 9;
@@ -20,11 +19,11 @@ private:
    static const int kSubgridSize = 3;
    static const int kPuzzle[kCellCount];
 
-   void validateConfiguration(const Population::Configuration& configuration) const;
-   int uniquenessScoreForRow(const BaseString& b, int row) const;
-   int uniquenessScoreForColumn(const BaseString& b, int column) const;
-   int uniquenessScoreForBox(const BaseString& b, int boxRow, int boxColumn) const;
-   int givenConsistencyScore(const BaseString& b) const;
+   void validateSettings(const Population::Settings& settings) const;
+   int uniquenessScoreForRow(const BaseString& genes, int row) const;
+   int uniquenessScoreForColumn(const BaseString& genes, int column) const;
+   int uniquenessScoreForBox(const BaseString& genes, int boxRow, int boxColumn) const;
+   int givenConsistencyScore(const BaseString& genes) const;
 };
 
 #endif

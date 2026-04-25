@@ -6,11 +6,10 @@ class Alpha : public Population
 {
    double sqr ( double x );
 public:
-   explicit Alpha(const Population::Options& options);
-   explicit Alpha(const Population::Configuration& configuration);
+   explicit Alpha(const Population::Settings& settings);
 
-   double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b, std::ostream& out) override;
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) override;
    int RandomAlgorithm();
 };
 #endif

@@ -26,17 +26,11 @@ double Square(double value)
 }
 }
 
-TravelingSalesman::TravelingSalesman(const Population::Options& options,
-                                     int gridS)
-   : TravelingSalesman(options.toConfiguration(), gridS)
-{
-}
-
-TravelingSalesman::TravelingSalesman(const Population::Configuration& configuration,
-                                     int gridS)
-   : Population(configuration),
-     numCities(configuration.geneticDiversity),
-     gridSize(gridS == 0 ? configuration.geneticDiversity : gridS)
+TravelingSalesman::TravelingSalesman(const Population::Settings& settings,
+                                     int requestedGridSize)
+   : Population(settings),
+     numCities(settings.geneticDiversity),
+     gridSize(requestedGridSize == 0 ? settings.geneticDiversity : requestedGridSize)
 {
    if (gridSize <= 0)
    {
@@ -64,22 +58,22 @@ TravelingSalesman::TravelingSalesman(const Population::Configuration& configurat
    }
 }
 
-double TravelingSalesman::FitnessFunction(const BaseString& b)
+double TravelingSalesman::evaluateFitness(const BaseString& genes)
 {
    const double PENALTYLENGTH = 250.0;
    std::vector<int> visited(numCities, 0);
 
    double length = 0.0;
 
-   for ( int i = 0 ; i < b.length()-1 ; i++ )
+   for ( int i = 0 ; i < genes.length()-1 ; i++ )
    {
-      visited[b.test(i)] = 1;
-      visited[b.test(i+1)] = 1;
+      visited[genes.test(i)] = 1;
+      visited[genes.test(i+1)] = 1;
 
       double clength = 
 	 std::sqrt(
-	   Square(static_cast<double>(xCoordinates[b.test(i)]) - static_cast<double>(xCoordinates[b.test(i+1)]))
-	    + Square(static_cast<double>(yCoordinates[b.test(i)]) - static_cast<double>(yCoordinates[b.test(i+1)]))
+	   Square(static_cast<double>(xCoordinates[genes.test(i)]) - static_cast<double>(xCoordinates[genes.test(i+1)]))
+	    + Square(static_cast<double>(yCoordinates[genes.test(i)]) - static_cast<double>(yCoordinates[genes.test(i+1)]))
 	    );
       
       if (clength == 0) clength = PENALTYLENGTH;
@@ -96,11 +90,11 @@ double TravelingSalesman::FitnessFunction(const BaseString& b)
 }
 
 
-void TravelingSalesman::FitnessPrint(const BaseString& b, std::ostream& out)
+void TravelingSalesman::printCandidate(const BaseString& genes, std::ostream& out)
 {
-   for ( int i = 0 ; i < b.length() ; i++ )
+   for ( int i = 0 ; i < genes.length() ; i++ )
    {
-      out << static_cast<char>(b.test(i) + 'a');
+      out << static_cast<char>(genes.test(i) + 'a');
    }
    out << " ::";
 }

@@ -6,11 +6,10 @@
 class NQueens : public Population
 {
 public:
-   explicit NQueens(const Population::Options& options);
-   explicit NQueens(const Population::Configuration& configuration);
+   explicit NQueens(const Population::Settings& settings);
 
-   double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b, std::ostream& out) override;
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) override;
 };
 
 #endif

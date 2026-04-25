@@ -64,7 +64,7 @@ Chromosome::BaseStringPtr Chromosome::cloneBaseString(const BaseString *source, 
 // Chromosome implementation. 
 //
 //
-Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int PbaseStates,std::mt19937* randomGenerator)
+Chromosome::Chromosome(unsigned int requestedLength,bool requestedVariableLength,unsigned int requestedBaseStates,std::mt19937* randomGenerator)
 {
   //
   // Randomly initialize the chromosome
@@ -75,39 +75,39 @@ Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int Pb
    * but a string that gets really too long is probably an error. Feel free
    * to increase this limit.
    */
-  if (CLength > 2048) 
+  if (requestedLength > 2048) 
     throw GAFatalException(__FILE__,__LINE__,"Requested Chromosome Length over 2048. Proabably a mistake.");
   //
   //
   std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
-  ChromosomeLength = CLength;
-  variableLength = vlength;
-  baseStates     = PbaseStates;
-  ChromosomeString.reset(new BaseString(ChromosomeLength,baseStates));
+  chromosomeLength = requestedLength;
+  variableLength = requestedVariableLength;
+  baseStates = requestedBaseStates;
+  chromosomeString_ = std::make_unique<BaseString>(chromosomeLength,baseStates);
 
   if (baseStates == 2)
     {
-      for ( int i = 0 ; i < ChromosomeLength ; i++ )
+      for ( int i = 0 ; i < chromosomeLength ; i++ )
 	{
-	  if (randomBit(generator)) ChromosomeString->set(i);
-	  else ChromosomeString->clear(i);
+	  if (randomBit(generator)) chromosomeString_->set(i);
+	  else chromosomeString_->clear(i);
 	}
     }
   else
     {
-      for ( int i = 0 ; i < ChromosomeLength ; i++ )
+      for ( int i = 0 ; i < chromosomeLength ; i++ )
 	{
-	  ChromosomeString->set(i,randomIndex(generator,baseStates));
+	  chromosomeString_->set(i,randomIndex(generator,baseStates));
 	}
     }
 }
 
-Chromosome::Chromosome(std::unique_ptr<BaseString> b,unsigned int vlength,unsigned int PbaseStates)
+Chromosome::Chromosome(std::unique_ptr<BaseString> b,bool requestedVariableLength,unsigned int requestedBaseStates)
 {
-  ChromosomeLength = b->length();
-  ChromosomeString = std::move(b);
-  variableLength = vlength;
-  baseStates     = PbaseStates;
+  chromosomeLength = b->length();
+  chromosomeString_ = std::move(b);
+  variableLength = requestedVariableLength;
+  baseStates = requestedBaseStates;
 }
 
 //
@@ -117,7 +117,7 @@ Chromosome::Chromosome(std::unique_ptr<BaseString> b,unsigned int vlength,unsign
 // Changes required for variable length chromosome support
 //            - none.
 //
-void Chromosome::SingleBitMutate(double probability, std::mt19937* randomGenerator)
+void Chromosome::mutate(double probability, std::mt19937* randomGenerator)
 {
   std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
   if ((probability >= 0.0)&&(probability <= 1.0))
@@ -125,18 +125,18 @@ void Chromosome::SingleBitMutate(double probability, std::mt19937* randomGenerat
       int probabilityMask = static_cast<int>(probability * 65535.0);
       std::uniform_int_distribution<int> distribution(0, 0xFFFF);
    
-      for ( int i = 0 ; i < ChromosomeLength ; i++ )
+      for ( int i = 0 ; i < chromosomeLength ; i++ )
 	{
 	  if (distribution(generator) < probabilityMask)
 	    {
 	      if (baseStates == 2)
 		{
-		  if (randomBit(generator)) ChromosomeString->set(i);
-		  else ChromosomeString->clear(i);
+		  if (randomBit(generator)) chromosomeString_->set(i);
+		  else chromosomeString_->clear(i);
 		}
 	      else
 		{
-		  ChromosomeString->set(i,randomIndex(generator,baseStates));
+		  chromosomeString_->set(i,randomIndex(generator,baseStates));
 		}
 	      
 	    }
@@ -152,12 +152,11 @@ void Chromosome::SingleBitMutate(double probability, std::mt19937* randomGenerat
 //    Randomly deside if a chromosome pair will cross over.
 //
 //
-int Chromosome::testCrossOverRate(std::mt19937& randomGenerator, double crossOverRate)
+bool Chromosome::shouldCrossover(std::mt19937& randomGenerator, double crossoverRate)
 {
-  int probabilityMask = static_cast<int>(crossOverRate * 65535.0);
+  int probabilityMask = static_cast<int>(crossoverRate * 65535.0);
   std::uniform_int_distribution<int> distribution(0, 0xFFFF);
-  if (distribution(randomGenerator) < probabilityMask) return 1;
-  else return 0;
+  return distribution(randomGenerator) < probabilityMask;
 }
 //
 //
@@ -192,7 +191,7 @@ Chromosome::singlePointCrossOver(const BaseString *mother,const BaseString *fath
 {
   int FatherCrossoverPoint;
   int MotherCrossoverPoint;
-  if (this->variableLength) 
+  if (variableLength) 
     {
       FatherCrossoverPoint = randomIndex(randomGenerator,father->length());
       MotherCrossoverPoint = randomIndex(randomGenerator,mother->length());
@@ -321,13 +320,12 @@ Chromosome::uniformCrossOver(const BaseString *mother,const BaseString *father,s
 // children. 
 //
 std::pair<Chromosome::ChromosomePtr, Chromosome::ChromosomePtr>
-Chromosome::mate(Chromosome& father,double crossOverRate,CrossOverType crossType,std::mt19937* randomGenerator)
+Chromosome::mate(Chromosome& father,double crossoverRate,CrossoverType crossoverType,std::mt19937* randomGenerator)
 {
-  Chromosome *mother = this;         // Just for notation purposes.
   std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
   //
   //
-  if (!(this->variableLength) && (mother->ChromosomeLen() != father.ChromosomeLen()))
+  if (!variableLength && (length() != father.length()))
     {
       throw GAFatalException(__FILE__,__LINE__,"Mismatch in chromosome strings");
     }
@@ -337,19 +335,19 @@ Chromosome::mate(Chromosome& father,double crossOverRate,CrossOverType crossType
   // Only cross the chromosomes if we pass the
   // crossOverRate test.
   //
-  if (testCrossOverRate(generator,crossOverRate))
+  if (shouldCrossover(generator,crossoverRate))
     {
-      switch (crossType)
+      switch (crossoverType)
 	{
-	case SinglePoint:
-	  children = singlePointCrossOver(&mother->chromosomeString(),&father.chromosomeString(),generator);
+	case CrossoverType::SinglePoint:
+	  children = singlePointCrossOver(&genes(),&father.genes(),generator);
 	  break;
-	case TwoPoint:
-	  children = twoPointCrossOver(&mother->chromosomeString(),&father.chromosomeString(),generator);
+	case CrossoverType::TwoPoint:
+	  children = twoPointCrossOver(&genes(),&father.genes(),generator);
 	 
 	  break;
-	case Uniform:
-	  children = uniformCrossOver(&mother->chromosomeString(),&father.chromosomeString(),generator);
+	case CrossoverType::Uniform:
+	  children = uniformCrossOver(&genes(),&father.genes(),generator);
 	  break;
 	default:
 	  throw GANonFatalException(__FILE__,__LINE__,"Unimplemented crossover type");
@@ -362,21 +360,21 @@ Chromosome::mate(Chromosome& father,double crossOverRate,CrossOverType crossType
       // the Father into the Son and the bits from the mother
       // into the daughter.
       //
-      children = std::make_pair(cloneBaseString(&father.chromosomeString(),baseStates),
-                                cloneBaseString(&mother->chromosomeString(),baseStates));
+      children = std::make_pair(cloneBaseString(&father.genes(),baseStates),
+                                cloneBaseString(&genes(),baseStates));
     }
   return std::make_pair(
       std::make_unique<Chromosome>(std::move(children.first),father.variableLength,baseStates),
-      std::make_unique<Chromosome>(std::move(children.second),mother->variableLength,baseStates));
+      std::make_unique<Chromosome>(std::move(children.second),variableLength,baseStates));
 }
 
-bool Chromosome::compare(const Chromosome *candidate) const
+bool Chromosome::equals(const Chromosome& candidate) const
 {
-  if (candidate->ChromosomeLen() == this->ChromosomeLen())
+  if (candidate.length() == length())
     {
-      for ( int i = 0 ; i < this->ChromosomeLen() ; i++ )
+      for ( int i = 0 ; i < length() ; i++ )
 	{
-	  if (this->chromosomeString().test(i) != candidate->chromosomeString().test(i)) return false;
+	  if (genes().test(i) != candidate.genes().test(i)) return false;
 	}
       return true;
     }

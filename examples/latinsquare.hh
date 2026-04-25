@@ -6,14 +6,13 @@
 class LatinSquare : public Population
 {
 public:
-   explicit LatinSquare(const Population::Options& options);
-   explicit LatinSquare(const Population::Configuration& configuration);
+   explicit LatinSquare(const Population::Settings& settings);
 
-   double FitnessFunction(const BaseString& b) override;
-   void FitnessPrint(const BaseString& b, std::ostream& out) override;
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) override;
 
 private:
-   int squareSize(const BaseString& b) const;
+   int squareSize(const BaseString& genes) const;
 };
 
 #endif
