@@ -1,9 +1,6 @@
-#include <cstdio>
-#include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <unistd.h>
 
 #include "base.hh"
 #include "chromosome.hh"
@@ -17,9 +14,7 @@
 #include "nqueens.hh"
 #include "sudoku.hh"
 #include "sudoku_constrained.hh"
-#define private public
 #include "ts.hh"
-#undef private
 #include "spell.hh"
 
 namespace {
@@ -52,52 +47,6 @@ void expect_throws(Fn fn, const std::string& message)
       expect_true(false, message + " (threw wrong exception type)");
     }
 }
-
-class SilentOutput
-{
-public:
-  SilentOutput()
-    : saved_stdout_(-1),
-      saved_stderr_(-1),
-      null_(nullptr)
-  {
-    fflush(stdout);
-    fflush(stderr);
-    saved_stdout_ = dup(fileno(stdout));
-    saved_stderr_ = dup(fileno(stderr));
-    null_ = fopen("/dev/null", "w");
-    if (null_ != nullptr)
-      {
-        dup2(fileno(null_), fileno(stdout));
-        dup2(fileno(null_), fileno(stderr));
-      }
-  }
-
-  ~SilentOutput()
-  {
-    fflush(stdout);
-    fflush(stderr);
-    if (saved_stdout_ >= 0)
-      {
-        dup2(saved_stdout_, fileno(stdout));
-        close(saved_stdout_);
-      }
-    if (saved_stderr_ >= 0)
-      {
-        dup2(saved_stderr_, fileno(stderr));
-        close(saved_stderr_);
-      }
-    if (null_ != nullptr)
-      {
-        fclose(null_);
-      }
-  }
-
-private:
-  int saved_stdout_;
-  int saved_stderr_;
-  FILE *null_;
-};
 
 class InspectableSudokuConstrained : public SudokuConstrained
 {
@@ -162,7 +111,6 @@ Population::Settings make_options(Population::OperationMode operation,
 
 void test_dome_fitness()
 {
-  SilentOutput silence;
   Dome dome(make_options(Population::OperationMode::Minimize, 32,
                          Population::VariableLengthMode::Fixed, 2));
   BaseString origin = makeBinaryString(std::string(32, '0'));
@@ -173,7 +121,6 @@ void test_dome_fitness()
 
 void test_f6_fitness_is_positive()
 {
-  SilentOutput silence;
   F6 f6(make_options(Population::OperationMode::Maximize, 44,
                      Population::VariableLengthMode::Fixed, 2));
   BaseString origin = makeBinaryString(std::string(44, '0'));
@@ -184,7 +131,6 @@ void test_f6_fitness_is_positive()
 
 void test_spell_fitness_matches_target_word()
 {
-  SilentOutput silence;
   Spell spell(make_options(Population::OperationMode::Maximize, 7,
                            Population::VariableLengthMode::Variable, 26));
   BaseString target = makeSymbolicString("egghead");
@@ -198,7 +144,6 @@ void test_spell_fitness_matches_target_word()
 
 void test_alpha_prefers_sorted_alphabet()
 {
-  SilentOutput silence;
   Alpha alpha(make_options(Population::OperationMode::Maximize, 13,
                            Population::VariableLengthMode::Variable, 13));
   BaseString sorted(13, 13);
@@ -215,25 +160,21 @@ void test_alpha_prefers_sorted_alphabet()
 
 void test_traveling_salesman_construction_and_validation()
 {
-  SilentOutput silence;
   TravelingSalesman tsp(make_options(Population::OperationMode::Minimize, 5,
                                      Population::VariableLengthMode::Variable, 5), 10);
 
-  expect_true(static_cast<int>(tsp.xCoordinates.size()) == 5,
-              "TravelingSalesman should allocate one X coordinate per city");
-  expect_true(static_cast<int>(tsp.yCoordinates.size()) == 5,
-              "TravelingSalesman should allocate one Y coordinate per city");
+  expect_true(static_cast<int>(tsp.cityCoordinates().size()) == 5,
+              "TravelingSalesman should allocate one coordinate per city");
 
-  for (int i = 0 ; i < tsp.numCities ; i++)
+  for (int i = 0 ; i < tsp.cityCount() ; i++)
     {
-      expect_true(tsp.xCoordinates[i] >= 0 && tsp.xCoordinates[i] < tsp.gridSize,
+      expect_true(tsp.cityCoordinates()[i].first >= 0 && tsp.cityCoordinates()[i].first < tsp.cityGridSize(),
                   "TravelingSalesman X coordinates should be in range");
-      expect_true(tsp.yCoordinates[i] >= 0 && tsp.yCoordinates[i] < tsp.gridSize,
+      expect_true(tsp.cityCoordinates()[i].second >= 0 && tsp.cityCoordinates()[i].second < tsp.cityGridSize(),
                   "TravelingSalesman Y coordinates should be in range");
-      for (int j = i + 1 ; j < tsp.numCities ; j++)
+      for (int j = i + 1 ; j < tsp.cityCount() ; j++)
         {
-          const bool unique = tsp.xCoordinates[i] != tsp.xCoordinates[j]
-                           || tsp.yCoordinates[i] != tsp.yCoordinates[j];
+          const bool unique = tsp.cityCoordinates()[i] != tsp.cityCoordinates()[j];
           expect_true(unique,
                       "TravelingSalesman should not generate duplicate city coordinates");
         }
@@ -249,7 +190,6 @@ void test_traveling_salesman_construction_and_validation()
 
   expect_throws<GAFatalException>(
     []() {
-      SilentOutput local_silence;
       TravelingSalesman impossible(make_options(Population::OperationMode::Minimize, 5,
                                                 Population::VariableLengthMode::Variable, 5), 2);
     },
@@ -258,7 +198,6 @@ void test_traveling_salesman_construction_and_validation()
 
 void test_traveling_salesman_fixed_seed_is_reproducible()
 {
-  SilentOutput silence;
   Population::Settings options = make_options(Population::OperationMode::Minimize, 5,
                                              Population::VariableLengthMode::Variable, 5);
   options.useFixedRandomSeed = true;
@@ -267,15 +206,12 @@ void test_traveling_salesman_fixed_seed_is_reproducible()
   TravelingSalesman first(options, 10);
   TravelingSalesman second(options, 10);
 
-  expect_true(first.xCoordinates == second.xCoordinates,
-              "TravelingSalesman should generate the same X coordinates for a fixed seed");
-  expect_true(first.yCoordinates == second.yCoordinates,
-              "TravelingSalesman should generate the same Y coordinates for a fixed seed");
+  expect_true(first.cityCoordinates() == second.cityCoordinates(),
+              "TravelingSalesman should generate the same city coordinates for a fixed seed");
 }
 
 void test_nqueens_rewards_non_attacking_layouts()
 {
-  SilentOutput silence;
   NQueens queens(make_options(Population::OperationMode::Maximize, 8,
                               Population::VariableLengthMode::Fixed, 8));
 
@@ -296,7 +232,6 @@ void test_nqueens_rewards_non_attacking_layouts()
 
 void test_knapsack_prefers_feasible_high_value_selections()
 {
-  SilentOutput silence;
   Knapsack knapsack(make_options(Population::OperationMode::Maximize, 12,
                                  Population::VariableLengthMode::Fixed, 2));
 
@@ -311,7 +246,6 @@ void test_knapsack_prefers_feasible_high_value_selections()
 
 void test_latin_square_rewards_unique_rows_and_columns()
 {
-  SilentOutput silence;
   LatinSquare latin_square(make_options(Population::OperationMode::Maximize, 16,
                                         Population::VariableLengthMode::Fixed, 4));
 
@@ -337,7 +271,6 @@ void test_latin_square_rewards_unique_rows_and_columns()
 
 void test_latin_square_run_path()
 {
-  SilentOutput silence;
   Population::Settings options = make_options(Population::OperationMode::Maximize, 16,
                                              Population::VariableLengthMode::Fixed, 4);
   options.numberOfIndividuals = 24;
@@ -357,7 +290,6 @@ void test_latin_square_run_path()
 
 void test_sudoku_rewards_valid_solution_and_givens()
 {
-  SilentOutput silence;
   Sudoku sudoku(make_options(Population::OperationMode::Maximize, 81,
                              Population::VariableLengthMode::Fixed, 9));
 
@@ -388,7 +320,6 @@ void test_sudoku_rewards_valid_solution_and_givens()
 
 void test_sudoku_run_path()
 {
-  SilentOutput silence;
   Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
                                              Population::VariableLengthMode::Fixed, 9);
   options.numberOfIndividuals = 36;
@@ -408,7 +339,6 @@ void test_sudoku_run_path()
 
 void test_constrained_sudoku_preserves_row_structure_and_givens()
 {
-  SilentOutput silence;
   Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
                                              Population::VariableLengthMode::Fixed, 9);
   options.bitMutationRate = 0.05;
@@ -490,7 +420,6 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
 
 void test_constrained_sudoku_run_path()
 {
-  SilentOutput silence;
   Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
                                              Population::VariableLengthMode::Fixed, 9);
   options.numberOfIndividuals = 40;
@@ -510,7 +439,6 @@ void test_constrained_sudoku_run_path()
 
 void test_constrained_sudoku_fixed_seed_is_reproducible()
 {
-  SilentOutput silence;
   Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
                                              Population::VariableLengthMode::Fixed, 9);
   options.useFixedRandomSeed = true;

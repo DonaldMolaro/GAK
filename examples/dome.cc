@@ -17,8 +17,8 @@ double Dome::sqr(double x)
 
 double Dome::evaluateFitness(const BaseString& genes)
 {
-   int x1 = decode(genes, 0,16);
-   int y1 = decode(genes,16,32);
+   int x1 = genes.decodeBits(0,16);
+   int y1 = genes.decodeBits(16,32);
    double x2 = static_cast<double>(x1) / 100.0;
    double y2 = static_cast<double>(y1) / 100.0;
 
@@ -29,8 +29,8 @@ double Dome::evaluateFitness(const BaseString& genes)
 
 void Dome::printCandidate(const BaseString& genes, std::ostream& out) const
 {
-   int x1 = decode(genes,0,16);
-   int y1 = decode(genes,16,32);
+   int x1 = genes.decodeBits(0,16);
+   int y1 = genes.decodeBits(16,32);
 
    double x2 = static_cast<double>(x1) / 100.0;
    double y2 = static_cast<double>(y1) / 100.0;

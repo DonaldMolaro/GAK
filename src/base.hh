@@ -36,6 +36,7 @@ public:
 
   // Read or write the symbolic value stored at a gene position.
   int valueAt(int index) const;
+  int decodeBits(int startBit, int endBit) const;
   void setValue(int index,int value = 1);
   void clearValue(int index);
   void swapValues(int first, int second);

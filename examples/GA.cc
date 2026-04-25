@@ -399,6 +399,7 @@ int main(int argc,char *argv[])
       {
         const int gridSize = cli.gridProvided ? cli.grid : 500;
         TravelingSalesman travelingSalesman(applyOverrides(make_traveling_salesman_options(), cli), gridSize);
+        travelingSalesman.writeCityList(std::cout);
         return runExample(travelingSalesman, cli.showSettings);
       }
     case 'Q':

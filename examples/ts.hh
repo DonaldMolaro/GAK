@@ -10,21 +10,24 @@
 class TravelingSalesman : public Population
 {
 public:
+   using Coordinate = std::pair<int, int>;
+
    TravelingSalesman(const Population::Settings& settings,
                      int gridSize = 0);
   
    double evaluateFitness(const BaseString& genes) override;
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
+   int cityCount() const noexcept { return numCities; }
+   int cityGridSize() const noexcept { return gridSize; }
+   const std::vector<Coordinate>& cityCoordinates() const noexcept { return cityCoordinates_; }
+   void writeCityList(std::ostream& out) const;
 private:
-   using Coordinate = std::pair<int, int>;
-
    bool hasCityCoordinate(int allocated, const Coordinate& coordinate) const;
    Coordinate randomCoordinate();
    void initializeCityCoordinates();
 
    int numCities;
    int gridSize;
-   std::vector<int> xCoordinates;
-   std::vector<int> yCoordinates;
+   std::vector<Coordinate> cityCoordinates_;
    std::mt19937 randomGenerator;
 };

@@ -1,8 +1,6 @@
 // Traveling salesman example built on the GA population engine.
-#include <cstdio>
 #include <cmath>
 #include <iostream>
-#include <ctime>
 #include <genetic.hh>
 #include "except.hh"
 #include "ts.hh"
@@ -39,12 +37,6 @@ TravelingSalesman::TravelingSalesman(const Population::Settings& settings,
    randomGenerator.seed(randomSeed());
 
    initializeCityCoordinates();
-
-   fprintf(stdout,"City List is:\n");
-   for ( int i = 0 ; i < numCities ; i++ )
-   {
-      fprintf(stdout,"%c:(%d,%d)\n",(i + 'a'),xCoordinates[i],yCoordinates[i]);
-   }
 }
 
 double TravelingSalesman::evaluateFitness(const BaseString& genes)
@@ -61,8 +53,8 @@ double TravelingSalesman::evaluateFitness(const BaseString& genes)
 
       double clength = 
 	 std::sqrt(
-	   Square(static_cast<double>(xCoordinates[genes.valueAt(i)]) - static_cast<double>(xCoordinates[genes.valueAt(i+1)]))
-	    + Square(static_cast<double>(yCoordinates[genes.valueAt(i)]) - static_cast<double>(yCoordinates[genes.valueAt(i+1)]))
+	   Square(static_cast<double>(cityCoordinates_[genes.valueAt(i)].first) - static_cast<double>(cityCoordinates_[genes.valueAt(i+1)].first))
+	    + Square(static_cast<double>(cityCoordinates_[genes.valueAt(i)].second) - static_cast<double>(cityCoordinates_[genes.valueAt(i+1)].second))
 	    );
       
       if (clength == 0) clength = PENALTYLENGTH;
@@ -92,7 +84,7 @@ bool TravelingSalesman::hasCityCoordinate(int allocated, const Coordinate& coord
 {
    for ( int i = 0 ; i < allocated ; i++ )
    {
-      if (xCoordinates[i] == coordinate.first && yCoordinates[i] == coordinate.second)
+      if (cityCoordinates_[i] == coordinate)
       {
          return true;
       }
@@ -109,8 +101,7 @@ TravelingSalesman::Coordinate TravelingSalesman::randomCoordinate()
 
 void TravelingSalesman::initializeCityCoordinates()
 {
-   xCoordinates.assign(numCities, 0);
-   yCoordinates.assign(numCities, 0);
+   cityCoordinates_.assign(numCities, Coordinate(0, 0));
 
    int allocated = 0;
    while (allocated < numCities)
@@ -121,8 +112,18 @@ void TravelingSalesman::initializeCityCoordinates()
          continue;
       }
 
-      xCoordinates[allocated] = candidate.first;
-      yCoordinates[allocated] = candidate.second;
+      cityCoordinates_[allocated] = candidate;
       allocated++;
+   }
+}
+
+void TravelingSalesman::writeCityList(std::ostream& out) const
+{
+   out << "City List is:\n";
+   for ( int i = 0 ; i < numCities ; i++ )
+   {
+      out << static_cast<char>(i + 'a') << ":("
+          << cityCoordinates_[i].first << ','
+          << cityCoordinates_[i].second << ")\n";
    }
 }

@@ -18,8 +18,8 @@ double F6::sqr(double x)
 
 double F6::evaluateFitness(const BaseString& genes)
 {
-   double x1 = static_cast<double>(decode(genes,0,22));
-   double y1 = static_cast<double>(decode(genes,22,44));
+   double x1 = static_cast<double>(genes.decodeBits(0,22));
+   double y1 = static_cast<double>(genes.decodeBits(22,44));
    double x2 = x1 / 1000.00;
    double y2 = y1 / 1000.00;
    double x3 = x2 - 100.000;   
@@ -38,8 +38,8 @@ double F6::evaluateFitness(const BaseString& genes)
 
 void F6::printCandidate(const BaseString& genes, std::ostream& out) const
 {
-   double x1 = static_cast<double>(decode(genes,0,22));
-   double y1 = static_cast<double>(decode(genes,22,44));
+   double x1 = static_cast<double>(genes.decodeBits(0,22));
+   double y1 = static_cast<double>(genes.decodeBits(22,44));
    double x2 = x1 / 1000.00;
    double y2 = y1 / 1000.00;
    double x3 = x2 - 100.000;   
@@ -47,7 +47,6 @@ void F6::printCandidate(const BaseString& genes, std::ostream& out) const
    
    out << "X ( " << x3 << " ) Y ( " << y3 << " ) ";
 }
-
 
 
 

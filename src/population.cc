@@ -334,11 +334,16 @@ void Population::RunReporter::write(std::ostream& out,
    }
 }
 
+void Population::run(std::ostream& out, const RunReportOptions& options)
+{
+   RunResult result = execute(options.includeGenerationSummaries);
+   RunReporter::write(out, *this, result, options);
+}
+
 void Population::run()
 {
    const bool verbose = IsVerboseEnabled();
-   RunResult result = execute(verbose);
-   RunReporter::write(std::cerr, *this, result, RunReportOptions{verbose, verbose});
+   run(std::cerr, RunReportOptions{verbose, verbose});
 }
 //
 // Start Population with randomly generated population.
@@ -636,25 +641,4 @@ void Population::sortPopulation()
 
    fitnessTable.swap(sortedFitness);
    populationTable.swap(sortedPopulation);
-}
-//
-//
-//
-int Population::decode(const BaseString& b,int start,int end) const
-{
-   int res = 0;
-   for ( int i = start ; i < end ; i++ )
-   {
-      res <<= 1;
-      if ( b.valueAt(i) )
-      {
-	 res += 1;   
-      }
-      else
-      {
-	 res += 0;
-      }
-      
-   }
-   return res;
 }

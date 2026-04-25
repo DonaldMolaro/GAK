@@ -118,6 +118,26 @@ int BaseString::valueAt(int index) const
    return result;
 }
 
+int BaseString::decodeBits(int startBit, int endBit) const
+{
+  if (startBit < 0 || endBit < startBit || endBit > bitLength)
+    {
+      throw GAFatalException(__FILE__,__LINE__,"Attempted to decode out of range bits");
+    }
+
+  int result = 0;
+  for (int bit = startBit ; bit < endBit ; bit++)
+    {
+      result <<= 1;
+      if (testBit(bit))
+        {
+          result += 1;
+        }
+    }
+
+  return result;
+}
+
 void BaseString::setValue(int index, int value)
 {
   if (( index >= 0)&&(index < stringLength))

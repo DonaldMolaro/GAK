@@ -123,34 +123,22 @@ private:
    std::mt19937 randomGenerator;
    unsigned int activeRandomSeed_;
    static const int kSummaryCount = 5;
-   //
-   // Private methods.
-   //
+protected:
    int initializePopulation();
    int insertNewPopulation(std::vector<std::unique_ptr<Chromosome> > replacementList,int numtoReplace);
    void evaluatePopulation();
-   void sortPopulation();
-   int replacementCount() const;
-   int replacementSlotIndex(int offset) const;
-   PopulationSummary buildPopulationSummary() const;
-   RunResult executeInternal(bool captureGenerationSummaries);
-   int selectRandomParent();
+   int randomIndex(int upperBoundExclusive);
+   long randomBelow(long upperBoundExclusive);
+   const std::vector<double>& selectFitnessWeights();
+   int selectParent(const std::vector<double>& rouletteTable);
+   std::vector<std::unique_ptr<Chromosome> > breedPopulation(int numberToReplace);
    bool containsChromosome(const Chromosome& candidate,
                            const std::vector<std::unique_ptr<Chromosome> >& population,
                            int populationLength) const;
-   int randomIndex(int upperBoundExclusive);
-   long randomBelow(long upperBoundExclusive);
    bool appendReplacement(std::vector<std::unique_ptr<Chromosome> >& replacementList,
 			  std::unique_ptr<Chromosome> candidate,
 			  int numberToReplace,
 			  bool allowDuplicates);
-   const std::vector<double>& selectFitnessWeights();
-   int selectParent(const std::vector<double>& rouletteTable);
-   std::vector<std::unique_ptr<Chromosome> > breedPopulation(int numberToReplace);
-   //
-   //
-   //
-protected:
    void setInitializationStrategy(std::unique_ptr<InitializationStrategy> strategy);
    void setMatingStrategy(std::unique_ptr<MatingStrategy> strategy);
    void setMutationStrategy(std::unique_ptr<MutationStrategy> strategy);
@@ -162,6 +150,16 @@ protected:
    std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
       mateDefaultChromosomes(Chromosome& mother, Chromosome& father);
    void mutateDefaultChromosome(Chromosome& chromosome);
+   std::vector<std::unique_ptr<Chromosome> >& chromosomes() noexcept { return populationTable; }
+   const std::vector<std::unique_ptr<Chromosome> >& chromosomes() const noexcept { return populationTable; }
+   std::vector<double>& fitnessValues() noexcept { return fitnessTable; }
+   const std::vector<double>& fitnessValues() const noexcept { return fitnessTable; }
+   std::vector<double>& windowedFitnessValues() noexcept { return windowedFitnessTable; }
+   const std::vector<double>& windowedFitnessValues() const noexcept { return windowedFitnessTable; }
+   std::vector<double>& normalizedFitnessValues() noexcept { return linearNormalizedfitnessTable; }
+   const std::vector<double>& normalizedFitnessValues() const noexcept { return linearNormalizedfitnessTable; }
+   bool isPopulationInitialized() const noexcept { return populationInitialized; }
+   void setPopulationInitialized(bool initialized) noexcept { populationInitialized = initialized; }
 public:
    explicit Population(const Settings& settings);
    virtual ~Population();
@@ -171,9 +169,20 @@ public:
    unsigned int randomSeed() const noexcept { return activeRandomSeed_; }
    std::mt19937& randomEngine() noexcept { return randomGenerator; }
    void setRandomSeed(unsigned int seed);
-   int decode(const BaseString& genes,int start,int end) const;
+   void setOperationMode(OperationMode mode) noexcept { settings_.operation = mode; }
+   void setParentSelectionMode(ParentSelectionMode mode) noexcept { settings_.parentSelection = mode; }
+   void setDeletionMode(DeletionMode mode) noexcept { settings_.deletion = mode; }
+   void setFitnessMode(FitnessMode mode) noexcept { settings_.fitness = mode; }
    // Run the GA silently and return a structured summary.
    [[nodiscard]] RunResult execute(bool captureGenerationSummaries = false);
+   void run(std::ostream& out, const RunReportOptions& options);
    // Compatibility wrapper around `execute()` that prints progress/summaries.
    void run();
+private:
+   void sortPopulation();
+   int replacementCount() const;
+   int replacementSlotIndex(int offset) const;
+   PopulationSummary buildPopulationSummary() const;
+   RunResult executeInternal(bool captureGenerationSummaries);
+   int selectRandomParent();
 };
