@@ -61,35 +61,6 @@ SudokuConstrained::SudokuConstrained(const Population::Configuration& configurat
    }
 }
 
-SudokuConstrained::SudokuConstrained(
-   Population::OperationTechnique Operation,
-   int numberofIndividuals,
-   int numberofTrials,
-   int GenecticDeversity,
-   double BitMutationRate,
-   double CrossOverRate,
-   Population::ReproductionTechniques ReproductionTechniques,
-   Population::ParentSelectionTechnique ParentSelction,
-   Population::DeletionTechnique Deletetion,
-   Population::FitnessTechnique Fitness,
-   Population::VariableLength Variable,
-   int baseStates
-   )
-   : SudokuConstrained(Population::Configuration{Operation,
-                                                 numberofIndividuals,
-                                                 numberofTrials,
-                                                 GenecticDeversity,
-                                                 BitMutationRate,
-                                                 CrossOverRate,
-                                                 ReproductionTechniques,
-                                                 ParentSelction,
-                                                 Deletetion,
-                                                 Fitness,
-                                                 Variable,
-                                                 baseStates})
-{
-}
-
 void SudokuConstrained::validateConfiguration(const Population::Configuration& configuration) const
 {
    if (configuration.geneticDiversity != kCellCount)
@@ -282,7 +253,7 @@ std::unique_ptr<Chromosome> SudokuConstrained::createInitialChromosome()
       initializeRow(board.get(), row);
    }
    return std::make_unique<Chromosome>(board.release(),
-                                       configuration().variableLength,
+                                       static_cast<unsigned int>(configuration().variableLength == Population::VariableLengthMode::Variable),
                                        configuration().baseStates);
 }
 
@@ -296,10 +267,10 @@ SudokuConstrained::mateChromosomes(Chromosome *mother, Chromosome *father)
    {
       return std::make_pair(
          std::make_unique<Chromosome>(cloneBoard(&mother->chromosomeString()),
-                                      configuration().variableLength,
+                                      static_cast<unsigned int>(configuration().variableLength == Population::VariableLengthMode::Variable),
                                       configuration().baseStates),
          std::make_unique<Chromosome>(cloneBoard(&father->chromosomeString()),
-                                      configuration().variableLength,
+                                      static_cast<unsigned int>(configuration().variableLength == Population::VariableLengthMode::Variable),
                                       configuration().baseStates));
    }
 
@@ -315,10 +286,10 @@ SudokuConstrained::mateChromosomes(Chromosome *mother, Chromosome *father)
 
    return std::make_pair(
       std::make_unique<Chromosome>(std::move(first),
-                                   configuration().variableLength,
+                                   static_cast<unsigned int>(configuration().variableLength == Population::VariableLengthMode::Variable),
                                    configuration().baseStates),
       std::make_unique<Chromosome>(std::move(second),
-                                   configuration().variableLength,
+                                   static_cast<unsigned int>(configuration().variableLength == Population::VariableLengthMode::Variable),
                                    configuration().baseStates));
 }
 

@@ -18,35 +18,6 @@ F6::F6(const Population::Configuration& configuration)
 {
 }
 
-F6::F6(
-   Population::OperationTechnique Operation,
-   int numberofIndividuals,
-   int numberofTrials,
-   int GenecticDeversity,
-   double BitMutationRate,
-   double CrossOverRate,
-   Population::ReproductionTechniques ReproductionTechniques,
-   Population::ParentSelectionTechnique ParentSelction,
-   Population::DeletionTechnique Deletetion,
-   Population::FitnessTechnique Fitness,
-   Population::VariableLength Variable,
-   int baseStates
-   )
-   : F6(Population::Configuration{Operation,
-                                  numberofIndividuals,
-                                  numberofTrials,
-                                  GenecticDeversity,
-                                  BitMutationRate,
-                                  CrossOverRate,
-                                  ReproductionTechniques,
-                                  ParentSelction,
-                                  Deletetion,
-                                  Fitness,
-                                  Variable,
-                                  baseStates})
-{
-}
-
 double F6::sqr(double x)
 {
    return x * x;
@@ -83,7 +54,6 @@ void F6::FitnessPrint(const BaseString& b)
    
    fprintf(stderr,"X ( %3.8f ) Y ( %3.8f ) ",x3,y3);
 }
-
 
 
 

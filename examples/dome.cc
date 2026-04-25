@@ -18,36 +18,6 @@ Dome::Dome(const Population::Configuration& configuration)
 {
 }
 
-Dome::Dome(
-   Population::OperationTechnique Operation,
-   int numberofIndividuals,
-   int numberofTrials,
-   int GenecticDeversity,
-   double BitMutationRate,
-   double CrossOverRate,
-   Population::ReproductionTechniques ReproductionTechniques,
-   Population::ParentSelectionTechnique ParentSelction,
-   Population::DeletionTechnique Deletetion,
-   Population::FitnessTechnique Fitness,
-   Population::VariableLength Variable,
-   int baseStates
-   )
-   : Dome(Population::Configuration{Operation,
-                                    numberofIndividuals,
-                                    numberofTrials,
-                                    GenecticDeversity,
-                                    BitMutationRate,
-                                    CrossOverRate,
-                                    ReproductionTechniques,
-                                    ParentSelction,
-                                    Deletetion,
-                                    Fitness,
-                                    Variable,
-                                    baseStates})
-{
-}
-
-
 double Dome::sqr(double x)
 {
    return x * x;

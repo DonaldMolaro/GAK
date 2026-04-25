@@ -170,52 +170,6 @@ public:
   {
   }
 
-  InspectablePopulation(OperationTechnique op,
-			int individuals,
-			int trials,
-			int diversity,
-			double mutation,
-			double crossover,
-			ReproductionTechniques reproduction,
-			ParentSelectionTechnique selection,
-			DeletionTechnique deletion,
-			FitnessTechnique fitness,
-			VariableLength variable,
-			int states)
-    : Population(make_population_options(op == Minimize ? Population::OperationMode::Minimize
-						       : Population::OperationMode::Maximize,
-					 individuals,
-					 trials,
-					 diversity,
-					 mutation,
-					 crossover,
-					 reproduction == DuplicatesNotAllowed
-					    ? Population::ReproductionMode::DisallowDuplicates
-					    : Population::ReproductionMode::AllowDuplicates,
-					 selection == Random
-					    ? Population::ParentSelectionMode::Random
-					    : Population::ParentSelectionMode::RouletteWheel,
-					 deletion == DeleteAllButBest
-					    ? Population::DeletionMode::DeleteAllButBest
-					    : deletion == DeleteHalf
-					       ? Population::DeletionMode::DeleteHalf
-					       : deletion == DeleteQuarter
-						  ? Population::DeletionMode::DeleteQuarter
-						  : deletion == DeleteLast
-						     ? Population::DeletionMode::DeleteLast
-						     : Population::DeletionMode::DeleteAll,
-					 fitness == WindowedFitness
-					    ? Population::FitnessMode::Windowed
-					    : fitness == LinearNormalizedFitness
-					       ? Population::FitnessMode::LinearNormalized
-					       : Population::FitnessMode::Evaluation,
-					 variable == VariableLengthPermitted
-					    ? Population::VariableLengthMode::Variable
-					    : Population::VariableLengthMode::Fixed,
-					 states))
-  {
-  }
-
   double FitnessFunction(const BaseString& b) override
   {
     return b.test(0);
@@ -313,17 +267,17 @@ void test_base_string()
 void test_population_options_round_trip()
 {
   Population::Configuration configuration;
-  configuration.operation = Population::Minimize;
+  configuration.operation = Population::OperationMode::Minimize;
   configuration.numberOfIndividuals = 17;
   configuration.numberOfTrials = 99;
   configuration.geneticDiversity = 23;
   configuration.bitMutationRate = 0.125;
   configuration.crossOverRate = 0.75;
-  configuration.reproduction = Population::DuplicatesNotAllowed;
-  configuration.parentSelection = Population::Random;
-  configuration.deletion = Population::DeleteQuarter;
-  configuration.fitness = Population::LinearNormalizedFitness;
-  configuration.variableLength = Population::VariableLengthPermitted;
+  configuration.reproduction = Population::ReproductionMode::DisallowDuplicates;
+  configuration.parentSelection = Population::ParentSelectionMode::Random;
+  configuration.deletion = Population::DeletionMode::DeleteQuarter;
+  configuration.fitness = Population::FitnessMode::LinearNormalized;
+  configuration.variableLength = Population::VariableLengthMode::Variable;
   configuration.baseStates = 7;
   configuration.useFixedRandomSeed = true;
   configuration.randomSeed = 4242;
@@ -1044,7 +998,7 @@ void test_population_invalid_enum_paths()
 							   Population::DeletionMode::DeleteAll,
 							   Population::FitnessMode::Evaluation,
 							   Population::VariableLengthMode::Fixed, 2));
-  bad_delete.config_.deletion = static_cast<Population::DeletionTechnique>(99);
+  bad_delete.config_.deletion = static_cast<Population::DeletionMode>(99);
   expect_throws<GAFatalException>(
     [&bad_delete]() { bad_delete.run(); },
     "Unsupported deletion technique should throw");
@@ -1055,7 +1009,7 @@ void test_population_invalid_enum_paths()
 							    Population::DeletionMode::DeleteAll,
 							    Population::FitnessMode::Evaluation,
 							    Population::VariableLengthMode::Fixed, 2));
-  bad_fitness.config_.fitness = static_cast<Population::FitnessTechnique>(99);
+  bad_fitness.config_.fitness = static_cast<Population::FitnessMode>(99);
   expect_throws<GAFatalException>(
     [&bad_fitness]() { bad_fitness.selectFitnessWeights(); },
     "Unsupported fitness technique should throw");
@@ -1066,7 +1020,7 @@ void test_population_invalid_enum_paths()
 							   Population::DeletionMode::DeleteAll,
 							   Population::FitnessMode::Evaluation,
 							   Population::VariableLengthMode::Fixed, 2));
-  bad_parent.config_.parentSelection = static_cast<Population::ParentSelectionTechnique>(99);
+  bad_parent.config_.parentSelection = static_cast<Population::ParentSelectionMode>(99);
   prepare_population(bad_parent, "1111", "0000");
   expect_throws<GAFatalException>(
     [&bad_parent]() { bad_parent.breedPopulation(1); },
@@ -1079,7 +1033,7 @@ void test_population_invalid_enum_paths()
 							      Population::FitnessMode::Evaluation,
 							      Population::VariableLengthMode::Fixed, 2));
   prepare_population(bad_operation, "1111", "0000");
-  bad_operation.config_.operation = static_cast<Population::OperationTechnique>(99);
+  bad_operation.config_.operation = static_cast<Population::OperationMode>(99);
   expect_throws<GAFatalException>(
     [&bad_operation]() {
       int selected = -1;
@@ -1102,7 +1056,7 @@ void test_population_invalid_enum_paths()
 								  Population::FitnessMode::Evaluation,
 								  Population::VariableLengthMode::Fixed, 2));
   prepare_population(bad_operation_dup, "1111", "0000");
-  bad_operation_dup.config_.operation = static_cast<Population::OperationTechnique>(99);
+  bad_operation_dup.config_.operation = static_cast<Population::OperationMode>(99);
   std::vector<std::unique_ptr<Chromosome> > dup_replacements;
   dup_replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0011"))));
   expect_throws<GAFatalException>(

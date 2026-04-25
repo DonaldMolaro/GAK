@@ -29,35 +29,6 @@ Sudoku::Sudoku(const Population::Configuration& configuration)
    validateConfiguration(configuration);
 }
 
-Sudoku::Sudoku(
-   Population::OperationTechnique Operation,
-   int numberofIndividuals,
-   int numberofTrials,
-   int GenecticDeversity,
-   double BitMutationRate,
-   double CrossOverRate,
-   Population::ReproductionTechniques ReproductionTechniques,
-   Population::ParentSelectionTechnique ParentSelction,
-   Population::DeletionTechnique Deletetion,
-   Population::FitnessTechnique Fitness,
-   Population::VariableLength Variable,
-   int baseStates
-   )
-   : Sudoku(Population::Configuration{Operation,
-                                      numberofIndividuals,
-                                      numberofTrials,
-                                      GenecticDeversity,
-                                      BitMutationRate,
-                                      CrossOverRate,
-                                      ReproductionTechniques,
-                                      ParentSelction,
-                                      Deletetion,
-                                      Fitness,
-                                      Variable,
-                                      baseStates})
-{
-}
-
 void Sudoku::validateConfiguration(const Population::Configuration& configuration) const
 {
    if (configuration.geneticDiversity != kCellCount)

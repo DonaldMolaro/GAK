@@ -23,22 +23,6 @@ public:
                      int gridS = 0);
    TravelingSalesman(const Population::Configuration& configuration,
                      int gridS = 0);
-   [[deprecated("Use TravelingSalesman(const Population::Options&, int) or TravelingSalesman(const Population::Configuration&, int)")]]
-   TravelingSalesman(
-      Population::OperationTechnique Operation,
-      int numberofIndividuals,
-      int numberofTrials,
-      int GenecticDeversity,
-      double BitMutationRate,
-      double CrossOverRate,
-      Population::ReproductionTechniques PReproductionTechniques,
-      Population::ParentSelectionTechnique ParentSelction,
-      Population::DeletionTechnique Deletetion,
-      Population::FitnessTechnique Fitness,
-      Population::VariableLength Variable,
-      int baseStates,
-      int gridS = 0
-      );
   
    double FitnessFunction(const BaseString& b) override;
    void FitnessPrint(const BaseString& b) override;

@@ -38,144 +38,22 @@ bool IsVerboseEnabled()
 {
    return std::getenv("GAK_VERBOSE") != NULL;
 }
-
-Population::OperationTechnique ToLegacyOperation(Population::OperationMode mode)
-{
-   return (mode == Population::OperationMode::Minimize) ? Population::Minimize : Population::Maximize;
-}
-
-Population::ReproductionTechniques ToLegacyReproduction(Population::ReproductionMode mode)
-{
-   return (mode == Population::ReproductionMode::DisallowDuplicates)
-      ? Population::DuplicatesNotAllowed
-      : Population::DuplicatesAllowed;
-}
-
-Population::ParrentSelectionTechnique ToLegacyParentSelection(Population::ParentSelectionMode mode)
-{
-   return (mode == Population::ParentSelectionMode::Random)
-      ? Population::Random
-      : Population::RouletteWheel;
-}
-
-Population::DeletetionTechnique ToLegacyDeletion(Population::DeletionMode mode)
-{
-   switch (mode)
-   {
-   case Population::DeletionMode::DeleteAll:
-      return Population::DeleteAll;
-   case Population::DeletionMode::DeleteAllButBest:
-      return Population::DeleteAllButBest;
-   case Population::DeletionMode::DeleteHalf:
-      return Population::DeleteHalf;
-   case Population::DeletionMode::DeleteQuarter:
-      return Population::DeleteQuarter;
-   case Population::DeletionMode::DeleteLast:
-      return Population::DeleteLast;
-   }
-
-   throw GAFatalException(__FILE__,__LINE__,"Unsupported deletion mode");
-}
-
-Population::FitnessTechnique ToLegacyFitness(Population::FitnessMode mode)
-{
-   switch (mode)
-   {
-   case Population::FitnessMode::Evaluation:
-      return Population::FitnessIsEvaluation;
-   case Population::FitnessMode::Windowed:
-      return Population::WindowedFitness;
-   case Population::FitnessMode::LinearNormalized:
-      return Population::LinearNormalizedFitness;
-   }
-
-   throw GAFatalException(__FILE__,__LINE__,"Unsupported fitness mode");
-}
-
-Population::VariableLength ToLegacyVariableLength(Population::VariableLengthMode mode)
-{
-   return (mode == Population::VariableLengthMode::Variable)
-      ? Population::VariableLengthPermitted
-      : Population::VariableLengthNotPermitted;
-}
-
-Population::OperationMode ToModernOperation(Population::OperationTechnique technique)
-{
-   return (technique == Population::Minimize)
-      ? Population::OperationMode::Minimize
-      : Population::OperationMode::Maximize;
-}
-
-Population::ReproductionMode ToModernReproduction(Population::ReproductionTechniques technique)
-{
-   return (technique == Population::DuplicatesNotAllowed)
-      ? Population::ReproductionMode::DisallowDuplicates
-      : Population::ReproductionMode::AllowDuplicates;
-}
-
-Population::ParentSelectionMode ToModernParentSelection(Population::ParrentSelectionTechnique technique)
-{
-   return (technique == Population::Random)
-      ? Population::ParentSelectionMode::Random
-      : Population::ParentSelectionMode::RouletteWheel;
-}
-
-Population::DeletionMode ToModernDeletion(Population::DeletetionTechnique technique)
-{
-   switch (technique)
-   {
-   case Population::DeleteAll:
-      return Population::DeletionMode::DeleteAll;
-   case Population::DeleteAllButBest:
-      return Population::DeletionMode::DeleteAllButBest;
-   case Population::DeleteHalf:
-      return Population::DeletionMode::DeleteHalf;
-   case Population::DeleteQuarter:
-      return Population::DeletionMode::DeleteQuarter;
-   case Population::DeleteLast:
-      return Population::DeletionMode::DeleteLast;
-   }
-
-   throw GAFatalException(__FILE__,__LINE__,"Unsupported deletion technique");
-}
-
-Population::FitnessMode ToModernFitness(Population::FitnessTechnique technique)
-{
-   switch (technique)
-   {
-   case Population::FitnessIsEvaluation:
-      return Population::FitnessMode::Evaluation;
-   case Population::WindowedFitness:
-      return Population::FitnessMode::Windowed;
-   case Population::LinearNormalizedFitness:
-      return Population::FitnessMode::LinearNormalized;
-   }
-
-   throw GAFatalException(__FILE__,__LINE__,"Unsupported fitness technique");
-}
-
-Population::VariableLengthMode ToModernVariableLength(Population::VariableLength technique)
-{
-   return (technique == Population::VariableLengthPermitted)
-      ? Population::VariableLengthMode::Variable
-      : Population::VariableLengthMode::Fixed;
-}
 }
 
 Population::Options Population::Configuration::toOptions() const
 {
    Options options;
-   options.operation = ToModernOperation(operation);
+   options.operation = operation;
    options.numberOfIndividuals = numberOfIndividuals;
    options.numberOfTrials = numberOfTrials;
    options.geneticDiversity = geneticDiversity;
    options.bitMutationRate = bitMutationRate;
    options.crossOverRate = crossOverRate;
-   options.reproduction = ToModernReproduction(reproduction);
-   options.parentSelection = ToModernParentSelection(parentSelection);
-   options.deletion = ToModernDeletion(deletion);
-   options.fitness = ToModernFitness(fitness);
-   options.variableLength = ToModernVariableLength(variableLength);
+   options.reproduction = reproduction;
+   options.parentSelection = parentSelection;
+   options.deletion = deletion;
+   options.fitness = fitness;
+   options.variableLength = variableLength;
    options.baseStates = baseStates;
    options.useFixedRandomSeed = useFixedRandomSeed;
    options.randomSeed = randomSeed;
@@ -185,17 +63,17 @@ Population::Options Population::Configuration::toOptions() const
 Population::Configuration Population::Options::toConfiguration() const
 {
    Configuration configuration;
-   configuration.operation = ToLegacyOperation(operation);
+   configuration.operation = operation;
    configuration.numberOfIndividuals = numberOfIndividuals;
    configuration.numberOfTrials = numberOfTrials;
    configuration.geneticDiversity = geneticDiversity;
    configuration.bitMutationRate = bitMutationRate;
    configuration.crossOverRate = crossOverRate;
-   configuration.reproduction = ToLegacyReproduction(reproduction);
-   configuration.parentSelection = ToLegacyParentSelection(parentSelection);
-   configuration.deletion = ToLegacyDeletion(deletion);
-   configuration.fitness = ToLegacyFitness(fitness);
-   configuration.variableLength = ToLegacyVariableLength(variableLength);
+   configuration.reproduction = reproduction;
+   configuration.parentSelection = parentSelection;
+   configuration.deletion = deletion;
+   configuration.fitness = fitness;
+   configuration.variableLength = variableLength;
    configuration.baseStates = baseStates;
    configuration.useFixedRandomSeed = useFixedRandomSeed;
    configuration.randomSeed = randomSeed;
@@ -241,44 +119,19 @@ void Population::setRandomSeed(unsigned int seed)
    Chromosome::seedRandom(seed);
 }
 
-Population::Population(OperationTechnique POperation,
-		       int PnumberofIndividuals,int PnumberofTrials,
-		       int PGenecticDeversity,double PBitMutationRate,
-		       double PCrossOverRate,
-		       ReproductionTechniques PReproductionTechnique,
-		       ParrentSelectionTechnique PParentSelection,
-		       DeletetionTechnique PDeletion,
-		       FitnessTechnique PFitness,
-		       VariableLength PVariable,
-		       int PbaseStates)
-   : Population(Configuration{POperation,
-                              PnumberofIndividuals,
-                              PnumberofTrials,
-                              PGenecticDeversity,
-                              PBitMutationRate,
-                              PCrossOverRate,
-                              PReproductionTechnique,
-                              PParentSelection,
-                              PDeletion,
-                              PFitness,
-                              PVariable,
-                              PbaseStates})
-{
-}
-
 int Population::replacementCount() const
 {
    switch (config_.deletion)
    {
-   case DeleteAll:
+   case Population::DeletionMode::DeleteAll:
       return config_.numberOfIndividuals;
-   case DeleteAllButBest:
+   case Population::DeletionMode::DeleteAllButBest:
       return config_.numberOfIndividuals - 1;
-   case DeleteHalf:
+   case Population::DeletionMode::DeleteHalf:
       return  config_.numberOfIndividuals / 2;
-   case DeleteQuarter:
+   case Population::DeletionMode::DeleteQuarter:
       return config_.numberOfIndividuals / 4;
-   case DeleteLast:
+   case Population::DeletionMode::DeleteLast:
       return 2;
    default:
       throw GAFatalException(__FILE__,__LINE__,"Unsupported deletion technique");
@@ -289,9 +142,9 @@ int Population::replacementSlotIndex(int offset) const
 {
    switch (config_.operation)
    {
-   case Maximize:
+   case Population::OperationMode::Maximize:
       return offset;
-   case Minimize:
+   case Population::OperationMode::Minimize:
       return (config_.numberOfIndividuals - 1) - offset;
    default:
       throw GAFatalException(__FILE__,__LINE__,"Unsupported operation technique");
@@ -315,14 +168,14 @@ Population::PopulationSummary Population::buildPopulationSummary() const
 
 void Population::printConfigurationSummary() const
 {
-   fprintf(stderr,"Operation             :: %s\n", config_.operation == Minimize ? "Minimize" : "Maximize");
+   fprintf(stderr,"Operation             :: %s\n", config_.operation == Population::OperationMode::Minimize ? "Minimize" : "Maximize");
    fprintf(stderr,"Number of Individuals :: %d\n",config_.numberOfIndividuals);
    fprintf(stderr,"Number of Trails      :: %d\n",config_.numberOfTrials);
    fprintf(stderr,"Genectic Diversity    :: %d\n",config_.geneticDiversity);
    fprintf(stderr,"Mutation Rate         :: %5.4f\n",config_.bitMutationRate);
    fprintf(stderr,"Cross Over Rate       :: %4.3f\n",config_.crossOverRate);
-   fprintf(stderr,"Duplicate Reproduction:: %s\n", config_.reproduction == DuplicatesNotAllowed ? "NOT Ok." : " Ok.");
-   fprintf(stderr,"Variable              :: %s\n", config_.variableLength ==  VariableLengthNotPermitted ? "NOT Ok." : " Ok.");
+   fprintf(stderr,"Duplicate Reproduction:: %s\n", config_.reproduction == Population::ReproductionMode::DisallowDuplicates ? "NOT Ok." : " Ok.");
+   fprintf(stderr,"Variable              :: %s\n", config_.variableLength == Population::VariableLengthMode::Fixed ? "NOT Ok." : " Ok.");
    fprintf(stderr,"Random Seed           :: %u%s\n",
            activeRandomSeed_,
            config_.useFixedRandomSeed ? " (configured)" : " (generated)");
@@ -336,7 +189,7 @@ void Population::printPopulationSummary(const PopulationSummary& summary)
       return;
    }
 
-   if (config_.operation == Maximize)
+   if (config_.operation == Population::OperationMode::Maximize)
       fprintf(stderr,"Best %d Members are:\n",summaryCount);
    else
       fprintf(stderr,"Worst %d Members are:\n",summaryCount);
@@ -347,7 +200,7 @@ void Population::printPopulationSummary(const PopulationSummary& summary)
       fprintf(stderr,"(F = %3.8f)\n",summary.mostFit[i]);
    }
 
-   if (config_.operation == Maximize)
+   if (config_.operation == Population::OperationMode::Maximize)
       fprintf(stderr,"Worst %d Members are:\n",summaryCount);
    else
       fprintf(stderr,"Best %d Members are:\n",summaryCount);
@@ -375,14 +228,14 @@ void Population::printFinalSummary(const RunResult& result)
    const int summaryCount = static_cast<int>(result.finalSummary.mostFit.size());
    switch(config_.operation)
    {
-      case Maximize:
+      case Population::OperationMode::Maximize:
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
 	 FitnessPrint(populationTable[(config_.numberOfIndividuals - 1) - i].get()->chromosomeString());
 	 fprintf(stderr,"%f\n",result.finalSummary.mostFit[i]);
       }
       break;
-      case Minimize:
+      case Population::OperationMode::Minimize:
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
 	 FitnessPrint(populationTable[i].get()->chromosomeString());
@@ -567,7 +420,7 @@ void Population::evaluatePopulation()
    for ( int i = 0 ; i < config_.numberOfIndividuals ; i++ )
    {
       linearNormalizedfitnessTable[i] = i + 1.00;
-      windowedFitnessTable[i] = (config_.operation == Maximize)
+      windowedFitnessTable[i] = (config_.operation == Population::OperationMode::Maximize)
 	 ? (fitnessTable[i] - fitnessTable[0] + 1.00)
 	 : (fitnessTable[config_.numberOfIndividuals - 1] - fitnessTable[i] + 1.00);
    }
@@ -604,7 +457,7 @@ Chromosome *Population::selectParent(int *selected,double *rouletteTable)
    long int selectValue;
    switch (config_.operation)
      {
-     case Maximize:
+     case Population::OperationMode::Maximize:
        if (totalFitness <= 0.0)
        {
           *selected = randomIndex(config_.numberOfIndividuals);
@@ -616,7 +469,7 @@ Chromosome *Population::selectParent(int *selected,double *rouletteTable)
 	   selectValue -= static_cast<long int>(std::rint(rouletteTable[++(*selected)]));
 	 }
        break;
-     case Minimize:
+     case Population::OperationMode::Minimize:
        if (invertedTotalFitness <= 0.0)
        {
           *selected = randomIndex(config_.numberOfIndividuals);
@@ -642,11 +495,11 @@ double *Population::selectFitnessWeights()
 {
    switch (config_.fitness)
    {
-   case FitnessIsEvaluation:
+   case Population::FitnessMode::Evaluation:
       return fitnessTable.data();
-   case WindowedFitness:
+   case Population::FitnessMode::Windowed:
       return windowedFitnessTable.data();
-   case LinearNormalizedFitness:
+   case Population::FitnessMode::LinearNormalized:
       return linearNormalizedfitnessTable.data();
    default:
       throw GAFatalException(__FILE__,__LINE__,"Unsupported fitness technique");
@@ -662,20 +515,20 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
    std::vector<std::unique_ptr<Chromosome> > replacementList;
    replacementList.reserve(numberToReplace);
 #ifdef VVERBOSE
-	    fprintf(stderr,"Adding to replacement list.. duplicates %s permitted\n",config_.reproduction == DuplicatesNotAllowed ? "NOT" : "");
+	    fprintf(stderr,"Adding to replacement list.. duplicates %s permitted\n",config_.reproduction == Population::ReproductionMode::DisallowDuplicates ? "NOT" : "");
 #endif 
   int numberGenerated = 0;
   switch (config_.parentSelection)
    {
-   case RouletteWheel:
-   case Random:
+   case Population::ParentSelectionMode::RouletteWheel:
+   case Population::ParentSelectionMode::Random:
       while (numberGenerated < numberToReplace)
       {
 	 int selected = -1;
-	 Chromosome *father = (config_.parentSelection == RouletteWheel)
+	 Chromosome *father = (config_.parentSelection == Population::ParentSelectionMode::RouletteWheel)
 	    ? selectParent(&selected,selectFitnessWeights())
 	    : selectRandomParent(&selected);
-	 Chromosome *mother = (config_.parentSelection == RouletteWheel)
+	 Chromosome *mother = (config_.parentSelection == Population::ParentSelectionMode::RouletteWheel)
 	    ? selectParent(&selected,selectFitnessWeights())
 	    : selectRandomParent(&selected);
          std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
@@ -690,7 +543,7 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
 	 //
 	 switch (config_.reproduction)
 	 {
-	 case DuplicatesAllowed:
+	 case Population::ReproductionMode::AllowDuplicates:
 	    appendReplacement(replacementList,children.first.release(),numberGenerated,numberToReplace,true);
 	    //
 	    // Keep the daugter if necessary to complete the
@@ -698,7 +551,7 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
 	    //
 	    appendReplacement(replacementList,children.second.release(),numberGenerated,numberToReplace,true);
 	    break;
-	 case DuplicatesNotAllowed:
+	 case Population::ReproductionMode::DisallowDuplicates:
 	    appendReplacement(replacementList,children.first.release(),numberGenerated,numberToReplace,false);
 	    //
 	    // Keep the daugter if necessary to complete the
@@ -718,7 +571,7 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
 std::unique_ptr<Chromosome> Population::createInitialChromosome()
 {
    return std::make_unique<Chromosome>(config_.geneticDiversity,
-                                       config_.variableLength,
+                                       static_cast<unsigned int>(config_.variableLength == Population::VariableLengthMode::Variable),
                                        config_.baseStates);
 }
 
@@ -762,7 +615,7 @@ int Population::insertNewPopulation(std::vector<std::unique_ptr<Chromosome> > re
    // Assume population table is sorted by fitness.
    //
 #ifdef VVERBOSE
-   fprintf(stderr,"Replacing population.. duplicates %s permitted\n",config_.reproduction == DuplicatesNotAllowed ? "NOT" : "");
+   fprintf(stderr,"Replacing population.. duplicates %s permitted\n",config_.reproduction == Population::ReproductionMode::DisallowDuplicates ? "NOT" : "");
 #endif 
    if (numToReplace > config_.numberOfIndividuals)
    {
@@ -772,7 +625,7 @@ int Population::insertNewPopulation(std::vector<std::unique_ptr<Chromosome> > re
    for ( int i = 0 ; i < numToReplace; i++ )
    {
       const int index = replacementSlotIndex(i);
-      if (config_.reproduction == DuplicatesNotAllowed &&
+      if (config_.reproduction == Population::ReproductionMode::DisallowDuplicates &&
           containsChromosome(replacementList[i].get(),populationTable,config_.numberOfIndividuals))
       {
          continue;

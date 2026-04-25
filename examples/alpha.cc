@@ -19,35 +19,6 @@ Alpha::Alpha(const Population::Configuration& configuration)
 {
 }
 
-Alpha::Alpha(
-   Population::OperationTechnique Operation,
-   int numberofIndividuals,
-   int numberofTrials,
-   int GenecticDeversity,
-   double BitMutationRate,
-   double CrossOverRate,
-   Population::ReproductionTechniques ReproductionTechniques,
-   Population::ParentSelectionTechnique ParentSelction,
-   Population::DeletionTechnique Deletetion,
-   Population::FitnessTechnique Fitness,
-   Population::VariableLength Variable,
-   int baseStates
-   )
-   : Alpha(Population::Configuration{Operation,
-                                     numberofIndividuals,
-                                     numberofTrials,
-                                     GenecticDeversity,
-                                     BitMutationRate,
-                                     CrossOverRate,
-                                     ReproductionTechniques,
-                                     ParentSelction,
-                                     Deletetion,
-                                     Fitness,
-                                     Variable,
-                                     baseStates})
-{
-}
-
 double Alpha::FitnessFunction(const BaseString& b)
 {
    //

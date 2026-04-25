@@ -14,14 +14,6 @@ class Population {
 public:
    struct Options;
    struct GenerationReport;
-   enum OperationTechnique        { Minimize,Maximize };
-   enum ReproductionTechniques    { DuplicatesAllowed, DuplicatesNotAllowed };
-   enum ParrentSelectionTechnique { RouletteWheel,Random };
-   enum DeletetionTechnique       { DeleteAll, DeleteAllButBest, DeleteHalf, DeleteQuarter, DeleteLast };
-   enum FitnessTechnique          { FitnessIsEvaluation, WindowedFitness,LinearNormalizedFitness };
-   enum VariableLength            { VariableLengthNotPermitted = 0,VariableLengthPermitted = 1};
-   using ParentSelectionTechnique = ParrentSelectionTechnique;
-   using DeletionTechnique = DeletetionTechnique;
    enum class OperationMode { Minimize, Maximize };
    enum class ReproductionMode { AllowDuplicates, DisallowDuplicates };
    enum class ParentSelectionMode { RouletteWheel, Random };
@@ -32,17 +24,17 @@ public:
    {
       // Legacy-compatible configuration surface. New code should prefer
       // `Options`, but this remains useful for bridging older callers.
-      OperationTechnique operation = Maximize;
+      OperationMode operation = OperationMode::Maximize;
       int numberOfIndividuals = 100;
       int numberOfTrials = 4000;
       int geneticDiversity = 44;
       double bitMutationRate = 0.008;
       double crossOverRate = 0.65;
-      ReproductionTechniques reproduction = DuplicatesAllowed;
-      ParrentSelectionTechnique parentSelection = RouletteWheel;
-      DeletetionTechnique deletion = DeleteAll;
-      FitnessTechnique fitness = FitnessIsEvaluation;
-      VariableLength variableLength = VariableLengthNotPermitted;
+      ReproductionMode reproduction = ReproductionMode::AllowDuplicates;
+      ParentSelectionMode parentSelection = ParentSelectionMode::RouletteWheel;
+      DeletionMode deletion = DeletionMode::DeleteAll;
+      FitnessMode fitness = FitnessMode::Evaluation;
+      VariableLengthMode variableLength = VariableLengthMode::Fixed;
       int baseStates = 2;
       bool useFixedRandomSeed = false;
       unsigned int randomSeed = 0;
@@ -154,20 +146,6 @@ public:
    explicit Population(const Options& options);
    // Construct a population from the legacy-compatible configuration object.
    explicit Population(const Configuration& configuration);
-   [[deprecated("Use Population::Options or Population::Configuration")]]
-   Population(
-      OperationTechnique POperation = Maximize,
-      int PnumberofIndividuals = 100,
-      int PnumberofTrials      = 4000,
-      int PGenecticDeversity   = 44,
-      double PBitMutationRate     = 0.008,
-      double PCrossOverRate       = 0.65,
-      ReproductionTechniques PReproductionTechniques = DuplicatesAllowed,
-      ParrentSelectionTechnique ParentSelction = RouletteWheel,
-      DeletetionTechnique Deletetion           = DeleteAll,
-      FitnessTechnique Fitness                 = FitnessIsEvaluation,
-      VariableLength PVariable                 = VariableLengthNotPermitted,
-      int PbaseStates                          = 2);
    virtual ~Population();
    // Subclasses provide the problem-specific score for a chromosome.
    virtual double FitnessFunction(const BaseString& b)=0;

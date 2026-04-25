@@ -32,35 +32,6 @@ LatinSquare::LatinSquare(const Population::Configuration& configuration)
    }
 }
 
-LatinSquare::LatinSquare(
-   Population::OperationTechnique Operation,
-   int numberofIndividuals,
-   int numberofTrials,
-   int GenecticDeversity,
-   double BitMutationRate,
-   double CrossOverRate,
-   Population::ReproductionTechniques ReproductionTechniques,
-   Population::ParentSelectionTechnique ParentSelction,
-   Population::DeletionTechnique Deletetion,
-   Population::FitnessTechnique Fitness,
-   Population::VariableLength Variable,
-   int baseStates
-   )
-   : LatinSquare(Population::Configuration{Operation,
-                                           numberofIndividuals,
-                                           numberofTrials,
-                                           GenecticDeversity,
-                                           BitMutationRate,
-                                           CrossOverRate,
-                                           ReproductionTechniques,
-                                           ParentSelction,
-                                           Deletetion,
-                                           Fitness,
-                                           Variable,
-                                           baseStates})
-{
-}
-
 int LatinSquare::squareSize(const BaseString& b) const
 {
    const int size = static_cast<int>(std::sqrt(static_cast<double>(b.length())));
