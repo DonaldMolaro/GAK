@@ -31,32 +31,23 @@
 
 namespace
 {
-std::mt19937& ChromosomeRandomGenerator()
+std::mt19937& FallbackRandomGenerator()
 {
-  static std::mt19937 generator(0);
+  static std::mt19937 generator(std::random_device{}());
   return generator;
 }
 }
-std::mt19937& Chromosome::randomGenerator()
-{
-  return ChromosomeRandomGenerator();
-}
 
-int Chromosome::randomBit()
+int Chromosome::randomBit(std::mt19937& randomGenerator)
 {
   std::uniform_int_distribution<int> distribution(0, 1);
-  return distribution(randomGenerator());
+  return distribution(randomGenerator);
 }
 
-int Chromosome::randomIndex(int upperBoundExclusive)
+int Chromosome::randomIndex(std::mt19937& randomGenerator, int upperBoundExclusive)
 {
   std::uniform_int_distribution<int> distribution(0, upperBoundExclusive - 1);
-  return distribution(randomGenerator());
-}
-
-void Chromosome::seedRandom(unsigned int seed)
-{
-  randomGenerator().seed(seed);
+  return distribution(randomGenerator);
 }
 
 Chromosome::BaseStringPtr Chromosome::cloneBaseString(const BaseString *source, int baseStates)
@@ -73,7 +64,7 @@ Chromosome::BaseStringPtr Chromosome::cloneBaseString(const BaseString *source, 
 // Chromosome implementation. 
 //
 //
-Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int PbaseStates)
+Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int PbaseStates,std::mt19937* randomGenerator)
 {
   //
   // Randomly initialze the chromosome
@@ -88,6 +79,7 @@ Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int Pb
     throw GAFatalException(__FILE__,__LINE__,"Requested Chromosome Length over 2048. Proabably a mistake.");
   //
   //
+  std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
   ChromosomeLength = CLength;
   variableLength = vlength;
   baseStates     = PbaseStates;
@@ -97,7 +89,7 @@ Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int Pb
     {
       for ( int i = 0 ; i < ChromosomeLength ; i++ )
 	{
-	  if (randomBit()) ChromosomeString->set(i);
+	  if (randomBit(generator)) ChromosomeString->set(i);
 	  else ChromosomeString->clear(i);
 	}
     }
@@ -105,7 +97,7 @@ Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int Pb
     {
       for ( int i = 0 ; i < ChromosomeLength ; i++ )
 	{
-	  ChromosomeString->set(i,randomIndex(baseStates));
+	  ChromosomeString->set(i,randomIndex(generator,baseStates));
 	}
     }
 }
@@ -125,8 +117,9 @@ Chromosome::Chromosome(std::unique_ptr<BaseString> b,unsigned int vlength,unsign
 // Changes required for variable length chromosome support
 //            - none.
 //
-void Chromosome::SingleBitMutate(double probability)
+void Chromosome::SingleBitMutate(double probability, std::mt19937* randomGenerator)
 {
+  std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
   if ((probability >= 0.0)&&(probability <= 1.0))
     {
       int probabilityMask = (int) ( probability * 65535.0 );
@@ -134,16 +127,16 @@ void Chromosome::SingleBitMutate(double probability)
    
       for ( int i = 0 ; i < ChromosomeLength ; i++ )
 	{
-	  if (distribution(randomGenerator()) < probabilityMask)
+	  if (distribution(generator) < probabilityMask)
 	    {
 	      if (baseStates == 2)
 		{
-		  if (randomBit()) ChromosomeString->set(i);
+		  if (randomBit(generator)) ChromosomeString->set(i);
 		  else ChromosomeString->clear(i);
 		}
 	      else
 		{
-		  ChromosomeString->set(i,randomIndex(baseStates));
+		  ChromosomeString->set(i,randomIndex(generator,baseStates));
 		}
 	      
 	    }
@@ -159,11 +152,11 @@ void Chromosome::SingleBitMutate(double probability)
 //    Randomly deside if a chromosome pair will cross over.
 //
 //
-int Chromosome::testCrossOverRate(double crossOverRate)
+int Chromosome::testCrossOverRate(std::mt19937& randomGenerator, double crossOverRate)
 {
   int probabilityMask = (int) ( crossOverRate * 65535.0 );
   std::uniform_int_distribution<int> distribution(0, 0xFFFF);
-  if (distribution(randomGenerator()) < probabilityMask) return 1;
+  if (distribution(randomGenerator) < probabilityMask) return 1;
   else return 0;
 }
 //
@@ -195,18 +188,18 @@ int Chromosome::testCrossOverRate(double crossOverRate)
 //
 //
 std::pair<Chromosome::BaseStringPtr, Chromosome::BaseStringPtr>
-Chromosome::singlePointCrossOver(const BaseString *mother,const BaseString *father)
+Chromosome::singlePointCrossOver(const BaseString *mother,const BaseString *father,std::mt19937& randomGenerator)
 {
   int FatherCrossoverPoint;
   int MotherCrossoverPoint;
   if (this->variableLength) 
     {
-      FatherCrossoverPoint = randomIndex(father->length());
-      MotherCrossoverPoint = randomIndex(mother->length());
+      FatherCrossoverPoint = randomIndex(randomGenerator,father->length());
+      MotherCrossoverPoint = randomIndex(randomGenerator,mother->length());
     }
   else
     { 
-      FatherCrossoverPoint = randomIndex(father->length());
+      FatherCrossoverPoint = randomIndex(randomGenerator,father->length());
       MotherCrossoverPoint = FatherCrossoverPoint;
     }
   int FatherPrimaryLength = FatherCrossoverPoint;
@@ -253,18 +246,18 @@ Chromosome::singlePointCrossOver(const BaseString *mother,const BaseString *fath
 //
 //
 std::pair<Chromosome::BaseStringPtr, Chromosome::BaseStringPtr>
-Chromosome::twoPointCrossOver(const BaseString *mother,const BaseString *father)
+Chromosome::twoPointCrossOver(const BaseString *mother,const BaseString *father,std::mt19937& randomGenerator)
 {
   //
   // A two point cross over is just two single points and some extra memory.
   //
-  std::pair<BaseStringPtr, BaseStringPtr> intermediate = singlePointCrossOver(mother,father);
-  return singlePointCrossOver(intermediate.second.get(), intermediate.first.get());
+  std::pair<BaseStringPtr, BaseStringPtr> intermediate = singlePointCrossOver(mother,father,randomGenerator);
+  return singlePointCrossOver(intermediate.second.get(), intermediate.first.get(),randomGenerator);
 }
 //
 //
 std::pair<Chromosome::BaseStringPtr, Chromosome::BaseStringPtr>
-Chromosome::uniformCrossOver(const BaseString *mother,const BaseString *father)
+Chromosome::uniformCrossOver(const BaseString *mother,const BaseString *father,std::mt19937& randomGenerator)
 {
   BaseStringPtr boy;
   BaseStringPtr girl;
@@ -282,7 +275,7 @@ Chromosome::uniformCrossOver(const BaseString *mother,const BaseString *father)
       // New Chromosomes are made up of random bits of the two parrents
       for ( int i = 0 ; i < copyLength ; i++ )
 	{
-	  if (randomBit() == 0)
+	  if (randomBit(randomGenerator) == 0)
 	    {
 	      boy->assign(i,father->test(i));
 	      girl->assign(i,mother->test(i));
@@ -309,7 +302,7 @@ Chromosome::uniformCrossOver(const BaseString *mother,const BaseString *father)
       // New Chromosomes are made up of random bits of the two parrents
       for ( int i = 0 ; i < father->length() ; i++ )
 	{
-	  if (randomBit() == 0)
+	  if (randomBit(randomGenerator) == 0)
 	    {
 	      boy->assign(i,father->test(i));
 	      girl->assign(i,mother->test(i));
@@ -328,9 +321,10 @@ Chromosome::uniformCrossOver(const BaseString *mother,const BaseString *father)
 // children. 
 //
 std::pair<Chromosome::ChromosomePtr, Chromosome::ChromosomePtr>
-Chromosome::mate(Chromosome& father,double crossOverRate,CrossOverType crossType)
+Chromosome::mate(Chromosome& father,double crossOverRate,CrossOverType crossType,std::mt19937* randomGenerator)
 {
   Chromosome *mother = this;         // Just for notation purposes.
+  std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
   //
   //
   if (!(this->variableLength) && (mother->ChromosomeLen() != father.ChromosomeLen()))
@@ -343,19 +337,19 @@ Chromosome::mate(Chromosome& father,double crossOverRate,CrossOverType crossType
   // Only cross the chromosomes if we pass the
   // crossOverRate test.
   //
-  if (testCrossOverRate(crossOverRate))
+  if (testCrossOverRate(generator,crossOverRate))
     {
       switch (crossType)
 	{
 	case SinglePoint:
-	  children = singlePointCrossOver(&mother->chromosomeString(),&father.chromosomeString());
+	  children = singlePointCrossOver(&mother->chromosomeString(),&father.chromosomeString(),generator);
 	  break;
 	case TwoPoint:
-	  children = twoPointCrossOver(&mother->chromosomeString(),&father.chromosomeString());
+	  children = twoPointCrossOver(&mother->chromosomeString(),&father.chromosomeString(),generator);
 	 
 	  break;
 	case Uniform:
-	  children = uniformCrossOver(&mother->chromosomeString(),&father.chromosomeString());
+	  children = uniformCrossOver(&mother->chromosomeString(),&father.chromosomeString(),generator);
 	  break;
 	default:
 	  throw GANonFatalException(__FILE__,__LINE__,"Unimplemented crossover type");

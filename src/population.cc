@@ -116,7 +116,6 @@ void Population::setRandomSeed(unsigned int seed)
 {
    activeRandomSeed_ = seed;
    randomGenerator.seed(seed);
-   Chromosome::seedRandom(seed);
 }
 
 int Population::replacementCount() const
@@ -572,18 +571,19 @@ std::unique_ptr<Chromosome> Population::createInitialChromosome()
 {
    return std::make_unique<Chromosome>(config_.geneticDiversity,
                                        static_cast<unsigned int>(config_.variableLength == Population::VariableLengthMode::Variable),
-                                       config_.baseStates);
+                                       config_.baseStates,
+                                       &randomGenerator);
 }
 
 std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
 Population::mateChromosomes(Chromosome *mother, Chromosome *father)
 {
-   return mother->mate(*father,config_.crossOverRate,Chromosome::SinglePoint);
+   return mother->mate(*father,config_.crossOverRate,Chromosome::SinglePoint,&randomGenerator);
 }
 
 void Population::mutateChromosome(Chromosome *chromosome)
 {
-   chromosome->SingleBitMutate(config_.bitMutationRate);
+   chromosome->SingleBitMutate(config_.bitMutationRate, &randomGenerator);
 }
 
 bool Population::containsChromosome(const Chromosome *candidate,
