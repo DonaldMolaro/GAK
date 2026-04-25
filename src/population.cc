@@ -59,6 +59,21 @@ Population::Population(const Settings& settings)
 
 Population::~Population() = default;
 
+void Population::setInitializationStrategy(std::unique_ptr<InitializationStrategy> strategy)
+{
+   initializationStrategy_ = std::move(strategy);
+}
+
+void Population::setMatingStrategy(std::unique_ptr<MatingStrategy> strategy)
+{
+   matingStrategy_ = std::move(strategy);
+}
+
+void Population::setMutationStrategy(std::unique_ptr<MutationStrategy> strategy)
+{
+   mutationStrategy_ = std::move(strategy);
+}
+
 void Population::setRandomSeed(unsigned int seed)
 {
    activeRandomSeed_ = seed;
@@ -516,6 +531,15 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
 
 std::unique_ptr<Chromosome> Population::createInitialChromosome()
 {
+   if (initializationStrategy_)
+   {
+      return initializationStrategy_->create(*this);
+   }
+   return createDefaultChromosome();
+}
+
+std::unique_ptr<Chromosome> Population::createDefaultChromosome()
+{
    return std::make_unique<Chromosome>(settings_.geneticDiversity,
                                        settings_.variableLength == Population::VariableLengthMode::Variable,
                                        settings_.baseStates,
@@ -525,10 +549,30 @@ std::unique_ptr<Chromosome> Population::createInitialChromosome()
 std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
 Population::mateChromosomes(Chromosome& mother, Chromosome& father)
 {
+   if (matingStrategy_)
+   {
+      return matingStrategy_->mate(*this, mother, father);
+   }
+   return mateDefaultChromosomes(mother, father);
+}
+
+std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+Population::mateDefaultChromosomes(Chromosome& mother, Chromosome& father)
+{
    return mother.mate(father,settings_.crossOverRate,Chromosome::CrossoverType::SinglePoint,&randomGenerator);
 }
 
 void Population::mutateChromosome(Chromosome& chromosome)
+{
+   if (mutationStrategy_)
+   {
+      mutationStrategy_->mutate(*this, chromosome);
+      return;
+   }
+   mutateDefaultChromosome(chromosome);
+}
+
+void Population::mutateDefaultChromosome(Chromosome& chromosome)
 {
    chromosome.mutate(settings_.bitMutationRate, &randomGenerator);
 }

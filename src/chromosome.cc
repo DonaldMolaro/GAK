@@ -53,7 +53,7 @@ Chromosome::BaseStringValue Chromosome::cloneBaseString(const BaseString& source
   BaseString clone(source.length(), baseStates);
   for ( int i = 0 ; i < source.length() ; i++ )
     {
-      clone.assign(i,source.test(i));
+      clone.setValue(i,source.valueAt(i));
     }
   return clone;
 }
@@ -89,15 +89,15 @@ Chromosome::Chromosome(unsigned int requestedLength,
     {
       for ( int i = 0 ; i < chromosomeLength ; i++ )
 	{
-	  if (randomBit(generator)) chromosomeString_.set(i);
-	  else chromosomeString_.clear(i);
+	  if (randomBit(generator)) chromosomeString_.setValue(i);
+	  else chromosomeString_.clearValue(i);
 	}
     }
   else
     {
       for ( int i = 0 ; i < chromosomeLength ; i++ )
 	{
-	  chromosomeString_.set(i,randomIndex(generator,baseStates));
+	  chromosomeString_.setValue(i,randomIndex(generator,baseStates));
 	}
     }
 }
@@ -131,12 +131,12 @@ void Chromosome::mutate(double probability, std::mt19937* randomGenerator)
 	    {
 	      if (baseStates == 2)
 		{
-		  if (randomBit(generator)) chromosomeString_.set(i);
-		  else chromosomeString_.clear(i);
+		  if (randomBit(generator)) chromosomeString_.setValue(i);
+		  else chromosomeString_.clearValue(i);
 		}
 	      else
 		{
-		  chromosomeString_.set(i,randomIndex(generator,baseStates));
+		  chromosomeString_.setValue(i,randomIndex(generator,baseStates));
 		}
 
 	    }
@@ -220,11 +220,11 @@ Chromosome::singlePointCrossOver(const BaseString& mother, const BaseString& fat
     {
       if ( i < FatherPrimaryLength )
 	{
-	  boy.assign(i,father.test(i));
+	  boy.setValue(i,father.valueAt(i));
 	}
       else
 	{
-	  boy.assign(i,mother.test(i + (MotherPrimaryLength - FatherPrimaryLength)));
+	  boy.setValue(i,mother.valueAt(i + (MotherPrimaryLength - FatherPrimaryLength)));
 	}
     }
   //
@@ -232,11 +232,11 @@ Chromosome::singlePointCrossOver(const BaseString& mother, const BaseString& fat
     {
       if ( i < MotherPrimaryLength)
 	{
-	  girl.assign(i,mother.test(i));
+	  girl.setValue(i,mother.valueAt(i));
 	}
       else
 	{
-	  girl.assign(i,father.test(i + (FatherPrimaryLength - MotherPrimaryLength)));
+	  girl.setValue(i,father.valueAt(i + (FatherPrimaryLength - MotherPrimaryLength)));
 	}
 
     }
@@ -274,22 +274,22 @@ Chromosome::uniformCrossOver(const BaseString& mother, const BaseString& father,
 	{
 	  if (randomBit(randomGenerator) == 0)
 	    {
-	      boy.assign(i,father.test(i));
-	      girl.assign(i,mother.test(i));
+	      boy.setValue(i,father.valueAt(i));
+	      girl.setValue(i,mother.valueAt(i));
 	    }
 	  else
 	    {
-	      boy.assign(i,mother.test(i));
-	      girl.assign(i,father.test(i));
+	      boy.setValue(i,mother.valueAt(i));
+	      girl.setValue(i,father.valueAt(i));
 	    }
 	}
       for ( int i = copyLength ; i < father.length() ; i++ )
 	{
-	  boy.assign(i,father.test(i));
+	  boy.setValue(i,father.valueAt(i));
 	}
       for ( int i = copyLength ; i < mother.length() ; i++ )
 	{
-	  girl.assign(i,mother.test(i));
+	  girl.setValue(i,mother.valueAt(i));
 	}
     }
   else
@@ -299,13 +299,13 @@ Chromosome::uniformCrossOver(const BaseString& mother, const BaseString& father,
 	{
 	  if (randomBit(randomGenerator) == 0)
 	    {
-	      boy.assign(i,father.test(i));
-	      girl.assign(i,mother.test(i));
+	      boy.setValue(i,father.valueAt(i));
+	      girl.setValue(i,mother.valueAt(i));
 	    }
 	  else
 	    {
-	      boy.assign(i,mother.test(i));
-	      girl.assign(i,father.test(i));
+	      boy.setValue(i,mother.valueAt(i));
+	      girl.setValue(i,father.valueAt(i));
 	    }
 	}
     }
@@ -366,7 +366,7 @@ bool Chromosome::equals(const Chromosome& candidate) const
     {
       for ( int i = 0 ; i < length() ; i++ )
 	{
-	  if (genes().test(i) != candidate.genes().test(i)) return false;
+	  if (genes().valueAt(i) != candidate.genes().valueAt(i)) return false;
 	}
       return true;
     }

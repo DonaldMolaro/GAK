@@ -10,6 +10,61 @@
 #include "population.hh"
 #include "sudoku_constrained.hh"
 
+namespace
+{
+class SudokuInitializationStrategy : public Population::InitializationStrategy
+{
+public:
+   explicit SudokuInitializationStrategy(SudokuConstrained& owner)
+      : owner_(owner)
+   {
+   }
+
+   std::unique_ptr<Chromosome> create(Population&) override
+   {
+      return owner_.createConstraintAwareInitialChromosome();
+   }
+
+private:
+   SudokuConstrained& owner_;
+};
+
+class SudokuMatingStrategy : public Population::MatingStrategy
+{
+public:
+   explicit SudokuMatingStrategy(SudokuConstrained& owner)
+      : owner_(owner)
+   {
+   }
+
+   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+   mate(Population&, Chromosome& mother, Chromosome& father) override
+   {
+      return owner_.mateConstraintAwareChromosomes(mother, father);
+   }
+
+private:
+   SudokuConstrained& owner_;
+};
+
+class SudokuMutationStrategy : public Population::MutationStrategy
+{
+public:
+   explicit SudokuMutationStrategy(SudokuConstrained& owner)
+      : owner_(owner)
+   {
+   }
+
+   void mutate(Population&, Chromosome& chromosome) override
+   {
+      owner_.mutateConstraintAwareChromosome(chromosome);
+   }
+
+private:
+   SudokuConstrained& owner_;
+};
+}
+
 const int SudokuConstrained::kPuzzle[SudokuConstrained::kCellCount] = {
    5, 3, 0, 0, 7, 0, 0, 0, 0,
    6, 0, 0, 1, 9, 5, 0, 0, 0,
@@ -26,7 +81,6 @@ SudokuConstrained::SudokuConstrained(const Population::Settings& settings)
    : Population(settings)
 {
    validateSettings(settings);
-   randomGenerator_.seed(randomSeed());
 
    mutableColumnsByRow_.resize(kBoardSize);
    missingDigitsByRow_.resize(kBoardSize);
@@ -55,6 +109,10 @@ SudokuConstrained::SudokuConstrained(const Population::Settings& settings)
          }
       }
    }
+
+   setInitializationStrategy(std::make_unique<SudokuInitializationStrategy>(*this));
+   setMatingStrategy(std::make_unique<SudokuMatingStrategy>(*this));
+   setMutationStrategy(std::make_unique<SudokuMutationStrategy>(*this));
 }
 
 void SudokuConstrained::validateSettings(const Population::Settings& settings) const
@@ -76,7 +134,7 @@ int SudokuConstrained::uniquenessScoreForColumn(const BaseString& b, int column)
    int score = 0;
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
-      const int value = b.test((row * kBoardSize) + column);
+      const int value = b.valueAt((row * kBoardSize) + column);
       if (value < 0 || value >= kBoardSize)
       {
          throw GAFatalException(__FILE__,__LINE__,"SudokuConstrained encountered an out-of-range symbol");
@@ -100,7 +158,7 @@ int SudokuConstrained::uniquenessScoreForBox(const BaseString& b, int boxRow, in
       {
          const int row = (boxRow * kSubgridSize) + rowOffset;
          const int column = (boxColumn * kSubgridSize) + columnOffset;
-         const int value = b.test((row * kBoardSize) + column);
+         const int value = b.valueAt((row * kBoardSize) + column);
          if (value < 0 || value >= kBoardSize)
          {
             throw GAFatalException(__FILE__,__LINE__,"SudokuConstrained encountered an out-of-range symbol");
@@ -125,7 +183,7 @@ int SudokuConstrained::givenConsistencyScore(const BaseString& b) const
          continue;
       }
 
-      if ((b.test(cell) + 1) == kPuzzle[cell])
+      if ((b.valueAt(cell) + 1) == kPuzzle[cell])
       {
          score += kBoardSize;
       }
@@ -168,7 +226,7 @@ void SudokuConstrained::printCandidate(const BaseString& genes, std::ostream& ou
    {
       for ( int column = 0 ; column < kBoardSize ; column++ )
       {
-         out << (genes.test((row * kBoardSize) + column) + 1);
+         out << (genes.valueAt((row * kBoardSize) + column) + 1);
          if (column == 2 || column == 5)
          {
             out << " | ";
@@ -191,7 +249,7 @@ BaseString SudokuConstrained::cloneBoard(const BaseString& source) const
    BaseString clone(kCellCount, kBoardSize);
    for ( int cell = 0 ; cell < kCellCount ; cell++ )
    {
-      clone.set(cell, source.test(cell));
+      clone.setValue(cell, source.valueAt(cell));
    }
    return clone;
 }
@@ -201,7 +259,7 @@ void SudokuConstrained::fillRowFromParent(BaseString& destination, const BaseStr
    const int rowStart = row * kBoardSize;
    for ( int column = 0 ; column < kBoardSize ; column++ )
    {
-      destination.set(rowStart + column, source.test(rowStart + column));
+      destination.setValue(rowStart + column, source.valueAt(rowStart + column));
    }
 }
 
@@ -213,15 +271,15 @@ void SudokuConstrained::initializeRow(BaseString& board, int row)
       const int given = kPuzzle[rowStart + column];
       if (given != 0)
       {
-         board.set(rowStart + column, given - 1);
+         board.setValue(rowStart + column, given - 1);
       }
    }
 
    std::vector<int> digits = missingDigitsByRow_[row];
-   std::shuffle(digits.begin(), digits.end(), randomGenerator_);
+   std::shuffle(digits.begin(), digits.end(), randomEngine());
    for ( int i = 0 ; i < static_cast<int>(mutableColumnsByRow_[row].size()) ; i++ )
    {
-      board.set(rowStart + mutableColumnsByRow_[row][i], digits[i]);
+      board.setValue(rowStart + mutableColumnsByRow_[row][i], digits[i]);
    }
 }
 
@@ -231,7 +289,7 @@ bool SudokuConstrained::rowIsValidPermutation(const BaseString& board, int row) 
    const int rowStart = row * kBoardSize;
    for ( int column = 0 ; column < kBoardSize ; column++ )
    {
-      const int value = board.test(rowStart + column);
+      const int value = board.valueAt(rowStart + column);
       if (value < 0 || value >= kBoardSize || seen[value])
       {
          return false;
@@ -241,7 +299,7 @@ bool SudokuConstrained::rowIsValidPermutation(const BaseString& board, int row) 
    return true;
 }
 
-std::unique_ptr<Chromosome> SudokuConstrained::createInitialChromosome()
+std::unique_ptr<Chromosome> SudokuConstrained::createConstraintAwareInitialChromosome()
 {
    BaseString board(kCellCount, kBoardSize);
    for ( int row = 0 ; row < kBoardSize ; row++ )
@@ -254,12 +312,12 @@ std::unique_ptr<Chromosome> SudokuConstrained::createInitialChromosome()
 }
 
 std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-SudokuConstrained::mateChromosomes(Chromosome& mother, Chromosome& father)
+SudokuConstrained::mateConstraintAwareChromosomes(Chromosome& mother, Chromosome& father)
 {
    std::uniform_real_distribution<double> probability(0.0, 1.0);
    std::uniform_int_distribution<int> parent_choice(0, 1);
 
-   if (probability(randomGenerator_) >= settings().crossOverRate)
+   if (probability(randomEngine()) >= settings().crossOverRate)
    {
       return std::make_pair(
          std::make_unique<Chromosome>(cloneBoard(mother.genes()),
@@ -275,7 +333,7 @@ SudokuConstrained::mateChromosomes(Chromosome& mother, Chromosome& father)
 
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
-      const bool useMotherForFirst = parent_choice(randomGenerator_) == 0;
+      const bool useMotherForFirst = parent_choice(randomEngine()) == 0;
       fillRowFromParent(first, useMotherForFirst ? mother.genes() : father.genes(), row);
       fillRowFromParent(second, useMotherForFirst ? father.genes() : mother.genes(), row);
    }
@@ -289,7 +347,7 @@ SudokuConstrained::mateChromosomes(Chromosome& mother, Chromosome& father)
                                    settings().baseStates));
 }
 
-void SudokuConstrained::mutateChromosome(Chromosome& chromosome)
+void SudokuConstrained::mutateConstraintAwareChromosome(Chromosome& chromosome)
 {
    const double rowMutationRate = std::min(1.0, settings().bitMutationRate * kBoardSize);
    std::uniform_real_distribution<double> probability(0.0, 1.0);
@@ -303,25 +361,22 @@ void SudokuConstrained::mutateChromosome(Chromosome& chromosome)
          continue;
       }
 
-      if (probability(randomGenerator_) >= rowMutationRate)
+      if (probability(randomEngine()) >= rowMutationRate)
       {
          continue;
       }
 
       std::uniform_int_distribution<int> columnIndex(0, static_cast<int>(mutableColumns.size()) - 1);
-      int first = columnIndex(randomGenerator_);
-      int second = columnIndex(randomGenerator_);
+      int first = columnIndex(randomEngine());
+      int second = columnIndex(randomEngine());
       while (second == first)
       {
-         second = columnIndex(randomGenerator_);
+         second = columnIndex(randomEngine());
       }
 
       const int rowStart = row * kBoardSize;
       const int firstCell = rowStart + mutableColumns[first];
       const int secondCell = rowStart + mutableColumns[second];
-      const int firstValue = board.test(firstCell);
-      const int secondValue = board.test(secondCell);
-      board.set(firstCell, secondValue);
-      board.set(secondCell, firstValue);
+      board.swapValues(firstCell, secondCell);
    }
 }

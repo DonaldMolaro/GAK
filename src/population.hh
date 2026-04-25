@@ -12,6 +12,28 @@ class Chromosome;
 
 class Population {
 public:
+   class InitializationStrategy
+   {
+   public:
+      virtual ~InitializationStrategy() = default;
+      virtual std::unique_ptr<Chromosome> create(Population& population) = 0;
+   };
+
+   class MatingStrategy
+   {
+   public:
+      virtual ~MatingStrategy() = default;
+      virtual std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+         mate(Population& population, Chromosome& mother, Chromosome& father) = 0;
+   };
+
+   class MutationStrategy
+   {
+   public:
+      virtual ~MutationStrategy() = default;
+      virtual void mutate(Population& population, Chromosome& chromosome) = 0;
+   };
+
    struct Settings;
    struct GenerationReport;
    enum class OperationMode { Minimize, Maximize };
@@ -72,6 +94,9 @@ private:
    std::vector<double> windowedFitnessTable;
    std::vector<double> linearNormalizedfitnessTable;
    Settings settings_;
+   std::unique_ptr<InitializationStrategy> initializationStrategy_;
+   std::unique_ptr<MatingStrategy> matingStrategy_;
+   std::unique_ptr<MutationStrategy> mutationStrategy_;
    std::mt19937 randomGenerator;
    unsigned int activeRandomSeed_;
    static const int kSummaryCount = 5;
@@ -108,16 +133,17 @@ private:
    //
    //
 protected:
-   // Create an initial chromosome for the starting population. Subclasses can
-   // override this to generate candidates that already satisfy key constraints.
-   virtual std::unique_ptr<Chromosome> createInitialChromosome();
-   // Produce two children from a pair of parents. Override this when the
-   // default generic crossover should be replaced with problem-aware mating.
-   virtual std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+   void setInitializationStrategy(std::unique_ptr<InitializationStrategy> strategy);
+   void setMatingStrategy(std::unique_ptr<MatingStrategy> strategy);
+   void setMutationStrategy(std::unique_ptr<MutationStrategy> strategy);
+   std::unique_ptr<Chromosome> createInitialChromosome();
+   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
       mateChromosomes(Chromosome& mother, Chromosome& father);
-   // Apply a mutation step to a chromosome. Override this when mutations need
-   // to preserve invariants such as fixed givens or permutation validity.
-   virtual void mutateChromosome(Chromosome& chromosome);
+   void mutateChromosome(Chromosome& chromosome);
+   std::unique_ptr<Chromosome> createDefaultChromosome();
+   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+      mateDefaultChromosomes(Chromosome& mother, Chromosome& father);
+   void mutateDefaultChromosome(Chromosome& chromosome);
 public:
    explicit Population(const Settings& settings);
    virtual ~Population();
@@ -125,6 +151,7 @@ public:
    virtual void printCandidate(const BaseString& genes, std::ostream& out)=0;
    const Settings& settings() const noexcept { return settings_; }
    unsigned int randomSeed() const noexcept { return activeRandomSeed_; }
+   std::mt19937& randomEngine() noexcept { return randomGenerator; }
    void setRandomSeed(unsigned int seed);
    int decode(const BaseString& genes,int start,int end) const;
    // Run the GA silently and return a structured summary.

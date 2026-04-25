@@ -16,13 +16,6 @@ public:
    double evaluateFitness(const BaseString& genes) override;
    void printCandidate(const BaseString& genes, std::ostream& out) override;
 
-protected:
-   std::unique_ptr<Chromosome> createInitialChromosome() override;
-   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-      mateChromosomes(Chromosome& mother, Chromosome& father) override;
-   void mutateChromosome(Chromosome& chromosome) override;
-
-private:
    static const int kBoardSize = 9;
    static const int kCellCount = 81;
    static const int kSubgridSize = 3;
@@ -30,6 +23,12 @@ private:
 
    using RowColumns = std::vector<int>;
 
+   std::unique_ptr<Chromosome> createConstraintAwareInitialChromosome();
+   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+      mateConstraintAwareChromosomes(Chromosome& mother, Chromosome& father);
+   void mutateConstraintAwareChromosome(Chromosome& chromosome);
+
+private:
    void validateSettings(const Population::Settings& settings) const;
    int uniquenessScoreForColumn(const BaseString& genes, int column) const;
    int uniquenessScoreForBox(const BaseString& genes, int boxRow, int boxColumn) const;
@@ -41,7 +40,6 @@ private:
 
    std::vector<RowColumns> mutableColumnsByRow_;
    std::vector<std::vector<int> > missingDigitsByRow_;
-   std::mt19937 randomGenerator_;
 };
 
 #endif

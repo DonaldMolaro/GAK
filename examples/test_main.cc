@@ -119,11 +119,11 @@ BaseString makeBinaryString(const std::string& bits)
     {
       if (bits[i] == '1')
         {
-          b.set(i);
+          b.setValue(i);
         }
       else
         {
-          b.clear(i);
+          b.clearValue(i);
         }
     }
   return b;
@@ -134,7 +134,7 @@ BaseString makeSymbolicString(const std::string& letters)
   BaseString b(letters.length(), 26);
   for (int i = 0 ; i < static_cast<int>(letters.length()) ; i++)
     {
-      b.set(i, letters[i] - 'a');
+      b.setValue(i, letters[i] - 'a');
     }
   return b;
 }
@@ -205,8 +205,8 @@ void test_alpha_prefers_sorted_alphabet()
   BaseString reversed(13, 13);
   for (int i = 0 ; i < 13 ; i++)
     {
-      sorted.set(i, i);
-      reversed.set(i, 12 - i);
+      sorted.setValue(i, i);
+      reversed.setValue(i, 12 - i);
     }
 
   expect_true(alpha.evaluateFitness(sorted) > alpha.evaluateFitness(reversed),
@@ -242,7 +242,7 @@ void test_traveling_salesman_construction_and_validation()
   BaseString route(5, 5);
   for (int i = 0 ; i < 5 ; i++)
     {
-      route.set(i, i);
+      route.setValue(i, i);
     }
   expect_true(tsp.evaluateFitness(route) > 0.0,
               "TravelingSalesman route fitness should be positive");
@@ -284,8 +284,8 @@ void test_nqueens_rewards_non_attacking_layouts()
   BaseString bad(8, 8);
   for (int i = 0 ; i < 8 ; i++)
     {
-      solution.set(i, solved_rows[i]);
-      bad.set(i, 0);
+      solution.setValue(i, solved_rows[i]);
+      bad.setValue(i, 0);
     }
 
   expect_true(queens.evaluateFitness(solution) == 28,
@@ -325,8 +325,8 @@ void test_latin_square_rewards_unique_rows_and_columns()
   BaseString bad(16, 4);
   for (int i = 0 ; i < 16 ; i++)
     {
-      solution.set(i, solved_values[i]);
-      bad.set(i, 0);
+      solution.setValue(i, solved_values[i]);
+      bad.setValue(i, 0);
     }
 
   expect_true(latin_square.evaluateFitness(solution) == 32,
@@ -376,8 +376,8 @@ void test_sudoku_rewards_valid_solution_and_givens()
   BaseString bad(81, 9);
   for (int i = 0 ; i < 81 ; i++)
     {
-      solution.set(i, actual_solution[i]);
-      bad.set(i, 0);
+      solution.setValue(i, actual_solution[i]);
+      bad.setValue(i, 0);
     }
 
   expect_true(sudoku.evaluateFitness(solution) == 513,
@@ -434,7 +434,7 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
     int seen[9] = {0, 0, 0, 0, 0, 0, 0, 0, 0};
     for (int column = 0 ; column < 9 ; column++)
       {
-        int value = board.test((row * 9) + column);
+        int value = board.valueAt((row * 9) + column);
         if (value < 0 || value >= 9 || seen[value])
           {
             return false;
@@ -448,9 +448,9 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
     {
       if (givens[cell] != 0)
         {
-          expect_true(first->genes().test(cell) + 1 == givens[cell],
+          expect_true(first->genes().valueAt(cell) + 1 == givens[cell],
                       "Constrained Sudoku initialization should preserve givens");
-          expect_true(second->genes().test(cell) + 1 == givens[cell],
+          expect_true(second->genes().valueAt(cell) + 1 == givens[cell],
                       "Constrained Sudoku initialization should preserve givens across all individuals");
         }
     }
@@ -480,9 +480,9 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
     {
       if (givens[cell] != 0)
         {
-          expect_true(children.first->genes().test(cell) + 1 == givens[cell],
+          expect_true(children.first->genes().valueAt(cell) + 1 == givens[cell],
                       "Constrained Sudoku operators should keep givens locked in the first child");
-          expect_true(children.second->genes().test(cell) + 1 == givens[cell],
+          expect_true(children.second->genes().valueAt(cell) + 1 == givens[cell],
                       "Constrained Sudoku operators should keep givens locked in the second child");
         }
     }

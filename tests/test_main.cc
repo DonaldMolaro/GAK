@@ -204,6 +204,72 @@ public:
   }
 };
 
+class StrategyHookPopulation : public Population
+{
+public:
+  explicit StrategyHookPopulation(const Settings& settings)
+    : Population(settings)
+  {
+  }
+
+  using Population::createInitialChromosome;
+  using Population::mateChromosomes;
+  using Population::mutateChromosome;
+  using Population::setInitializationStrategy;
+  using Population::setMatingStrategy;
+  using Population::setMutationStrategy;
+
+  double evaluateFitness(const BaseString& b) override
+  {
+    return b.valueAt(0);
+  }
+
+  void printCandidate(const BaseString&, std::ostream&) override
+  {
+  }
+};
+
+class ConstantInitializationStrategy : public Population::InitializationStrategy
+{
+public:
+  std::unique_ptr<Chromosome> create(Population& population) override
+  {
+    BaseString genes(population.settings().geneticDiversity, population.settings().baseStates);
+    for (int i = 0 ; i < genes.length() ; i++)
+      {
+        genes.setValue(i, 1);
+      }
+    return std::make_unique<Chromosome>(std::move(genes),
+                                        population.settings().variableLength == Population::VariableLengthMode::Variable,
+                                        population.settings().baseStates);
+  }
+};
+
+class SwappingMatingStrategy : public Population::MatingStrategy
+{
+public:
+  std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+  mate(Population&, Chromosome& mother, Chromosome& father) override
+  {
+    BaseString first = father.genes();
+    BaseString second = mother.genes();
+    return std::make_pair(std::make_unique<Chromosome>(std::move(first)),
+                          std::make_unique<Chromosome>(std::move(second)));
+  }
+};
+
+class ZeroingMutationStrategy : public Population::MutationStrategy
+{
+public:
+  void mutate(Population&, Chromosome& chromosome) override
+  {
+    for (int i = 0 ; i < chromosome.length() ; i++)
+      {
+        chromosome.genes().clearValue(i);
+      }
+  }
+};
+
 Population::Settings make_population_options(Population::OperationMode operation,
 					    int individuals,
 					    int trials,
@@ -1260,6 +1326,44 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
       int value = children.first->genes().valueAt(i);
       expect_true(value == 0 || value == 1,
 		  "Default mutateChromosome should keep binary genes in range");
+    }
+}
+
+void test_population_operator_strategies_override_default_hooks()
+{
+  StrategyHookPopulation pop(make_population_options(Population::OperationMode::Maximize, 4, 4, 4, 1.0, 0.0,
+						     Population::ReproductionMode::AllowDuplicates,
+						     Population::ParentSelectionMode::RouletteWheel,
+						     Population::DeletionMode::DeleteAll,
+						     Population::FitnessMode::Evaluation,
+						     Population::VariableLengthMode::Fixed, 2));
+
+  pop.setInitializationStrategy(std::make_unique<ConstantInitializationStrategy>());
+  pop.setMatingStrategy(std::make_unique<SwappingMatingStrategy>());
+  pop.setMutationStrategy(std::make_unique<ZeroingMutationStrategy>());
+
+  std::unique_ptr<Chromosome> initial = pop.createInitialChromosome();
+  for (int i = 0 ; i < initial->length() ; i++)
+    {
+      expect_true(initial->genes().valueAt(i) == 1,
+		  "Custom initialization strategies should control the created chromosome");
+    }
+
+  std::unique_ptr<Chromosome> mother = std::make_unique<Chromosome>(makeBinaryString("1111"));
+  std::unique_ptr<Chromosome> father = std::make_unique<Chromosome>(makeBinaryString("0000"));
+  std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+    pop.mateChromosomes(*mother, *father);
+
+  expect_true(children.first->equals(*father),
+	      "Custom mating strategies should control the first child");
+  expect_true(children.second->equals(*mother),
+	      "Custom mating strategies should control the second child");
+
+  pop.mutateChromosome(*children.first);
+  for (int i = 0 ; i < children.first->length() ; i++)
+    {
+      expect_true(children.first->genes().valueAt(i) == 0,
+		  "Custom mutation strategies should control mutation behavior");
     }
 }
 
