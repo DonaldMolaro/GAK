@@ -1,7 +1,7 @@
 #include <iostream>
+#include <string>
 
 #include "except.hh"
-#include "stringutil.hh"
 
 GAException::GAException(const std::string& file, 
 			 const int line, 
@@ -10,7 +10,7 @@ GAException::GAException(const std::string& file,
   file_(file),
   line_(line)
 {
-  std::cerr << "Exception at " << file_ << ":" << tostring(line_)
+  std::cerr << "Exception at " << file_ << ":" << std::to_string(line_)
             << ":" << what()
             << std::endl;
 }

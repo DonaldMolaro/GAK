@@ -48,10 +48,15 @@ public:
   Chromosome(BaseString *b,
 	     unsigned int vlength = 0,
 	     unsigned int numStates = 2); 
+  Chromosome(std::unique_ptr<BaseString> b,
+	     unsigned int vlength = 0,
+	     unsigned int numStates = 2);
 
   ~Chromosome() = default;
   static void seedRandom(unsigned int seed);
   int ChromosomeLen() const                { return ChromosomeLength; }
+  BaseString& chromosomeString()           { return *ChromosomeString; }
+  const BaseString& chromosomeString() const { return *ChromosomeString; }
   BaseString *ChromosomeStr() const        { return ChromosomeString.get(); }
   // Apply the built-in point mutation operator across the chromosome.
   void SingleBitMutate(double probability = 0.008);

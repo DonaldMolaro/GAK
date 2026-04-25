@@ -10,7 +10,6 @@
 #include "base.hh"
 #include "chromosome.hh"
 #include "except.hh"
-#include "stringutil.hh"
 
 #define private public
 #include "population.hh"
@@ -440,7 +439,7 @@ void test_base_string_print_helpers()
   expect_true(text_out.str() == "abc", "print should render symbolic values");
 }
 
-void test_exception_and_stringutil_helpers()
+void test_exception_helpers()
 {
   SilentStderr silence;
   GAFatalException fatal(__FILE__, __LINE__, "fatal-reason");
@@ -455,7 +454,6 @@ void test_exception_and_stringutil_helpers()
   expect_true(std::string(nonfatal.what()) == "nonfatal-reason", "Non-fatal exception should preserve its reason");
   expect_true(std::string(complete.what()) == "complete-reason", "Complete exception should preserve its reason");
   expect_true(out.str().find("fatal-reason") != std::string::npos, "Exception stream operator should print the reason");
-  expect_true(tostring(42) == "42", "tostring should format integers");
 }
 
 void test_mutation_rate_zero_preserves_chromosome()
@@ -510,12 +508,12 @@ void test_invalid_mutation_probability_throws()
 void test_non_binary_mutation_with_probability_one_stays_in_range()
 {
   Chromosome::seedRandom(4);
-  Chromosome chromosome(new BaseString(5, 4), 0, 4);
+  Chromosome chromosome(std::make_unique<BaseString>(5, 4), 0, 4);
   chromosome.SingleBitMutate(1.0);
 
   for (int i = 0 ; i < chromosome.ChromosomeLen() ; i++)
     {
-      int value = chromosome.ChromosomeStr()->test(i);
+      int value = chromosome.chromosomeString().test(i);
       expect_true(value >= 0 && value < 4, "Non-binary mutation should keep values within range");
     }
 }
@@ -528,7 +526,7 @@ void test_binary_mutation_with_probability_one_changes_only_bits()
 
   for (int i = 0 ; i < chromosome.ChromosomeLen() ; i++)
     {
-      int value = chromosome.ChromosomeStr()->test(i);
+      int value = chromosome.chromosomeString().test(i);
       expect_true(value == 0 || value == 1, "Binary mutation should keep values binary");
     }
 }
@@ -775,7 +773,7 @@ void test_windowed_fitness_is_positive_for_maximize()
   pop.initializePopulation();
   for (int i = 0 ; i < 3 ; i++)
     {
-      pop.populationTable[i].reset(new Chromosome(makeBinaryString(i == 0 ? "0" : "1")));
+      pop.populationTable[i].reset(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString(i == 0 ? "0" : "1"))));
       pop.fitnessTable[i] = -1.0;
     }
   pop.populationInitialized = true;
@@ -800,7 +798,7 @@ void test_windowed_fitness_is_positive_for_minimize()
   pop.initializePopulation();
   for (int i = 0 ; i < 3 ; i++)
     {
-      pop.populationTable[i].reset(new Chromosome(makeBinaryString(i == 0 ? "0" : "1")));
+      pop.populationTable[i].reset(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString(i == 0 ? "0" : "1"))));
       pop.fitnessTable[i] = -1.0;
     }
   pop.populationInitialized = true;
@@ -845,8 +843,8 @@ void prepare_population(InspectablePopulation& pop, const std::string& first_bit
 			const std::string& second_bits)
 {
   pop.initializePopulation();
-  pop.populationTable[0].reset(new Chromosome(makeBinaryString(first_bits)));
-  pop.populationTable[1].reset(new Chromosome(makeBinaryString(second_bits)));
+  pop.populationTable[0].reset(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString(first_bits))));
+  pop.populationTable[1].reset(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString(second_bits))));
   for (int i = 0 ; i < pop.configuration().numberOfIndividuals ; i++)
     {
       pop.fitnessTable[i] = -1.0;
@@ -885,8 +883,8 @@ void test_population_selection_and_replacement_branches()
 	      "containsChromosome should report a present chromosome");
 
   std::vector<std::unique_ptr<Chromosome> > replacements_max;
-  replacements_max.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1111"))));
-  replacements_max.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0000"))));
+  replacements_max.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1111"))));
+  replacements_max.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0000"))));
   int replaced_max = dup_not_allowed.insertNewPopulation(std::move(replacements_max), 2);
   expect_true(replaced_max >= 0, "insertNewPopulation should handle duplicates-not-allowed maximize path");
 
@@ -898,8 +896,8 @@ void test_population_selection_and_replacement_branches()
 								    Population::VariableLengthMode::Fixed, 2));
   prepare_population(dup_not_allowed_min, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > replacements_min;
-  replacements_min.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1111"))));
-  replacements_min.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0000"))));
+  replacements_min.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1111"))));
+  replacements_min.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0000"))));
   int replaced_min = dup_not_allowed_min.insertNewPopulation(std::move(replacements_min), 2);
   expect_true(replaced_min >= 0, "insertNewPopulation should handle duplicates-not-allowed minimize path");
 
@@ -911,8 +909,8 @@ void test_population_selection_and_replacement_branches()
 								    Population::VariableLengthMode::Fixed, 2));
   prepare_population(dup_not_allowed_new, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > replacements_new;
-  replacements_new.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0011"))));
-  replacements_new.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1100"))));
+  replacements_new.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0011"))));
+  replacements_new.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1100"))));
   int replaced_new = dup_not_allowed_new.insertNewPopulation(std::move(replacements_new), 2);
   expect_true(replaced_new > 0, "Duplicates-not-allowed maximize path should insert new chromosomes");
 
@@ -924,8 +922,8 @@ void test_population_selection_and_replacement_branches()
 										Population::VariableLengthMode::Fixed, 2));
   prepare_population(dup_not_allowed_new_min, "1111", "0000");
   std::vector<std::unique_ptr<Chromosome> > replacements_new_min;
-  replacements_new_min.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0011"))));
-  replacements_new_min.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1100"))));
+  replacements_new_min.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0011"))));
+  replacements_new_min.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1100"))));
   int replaced_new_min = dup_not_allowed_new_min.insertNewPopulation(std::move(replacements_new_min), 2);
   expect_true(replaced_new_min > 0, "Duplicates-not-allowed minimize path should insert new chromosomes");
 
@@ -945,19 +943,19 @@ void test_population_append_replacement_helper()
   int generated = 0;
 
   expect_true(pop.appendReplacement(replacement_list,
-				    new Chromosome(makeBinaryString("1111")),
+				    new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("1111"))),
 				    generated, 2, false),
 	      "appendReplacement should keep the first unique child");
   expect_true(!pop.appendReplacement(replacement_list,
-				     new Chromosome(makeBinaryString("1111")),
+				     new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("1111"))),
 				     generated, 2, false),
 	      "appendReplacement should reject duplicate unique-only children");
   expect_true(pop.appendReplacement(replacement_list,
-				    new Chromosome(makeBinaryString("0000")),
+				    new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("0000"))),
 				    generated, 2, false),
 	      "appendReplacement should keep a second unique child");
   expect_true(!pop.appendReplacement(replacement_list,
-				     new Chromosome(makeBinaryString("0011")),
+				     new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("0011"))),
 				     generated, 2, true),
 	      "appendReplacement should delete overflow children when the replacement list is full");
 }
@@ -974,9 +972,9 @@ void test_population_insert_new_population_rejects_overflow()
   prepare_population(pop, "1111", "0000");
 
   std::vector<std::unique_ptr<Chromosome> > replacements;
-  replacements.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0011"))));
-  replacements.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1100"))));
-  replacements.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0101"))));
+  replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0011"))));
+  replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1100"))));
+  replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0101"))));
 
   expect_throws<GAFatalException>(
     [&pop, &replacements]() mutable {
@@ -1090,7 +1088,7 @@ void test_population_invalid_enum_paths()
     "Unsupported operation technique in selection should throw");
 
   std::vector<std::unique_ptr<Chromosome> > replacements;
-  replacements.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("1111"))));
+  replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("1111"))));
   expect_throws<GAFatalException>(
     [&bad_operation, &replacements]() mutable {
       bad_operation.insertNewPopulation(std::move(replacements), 1);
@@ -1106,7 +1104,7 @@ void test_population_invalid_enum_paths()
   prepare_population(bad_operation_dup, "1111", "0000");
   bad_operation_dup.config_.operation = static_cast<Population::OperationTechnique>(99);
   std::vector<std::unique_ptr<Chromosome> > dup_replacements;
-  dup_replacements.push_back(std::unique_ptr<Chromosome>(new Chromosome(makeBinaryString("0011"))));
+  dup_replacements.push_back(std::make_unique<Chromosome>(std::unique_ptr<BaseString>(makeBinaryString("0011"))));
   expect_throws<GAFatalException>(
     [&bad_operation_dup, &dup_replacements]() mutable {
       bad_operation_dup.insertNewPopulation(std::move(dup_replacements), 1);
@@ -1329,13 +1327,13 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
 	      "Default createInitialChromosome should use the configured diversity as chromosome length");
   for (int i = 0 ; i < initial->ChromosomeLen() ; i++)
     {
-      int value = initial->ChromosomeStr()->test(i);
+      int value = initial->chromosomeString().test(i);
       expect_true(value == 0 || value == 1,
 		  "Default createInitialChromosome should respect the configured base state range");
     }
 
-  std::unique_ptr<Chromosome> mother(new Chromosome(makeBinaryString("111100")));
-  std::unique_ptr<Chromosome> father(new Chromosome(makeBinaryString("000011")));
+  std::unique_ptr<Chromosome> mother(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("111100"))));
+  std::unique_ptr<Chromosome> father(new Chromosome(std::unique_ptr<BaseString>(makeBinaryString("000011"))));
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
     pop.mateChromosomes(mother.get(), father.get());
 
@@ -1349,7 +1347,7 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
   pop.mutateChromosome(children.first.get());
   for (int i = 0 ; i < children.first->ChromosomeLen() ; i++)
     {
-      int value = children.first->ChromosomeStr()->test(i);
+      int value = children.first->chromosomeString().test(i);
       expect_true(value == 0 || value == 1,
 		  "Default mutateChromosome should keep binary genes in range");
     }
@@ -1380,7 +1378,7 @@ int main()
   test_population_options_round_trip();
   test_base_string_error_paths();
   test_base_string_print_helpers();
-  test_exception_and_stringutil_helpers();
+  test_exception_helpers();
   test_mutation_rate_zero_preserves_chromosome();
   test_chromosome_constructor_and_compare_paths();
   test_invalid_mutation_probability_throws();

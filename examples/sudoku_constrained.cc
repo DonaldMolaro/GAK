@@ -295,10 +295,10 @@ SudokuConstrained::mateChromosomes(Chromosome *mother, Chromosome *father)
    if (probability(randomGenerator_) >= configuration().crossOverRate)
    {
       return std::make_pair(
-         std::make_unique<Chromosome>(cloneBoard(mother->ChromosomeStr()).release(),
+         std::make_unique<Chromosome>(cloneBoard(&mother->chromosomeString()),
                                       configuration().variableLength,
                                       configuration().baseStates),
-         std::make_unique<Chromosome>(cloneBoard(father->ChromosomeStr()).release(),
+         std::make_unique<Chromosome>(cloneBoard(&father->chromosomeString()),
                                       configuration().variableLength,
                                       configuration().baseStates));
    }
@@ -309,15 +309,15 @@ SudokuConstrained::mateChromosomes(Chromosome *mother, Chromosome *father)
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
       const bool useMotherForFirst = parent_choice(randomGenerator_) == 0;
-      fillRowFromParent(first.get(), useMotherForFirst ? mother->ChromosomeStr() : father->ChromosomeStr(), row);
-      fillRowFromParent(second.get(), useMotherForFirst ? father->ChromosomeStr() : mother->ChromosomeStr(), row);
+      fillRowFromParent(first.get(), useMotherForFirst ? &mother->chromosomeString() : &father->chromosomeString(), row);
+      fillRowFromParent(second.get(), useMotherForFirst ? &father->chromosomeString() : &mother->chromosomeString(), row);
    }
 
    return std::make_pair(
-      std::make_unique<Chromosome>(first.release(),
+      std::make_unique<Chromosome>(std::move(first),
                                    configuration().variableLength,
                                    configuration().baseStates),
-      std::make_unique<Chromosome>(second.release(),
+      std::make_unique<Chromosome>(std::move(second),
                                    configuration().variableLength,
                                    configuration().baseStates));
 }
@@ -327,7 +327,7 @@ void SudokuConstrained::mutateChromosome(Chromosome *chromosome)
    const double rowMutationRate = std::min(1.0, configuration().bitMutationRate * kBoardSize);
    std::uniform_real_distribution<double> probability(0.0, 1.0);
 
-   BaseString *board = chromosome->ChromosomeStr();
+   BaseString& board = chromosome->chromosomeString();
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
       const RowColumns& mutableColumns = mutableColumnsByRow_[row];
@@ -352,9 +352,9 @@ void SudokuConstrained::mutateChromosome(Chromosome *chromosome)
       const int rowStart = row * kBoardSize;
       const int firstCell = rowStart + mutableColumns[first];
       const int secondCell = rowStart + mutableColumns[second];
-      const int firstValue = board->test(firstCell);
-      const int secondValue = board->test(secondCell);
-      board->set(firstCell, secondValue);
-      board->set(secondCell, firstValue);
+      const int firstValue = board.test(firstCell);
+      const int secondValue = board.test(secondCell);
+      board.set(firstCell, secondValue);
+      board.set(secondCell, firstValue);
    }
 }

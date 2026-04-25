@@ -343,7 +343,7 @@ void Population::printPopulationSummary(const PopulationSummary& summary)
 
    for ( int i = 0 ; i < summaryCount ; i++ )
    {
-      FitnessPrint(*populationTable[(config_.numberOfIndividuals - 1) - i].get()->ChromosomeStr());
+      FitnessPrint(populationTable[(config_.numberOfIndividuals - 1) - i].get()->chromosomeString());
       fprintf(stderr,"(F = %3.8f)\n",summary.mostFit[i]);
    }
 
@@ -354,7 +354,7 @@ void Population::printPopulationSummary(const PopulationSummary& summary)
 
    for ( int i = 0 ; i < summaryCount ; i++ )
    {
-      FitnessPrint(*populationTable[i].get()->ChromosomeStr());
+      FitnessPrint(populationTable[i].get()->chromosomeString());
       fprintf(stderr,"(F = %3.8f)\n",summary.leastFit[i]);
    }
 }
@@ -378,14 +378,14 @@ void Population::printFinalSummary(const RunResult& result)
       case Maximize:
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
-	 FitnessPrint(*populationTable[(config_.numberOfIndividuals - 1) - i].get()->ChromosomeStr());
+	 FitnessPrint(populationTable[(config_.numberOfIndividuals - 1) - i].get()->chromosomeString());
 	 fprintf(stderr,"%f\n",result.finalSummary.mostFit[i]);
       }
       break;
       case Minimize:
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
-	 FitnessPrint(*populationTable[i].get()->ChromosomeStr());
+	 FitnessPrint(populationTable[i].get()->chromosomeString());
 	 fprintf(stderr,"%f\n",result.finalSummary.leastFit[i]);
       }
       break;
@@ -555,7 +555,7 @@ void Population::evaluatePopulation()
    {
       if (fitnessTable[i] < 0.0)
       {
-	 fitnessTable[i] = FitnessFunction(*populationTable[i].get()->ChromosomeStr());
+	 fitnessTable[i] = FitnessFunction(populationTable[i].get()->chromosomeString());
       }
    }
    sortPopulation();

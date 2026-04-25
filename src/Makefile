@@ -12,7 +12,7 @@ LDFLAGS += -fprofile-instr-generate
 endif
 
 LIB = libga.a
-LIBSRC = base.cc chromosome.cc population.cc except.cc stringutil.cc
+LIBSRC = base.cc chromosome.cc population.cc except.cc
 LIBOBJ = $(LIBSRC:.cc=.o)
 DEPS = $(LIBOBJ:.o=.d)
 
@@ -42,6 +42,5 @@ install: $(LIB)
 	cp population.hh ../include
 	cp genetic.hh ../include
 	cp except.hh ../include
-	cp stringutil.hh ../include
 
 -include $(DEPS)

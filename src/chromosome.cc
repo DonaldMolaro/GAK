@@ -119,6 +119,14 @@ Chromosome::Chromosome(BaseString *b,unsigned int vlength,unsigned int PbaseStat
   baseStates     = PbaseStates;
 }
 
+Chromosome::Chromosome(std::unique_ptr<BaseString> b,unsigned int vlength,unsigned int PbaseStates)
+{
+  ChromosomeLength = b->length();
+  ChromosomeString = std::move(b);
+  variableLength = vlength;
+  baseStates     = PbaseStates;
+}
+
 //
 // based upon probablity, randomly set or clear a bit
 // in the string.
@@ -373,8 +381,8 @@ Chromosome::matePair(Chromosome *father,double crossOverRate,CrossOverType cross
                                 cloneBaseString(mother->ChromosomeStr(),baseStates));
     }
   return std::make_pair(
-      std::make_unique<Chromosome>(children.first.release(),father->variableLength,baseStates),
-      std::make_unique<Chromosome>(children.second.release(),mother->variableLength,baseStates));
+      std::make_unique<Chromosome>(std::move(children.first),father->variableLength,baseStates),
+      std::make_unique<Chromosome>(std::move(children.second),mother->variableLength,baseStates));
 }
 
 void Chromosome::Mate(Chromosome *father,Chromosome **son,Chromosome **daughter,
