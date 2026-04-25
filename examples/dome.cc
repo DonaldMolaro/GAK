@@ -1,7 +1,4 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <math.h>
+#include <cmath>
 #include <iostream>
 #include "base.hh"
 #include "chromosome.hh"
@@ -27,11 +24,11 @@ double Dome::FitnessFunction(const BaseString& b)
 {
    int x1 = decode(b, 0,16);
    int y1 = decode(b,16,32);
-   double x2 = ((double)x1) / 100.0;
-   double y2 = ((double)y1) / 100.0;
+   double x2 = static_cast<double>(x1) / 100.0;
+   double y2 = static_cast<double>(y1) / 100.0;
 
    double res = (sqr(x2)+sqr(y2))+1.0;
-   return (int)(res * 100.0);
+   return static_cast<int>(res * 100.0);
 };
 
 
@@ -40,8 +37,8 @@ void Dome::FitnessPrint(const BaseString& b, std::ostream& out)
    int x1 = decode(b,0,16);
    int y1 = decode(b,16,32);
 
-   double x2 = ((double)x1) / 100.0;
-   double y2 = ((double)y1) / 100.0;
+   double x2 = static_cast<double>(x1) / 100.0;
+   double y2 = static_cast<double>(y1) / 100.0;
    
    out << "X ( " << x2 << " ) Y ( " << y2 << " ) ";
 }

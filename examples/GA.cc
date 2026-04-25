@@ -223,7 +223,7 @@ int main(int argc,char *argv[])
     case 'a':
       {
 	Alpha alpha(make_alpha_options());
-	//alpha.RandomAlgorithim();
+	//alpha.RandomAlgorithm();
 	alpha.run();
       }
       break;

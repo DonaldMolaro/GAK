@@ -1,5 +1,5 @@
 //
-// Genectic Algoritim Implementation.
+// Genetic Algorithm Implementation.
 //
 // Author:
 //        Donald Molaro

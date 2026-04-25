@@ -17,7 +17,6 @@
 // and symbolic ( rather than binary ) bases.
 //  
 //
-#include <assert.h>
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -171,8 +170,8 @@ void Population::printConfigurationSummary(std::ostream& out) const
    out << "Operation             :: "
        << (config_.operation == Population::OperationMode::Minimize ? "Minimize" : "Maximize") << '\n';
    out << "Number of Individuals :: " << config_.numberOfIndividuals << '\n';
-   out << "Number of Trails      :: " << config_.numberOfTrials << '\n';
-   out << "Genectic Diversity    :: " << config_.geneticDiversity << '\n';
+   out << "Number of Trials      :: " << config_.numberOfTrials << '\n';
+   out << "Genetic Diversity     :: " << config_.geneticDiversity << '\n';
    out << "Mutation Rate         :: " << std::fixed << std::setprecision(4)
        << config_.bitMutationRate << '\n';
    out << "Cross Over Rate       :: " << std::fixed << std::setprecision(3)

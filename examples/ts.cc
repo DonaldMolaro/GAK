@@ -92,7 +92,7 @@ double TravelingSalesman::FitnessFunction(const BaseString& b)
    {
       if (!visited[i]) length += PENALTYLENGTH;
    }
-   return (int)(length+0.5);
+   return static_cast<int>(length + 0.5);
 }
 
 

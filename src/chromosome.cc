@@ -1,5 +1,5 @@
 //
-// Genectic Algoritim Implementation.
+// Genetic Algorithm Implementation.
 //
 // Author:
 //        Donald Molaro
@@ -67,8 +67,8 @@ Chromosome::BaseStringPtr Chromosome::cloneBaseString(const BaseString *source, 
 Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int PbaseStates,std::mt19937* randomGenerator)
 {
   //
-  // Randomly initialze the chromosome
-  // at the start of of popultaion run.
+  // Randomly initialize the chromosome
+  // at the start of a population run.
   //
   /*
    * There is no real practical limit on the length of a chromosome string.
@@ -122,7 +122,7 @@ void Chromosome::SingleBitMutate(double probability, std::mt19937* randomGenerat
   std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
   if ((probability >= 0.0)&&(probability <= 1.0))
     {
-      int probabilityMask = (int) ( probability * 65535.0 );
+      int probabilityMask = static_cast<int>(probability * 65535.0);
       std::uniform_int_distribution<int> distribution(0, 0xFFFF);
    
       for ( int i = 0 ; i < ChromosomeLength ; i++ )
@@ -144,7 +144,7 @@ void Chromosome::SingleBitMutate(double probability, std::mt19937* randomGenerat
     }
   else
     {
-      throw GANonFatalException(__FILE__,__LINE__,"SingleBitMutate called with an impossible probablity. Ignored.");
+      throw GANonFatalException(__FILE__,__LINE__,"SingleBitMutate called with an impossible probability. Ignored.");
     }
 }
 //
@@ -154,7 +154,7 @@ void Chromosome::SingleBitMutate(double probability, std::mt19937* randomGenerat
 //
 int Chromosome::testCrossOverRate(std::mt19937& randomGenerator, double crossOverRate)
 {
-  int probabilityMask = (int) ( crossOverRate * 65535.0 );
+  int probabilityMask = static_cast<int>(crossOverRate * 65535.0);
   std::uniform_int_distribution<int> distribution(0, 0xFFFF);
   if (distribution(randomGenerator) < probabilityMask) return 1;
   else return 0;
@@ -265,14 +265,14 @@ Chromosome::uniformCrossOver(const BaseString *mother,const BaseString *father,s
     {
       //
       // A variable length uniform crossover randomly
-      // selects bits from the two parrents until the end of 
-      // one of the parrents strings, it then copies the remaining
+      // selects bits from the two parents until the end of
+      // one of the parent strings, it then copies the remaining
       // bits into the appropriate sexed children.
       //
       boy  = std::make_unique<BaseString>(father->length(),baseStates);
       girl = std::make_unique<BaseString>(mother->length(),baseStates);
       int copyLength = std::min(father->length(),mother->length());
-      // New Chromosomes are made up of random bits of the two parrents
+      // New chromosomes are made up of random bits of the two parents.
       for ( int i = 0 ; i < copyLength ; i++ )
 	{
 	  if (randomBit(randomGenerator) == 0)
@@ -299,7 +299,7 @@ Chromosome::uniformCrossOver(const BaseString *mother,const BaseString *father,s
     {
       boy  = std::make_unique<BaseString>(father->length(),baseStates);
       girl = std::make_unique<BaseString>(mother->length(),baseStates); 
-      // New Chromosomes are made up of random bits of the two parrents
+      // New chromosomes are made up of random bits of the two parents.
       for ( int i = 0 ; i < father->length() ; i++ )
 	{
 	  if (randomBit(randomGenerator) == 0)
@@ -329,7 +329,7 @@ Chromosome::mate(Chromosome& father,double crossOverRate,CrossOverType crossType
   //
   if (!(this->variableLength) && (mother->ChromosomeLen() != father.ChromosomeLen()))
     {
-      throw GAFatalException(__FILE__,__LINE__,"Missmatch in Chromosome strings");
+      throw GAFatalException(__FILE__,__LINE__,"Mismatch in chromosome strings");
     }
   //
   std::pair<BaseStringPtr, BaseStringPtr> children;

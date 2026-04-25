@@ -11,6 +11,6 @@ public:
 
    double FitnessFunction(const BaseString& b) override;
    void FitnessPrint(const BaseString& b, std::ostream& out) override;
-   int RandomAlgorithim();
+   int RandomAlgorithm();
 };
 #endif

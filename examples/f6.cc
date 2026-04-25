@@ -1,7 +1,5 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <assert.h>
-#include <math.h>
+#include <cassert>
+#include <cmath>
 #include <iostream>
 #include "base.hh"
 #include "chromosome.hh"
@@ -25,8 +23,8 @@ double F6::sqr(double x)
 
 double F6::FitnessFunction(const BaseString& b)
 {
-   double x1 = (double)decode(b,0,22);
-   double y1 = (double)decode(b,22,44);
+   double x1 = static_cast<double>(decode(b,0,22));
+   double y1 = static_cast<double>(decode(b,22,44));
    double x2 = x1 / 1000.00;
    double y2 = y1 / 1000.00;
    double x3 = x2 - 100.000;   
@@ -39,14 +37,14 @@ double F6::FitnessFunction(const BaseString& b)
 
    assert ( f6 >= 0 );
    
-   return ((int)(f6 * 1000.0)) + 1;
+   return static_cast<int>(f6 * 1000.0) + 1;
 
 }
 
 void F6::FitnessPrint(const BaseString& b, std::ostream& out)
 {
-   double x1 = (double)decode(b,0,22);
-   double y1 = (double)decode(b,22,44);
+   double x1 = static_cast<double>(decode(b,0,22));
+   double y1 = static_cast<double>(decode(b,22,44));
    double x2 = x1 / 1000.00;
    double y2 = y1 / 1000.00;
    double x3 = x2 - 100.000;   
@@ -54,7 +52,6 @@ void F6::FitnessPrint(const BaseString& b, std::ostream& out)
    
    out << "X ( " << x3 << " ) Y ( " << y3 << " ) ";
 }
-
 
 
 

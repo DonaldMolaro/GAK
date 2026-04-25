@@ -85,7 +85,7 @@ void Alpha::FitnessPrint(const BaseString& b, std::ostream& out)
    out << " ::";
 }
 
-int Alpha::RandomAlgorithim()
+int Alpha::RandomAlgorithm()
 {
    std::mt19937 generator(static_cast<unsigned int>(std::time(NULL)));
    std::uniform_int_distribution<int> value_distribution(0, 12);
