@@ -1,19 +1,41 @@
-#include <iostream>
 #include <cstdlib>
+#include <iostream>
+#include <sstream>
+#include <string>
+
 #include <genetic.hh>
-#include "dome.hh"
+
 #include "alpha.hh"
-#include "spell.hh"
+#include "dome.hh"
 #include "f6.hh"
-#include "ts.hh"
-#include "nqueens.hh"
 #include "knapsack.hh"
 #include "latinsquare.hh"
+#include "nqueens.hh"
+#include "spell.hh"
 #include "sudoku.hh"
 #include "sudoku_constrained.hh"
+#include "ts.hh"
 
 namespace
 {
+struct CliOptions
+{
+  std::string mode;
+  bool showSettings = false;
+  bool seedProvided = false;
+  unsigned int seed = 0;
+  bool populationProvided = false;
+  int population = 0;
+  bool trialsProvided = false;
+  int trials = 0;
+  bool mutationProvided = false;
+  double mutation = 0.0;
+  bool crossoverProvided = false;
+  double crossover = 0.0;
+  bool gridProvided = false;
+  int grid = 0;
+};
+
 Population::Settings make_dome_options()
 {
   Population::Settings options;
@@ -175,105 +197,242 @@ Population::Settings make_constrained_sudoku_options()
   options.crossOverRate = 0.80;
   return options;
 }
-}
 
 void usage(std::ostream& out)
 {
-  out << "Usage\n";
-  out << "\tGA D  - Dome Function (binary fixed length)\n";
-  out << "\tGA F6 - F6 Function   (binary fixed length)\n";
-  out << "\tGA A  - Alphabet      (high order, fixed length)\n";
-  out << "\tGA S  - Spell         (high order, variable length)\n";
-  out << "\tGA T  - Traveling Salesman (high order, fixed length)\n";
-  out << "\tGA Q  - 8 Queens      (constraint satisfaction)\n";
-  out << "\tGA K  - Knapsack      (combinatorial optimization)\n";
-  out << "\tGA L  - Latin Square  (symbolic constraint satisfaction)\n";
-  out << "\tGA U  - Sudoku        (givens + row/column/box constraints)\n";
-  out << "\tGA C  - Sudoku+       (constraint-aware operators)\n";
+  out << "Usage:\n";
+  out << "  GA MODE [options]\n\n";
+  out << "Modes:\n";
+  out << "  D   Dome Function\n";
+  out << "  6   F6 Function\n";
+  out << "  A   Alphabet\n";
+  out << "  S   Spell\n";
+  out << "  T   Traveling Salesman\n";
+  out << "  Q   8 Queens\n";
+  out << "  K   Knapsack\n";
+  out << "  L   Latin Square\n";
+  out << "  U   Sudoku\n";
+  out << "  C   Sudoku+\n\n";
+  out << "Options:\n";
+  out << "  --seed N          Use a fixed random seed\n";
+  out << "  --population N    Override population size\n";
+  out << "  --trials N        Override trial/evaluation budget\n";
+  out << "  --mutation R      Override mutation rate\n";
+  out << "  --crossover R     Override crossover rate\n";
+  out << "  --grid N          Override TSP grid size\n";
+  out << "  --show-settings   Print the resolved settings report before the final summary\n";
+  out << "  --help            Show this help\n";
+}
+
+bool parseInt(const std::string& text, int& value)
+{
+  std::istringstream stream(text);
+  stream >> value;
+  return stream.good() || stream.eof();
+}
+
+bool parseUnsigned(const std::string& text, unsigned int& value)
+{
+  std::istringstream stream(text);
+  stream >> value;
+  return stream.good() || stream.eof();
+}
+
+bool parseDouble(const std::string& text, double& value)
+{
+  std::istringstream stream(text);
+  stream >> value;
+  return stream.good() || stream.eof();
+}
+
+bool parseCliOptions(int argc, char* argv[], CliOptions& options)
+{
+  if (argc < 2)
+  {
+    return false;
+  }
+
+  options.mode = argv[1];
+  if (options.mode == "--help")
+  {
+    return false;
+  }
+
+  for (int i = 2 ; i < argc ; i++)
+  {
+    const std::string arg = argv[i];
+    if (arg == "--help")
+    {
+      return false;
+    }
+    if (arg == "--show-settings")
+    {
+      options.showSettings = true;
+      continue;
+    }
+    if (i + 1 >= argc)
+    {
+      return false;
+    }
+
+    const std::string value = argv[++i];
+    if (arg == "--seed")
+    {
+      options.seedProvided = parseUnsigned(value, options.seed);
+      if (!options.seedProvided) return false;
+    }
+    else if (arg == "--population")
+    {
+      options.populationProvided = parseInt(value, options.population);
+      if (!options.populationProvided) return false;
+    }
+    else if (arg == "--trials")
+    {
+      options.trialsProvided = parseInt(value, options.trials);
+      if (!options.trialsProvided) return false;
+    }
+    else if (arg == "--mutation")
+    {
+      options.mutationProvided = parseDouble(value, options.mutation);
+      if (!options.mutationProvided) return false;
+    }
+    else if (arg == "--crossover")
+    {
+      options.crossoverProvided = parseDouble(value, options.crossover);
+      if (!options.crossoverProvided) return false;
+    }
+    else if (arg == "--grid")
+    {
+      options.gridProvided = parseInt(value, options.grid);
+      if (!options.gridProvided) return false;
+    }
+    else
+    {
+      return false;
+    }
+  }
+
+  return options.mode.length() == 1;
+}
+
+Population::Settings applyOverrides(Population::Settings options, const CliOptions& cli)
+{
+  if (cli.seedProvided)
+  {
+    options.useFixedRandomSeed = true;
+    options.randomSeed = cli.seed;
+  }
+  if (cli.populationProvided)
+  {
+    options.numberOfIndividuals = cli.population;
+  }
+  if (cli.trialsProvided)
+  {
+    options.numberOfTrials = cli.trials;
+  }
+  if (cli.mutationProvided)
+  {
+    options.bitMutationRate = cli.mutation;
+  }
+  if (cli.crossoverProvided)
+  {
+    options.crossOverRate = cli.crossover;
+  }
+  return options;
+}
+
+template <typename Example>
+int runExample(Example& example, bool showSettings)
+{
+  if (showSettings)
+  {
+    Population::RunResult result = example.execute(false);
+    Population::RunReporter::write(std::cout,
+                                   example,
+                                   result,
+                                   Population::RunReportOptions(true, false));
+  }
+  else
+  {
+    example.run();
+  }
+  return EXIT_SUCCESS;
+}
 }
 
 int main(int argc,char *argv[])
 {
-  if (argc != 2)
+  CliOptions cli;
+  if (!parseCliOptions(argc, argv, cli))
   {
     usage(std::cerr);
     return EXIT_FAILURE;
   }
-  switch (*argv[1])
-    {
+
+  switch (cli.mode[0])
+  {
     case 'd':
     case 'D':
       {
-	Dome dome(make_dome_options());
-	dome.run();
+        Dome dome(applyOverrides(make_dome_options(), cli));
+        return runExample(dome, cli.showSettings);
       }
-      break;
     case '6':
       {
-	F6 F6(make_f6_options());
-	F6.run();
+        F6 f6(applyOverrides(make_f6_options(), cli));
+        return runExample(f6, cli.showSettings);
       }
-      break;
-
     case 'A':
     case 'a':
       {
-	Alpha alpha(make_alpha_options());
-	alpha.run();
+        Alpha alpha(applyOverrides(make_alpha_options(), cli));
+        return runExample(alpha, cli.showSettings);
       }
-      break;
     case 'S':
     case 's':
       {
-	Spell spell(make_spell_options());
-	spell.run();
+        Spell spell(applyOverrides(make_spell_options(), cli));
+        return runExample(spell, cli.showSettings);
       }
-      break;
     case 'T':
     case 't':
       {
-	TravelingSalesman travelingSalesman(make_traveling_salesman_options(), 500);
-	travelingSalesman.run();
+        const int gridSize = cli.gridProvided ? cli.grid : 500;
+        TravelingSalesman travelingSalesman(applyOverrides(make_traveling_salesman_options(), cli), gridSize);
+        return runExample(travelingSalesman, cli.showSettings);
       }
-      break;
     case 'Q':
     case 'q':
       {
-        NQueens queens(make_nqueens_options());
-        queens.run();
+        NQueens queens(applyOverrides(make_nqueens_options(), cli));
+        return runExample(queens, cli.showSettings);
       }
-      break;
     case 'K':
     case 'k':
       {
-        Knapsack knapsack(make_knapsack_options());
-        knapsack.run();
+        Knapsack knapsack(applyOverrides(make_knapsack_options(), cli));
+        return runExample(knapsack, cli.showSettings);
       }
-      break;
     case 'L':
     case 'l':
       {
-        LatinSquare latin_square(make_latin_square_options());
-        latin_square.run();
+        LatinSquare latinSquare(applyOverrides(make_latin_square_options(), cli));
+        return runExample(latinSquare, cli.showSettings);
       }
-      break;
     case 'U':
     case 'u':
       {
-        Sudoku sudoku(make_sudoku_options());
-        sudoku.run();
+        Sudoku sudoku(applyOverrides(make_sudoku_options(), cli));
+        return runExample(sudoku, cli.showSettings);
       }
-      break;
     case 'C':
     case 'c':
       {
-        SudokuConstrained sudoku(make_constrained_sudoku_options());
-        sudoku.run();
+        SudokuConstrained sudoku(applyOverrides(make_constrained_sudoku_options(), cli));
+        return runExample(sudoku, cli.showSettings);
       }
-      break;
     default:
       usage(std::cerr);
       return EXIT_FAILURE;
-    }
-  return 0;
+  }
 }
