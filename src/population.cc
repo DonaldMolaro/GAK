@@ -177,6 +177,8 @@ Population::Options Population::Configuration::toOptions() const
    options.fitness = ToModernFitness(fitness);
    options.variableLength = ToModernVariableLength(variableLength);
    options.baseStates = baseStates;
+   options.useFixedRandomSeed = useFixedRandomSeed;
+   options.randomSeed = randomSeed;
    return options;
 }
 
@@ -195,6 +197,8 @@ Population::Configuration Population::Options::toConfiguration() const
    configuration.fitness = ToLegacyFitness(fitness);
    configuration.variableLength = ToLegacyVariableLength(variableLength);
    configuration.baseStates = baseStates;
+   configuration.useFixedRandomSeed = useFixedRandomSeed;
+   configuration.randomSeed = randomSeed;
    return configuration;
 }
 //
@@ -208,27 +212,18 @@ Population::Configuration Population::Options::toConfiguration() const
 
 Population::Population(const Configuration& configuration)
    : populationInitialized(false),
-     config_(configuration)
+     config_(configuration),
+     activeRandomSeed_(0)
 {
-   //
-   // Seed the random number generator with something reasonable.
-   //
-   std::time_t currenttime;
-   std::time(&currenttime);
-   randomGenerator.seed(static_cast<unsigned int>(currenttime));
-   //
-   //
-   //
-   if (IsVerboseEnabled())
+   if (config_.useFixedRandomSeed)
    {
-   fprintf(stderr,"Operation             :: %s\n", config_.operation == Minimize ? "Minimize" : "Maximize");
-   fprintf(stderr,"Number of Individuals :: %d\n",config_.numberOfIndividuals);
-   fprintf(stderr,"Number of Trails      :: %d\n",config_.numberOfTrials);
-   fprintf(stderr,"Genectic Diversity    :: %d\n",config_.geneticDiversity);
-   fprintf(stderr,"Mutation Rate         :: %5.4f\n",config_.bitMutationRate);
-   fprintf(stderr,"Cross Over Rate       :: %4.3f\n",config_.crossOverRate);
-   fprintf(stderr,"Duplicate Reproduction:: %s\n", config_.reproduction == DuplicatesNotAllowed ? "NOT Ok." : " Ok.");
-   fprintf(stderr,"Variable              :: %s\n", config_.variableLength ==  VariableLengthNotPermitted ? "NOT Ok." : " Ok.");
+      setRandomSeed(config_.randomSeed);
+   }
+   else
+   {
+      std::time_t currenttime;
+      std::time(&currenttime);
+      setRandomSeed(static_cast<unsigned int>(currenttime));
    }
 }
 
@@ -238,6 +233,13 @@ Population::Population(const Options& options)
 }
 
 Population::~Population() = default;
+
+void Population::setRandomSeed(unsigned int seed)
+{
+   activeRandomSeed_ = seed;
+   randomGenerator.seed(seed);
+   Chromosome::seedRandom(seed);
+}
 
 Population::Population(OperationTechnique POperation,
 		       int PnumberofIndividuals,int PnumberofTrials,
@@ -311,6 +313,21 @@ Population::PopulationSummary Population::buildPopulationSummary() const
    return summary;
 }
 
+void Population::printConfigurationSummary() const
+{
+   fprintf(stderr,"Operation             :: %s\n", config_.operation == Minimize ? "Minimize" : "Maximize");
+   fprintf(stderr,"Number of Individuals :: %d\n",config_.numberOfIndividuals);
+   fprintf(stderr,"Number of Trails      :: %d\n",config_.numberOfTrials);
+   fprintf(stderr,"Genectic Diversity    :: %d\n",config_.geneticDiversity);
+   fprintf(stderr,"Mutation Rate         :: %5.4f\n",config_.bitMutationRate);
+   fprintf(stderr,"Cross Over Rate       :: %4.3f\n",config_.crossOverRate);
+   fprintf(stderr,"Duplicate Reproduction:: %s\n", config_.reproduction == DuplicatesNotAllowed ? "NOT Ok." : " Ok.");
+   fprintf(stderr,"Variable              :: %s\n", config_.variableLength ==  VariableLengthNotPermitted ? "NOT Ok." : " Ok.");
+   fprintf(stderr,"Random Seed           :: %u%s\n",
+           activeRandomSeed_,
+           config_.useFixedRandomSeed ? " (configured)" : " (generated)");
+}
+
 void Population::printPopulationSummary(const PopulationSummary& summary)
 {
    const int summaryCount = static_cast<int>(summary.mostFit.size());
@@ -339,6 +356,17 @@ void Population::printPopulationSummary(const PopulationSummary& summary)
    {
       FitnessPrint(populationTable[i].get()->ChromosomeStr());
       fprintf(stderr,"(F = %3.8f)\n",summary.leastFit[i]);
+   }
+}
+
+void Population::printGenerationProgress(const GenerationReport& report, bool printSummary)
+{
+   fprintf(stderr,"Generation %d Number of Evaluations %d \n",
+           report.generation,
+           report.evaluations);
+   if (printSummary)
+   {
+      printPopulationSummary(report.summary);
    }
 }
 
@@ -428,11 +456,11 @@ bool Population::appendReplacement(std::vector<std::unique_ptr<Chromosome> >& re
 //
 // Expanded on significantly by author.
 //
-Population::RunResult Population::executeInternal(bool captureGenerationSummaries,
-                                                  bool logProgress,
-                                                  bool logSummaries)
+Population::RunResult Population::executeInternal(bool captureGenerationSummaries)
 {
    RunResult result;
+   result.randomSeed = activeRandomSeed_;
+   result.usedConfiguredSeed = config_.useFixedRandomSeed;
    int numberBorn = initializePopulation();
    evaluatePopulation();
    int numGen = 0;
@@ -442,18 +470,15 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
       std::vector<std::unique_ptr<Chromosome> > replacementList = breedPopulation(numToReplace);
       numberBorn += insertNewPopulation(std::move(replacementList),numToReplace);
       evaluatePopulation();
-      if (logProgress)
-      {
-         fprintf(stderr,"Generation %d Number of Evaluations %d \n",numGen,numberBorn);
-      }
       if (captureGenerationSummaries)
       {
          PopulationSummary summary = buildPopulationSummary();
+         GenerationReport report;
+         report.generation = numGen;
+         report.evaluations = numberBorn;
+         report.summary = summary;
+         result.generationReports.push_back(report);
          result.generationSummaries.push_back(summary);
-         if (logSummaries)
-         {
-            printPopulationSummary(summary);
-         }
       }
       ++numGen;
    }
@@ -466,17 +491,40 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
 
 Population::RunResult Population::execute(bool captureGenerationSummaries)
 {
-   return executeInternal(captureGenerationSummaries, false, false);
+   return executeInternal(captureGenerationSummaries);
+}
+
+void Population::reportRun(const RunResult& result, bool printGenerationSummaries)
+{
+   if (printGenerationSummaries)
+   {
+      for (std::size_t i = 0 ; i < result.generationReports.size() ; i++ )
+      {
+         printGenerationProgress(result.generationReports[i], true);
+      }
+   }
+   else
+   {
+      const GenerationReport finalProgress = {
+         result.generationsCompleted,
+         result.evaluations,
+         PopulationSummary()
+      };
+      printGenerationProgress(finalProgress, false);
+   }
+
+   printFinalSummary(result);
 }
 
 void Population::run()
 {
    const bool verbose = IsVerboseEnabled();
-   RunResult result = executeInternal(verbose, true, verbose);
-   fprintf(stderr,"Generation %d Number of Evaluations %d \n",
-           result.generationsCompleted,
-           result.evaluations);
-   printFinalSummary(result);
+   if (verbose)
+   {
+      printConfigurationSummary();
+   }
+   RunResult result = execute(verbose);
+   reportRun(result, verbose);
 }
 //
 // Start Population with randomly generated population.

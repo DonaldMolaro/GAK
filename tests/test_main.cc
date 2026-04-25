@@ -326,6 +326,8 @@ void test_population_options_round_trip()
   configuration.fitness = Population::LinearNormalizedFitness;
   configuration.variableLength = Population::VariableLengthPermitted;
   configuration.baseStates = 7;
+  configuration.useFixedRandomSeed = true;
+  configuration.randomSeed = 4242;
 
   Population::Options options = configuration.toOptions();
   Population::Configuration round_trip = options.toConfiguration();
@@ -342,6 +344,10 @@ void test_population_options_round_trip()
               "Configuration::toOptions should convert fitness mode");
   expect_true(options.variableLength == Population::VariableLengthMode::Variable,
               "Configuration::toOptions should convert variable-length mode");
+  expect_true(options.useFixedRandomSeed,
+              "Configuration::toOptions should preserve seeded-run mode");
+  expect_true(options.randomSeed == 4242U,
+              "Configuration::toOptions should preserve the configured random seed");
   expect_true(round_trip.numberOfIndividuals == configuration.numberOfIndividuals,
               "Options round trip should preserve individual count");
   expect_true(round_trip.numberOfTrials == configuration.numberOfTrials,
@@ -354,6 +360,10 @@ void test_population_options_round_trip()
               "Options round trip should preserve crossover rate");
   expect_true(round_trip.baseStates == configuration.baseStates,
               "Options round trip should preserve base state count");
+  expect_true(round_trip.useFixedRandomSeed == configuration.useFixedRandomSeed,
+              "Options round trip should preserve fixed-seed mode");
+  expect_true(round_trip.randomSeed == configuration.randomSeed,
+              "Options round trip should preserve configured random seed");
   expect_true(round_trip.operation == configuration.operation,
               "Options round trip should preserve legacy operation");
   expect_true(round_trip.reproduction == configuration.reproduction,
@@ -1181,11 +1191,18 @@ void test_population_execute_returns_structured_result()
 						    Population::DeletionMode::DeleteAll,
 						    Population::FitnessMode::Evaluation,
 						    Population::VariableLengthMode::Fixed, 2));
+  pop.setRandomSeed(123U);
   Population::RunResult result = pop.execute(true);
 
+  expect_true(result.randomSeed == 123U,
+	      "execute should report the active random seed");
+  expect_true(!result.usedConfiguredSeed,
+	      "execute should report when the seed came from explicit runtime injection");
   expect_true(result.generationsCompleted >= 1, "execute should report completed generations");
   expect_true(result.evaluations >= pop.configuration().numberOfIndividuals,
 	      "execute should report total evaluations");
+  expect_true(!result.generationReports.empty(),
+	      "execute(true) should capture per-generation reports");
   expect_true(!result.generationSummaries.empty(),
 	      "execute(true) should capture per-generation summaries");
   expect_true(!result.finalSummary.mostFit.empty(),
@@ -1210,8 +1227,14 @@ void test_population_execute_result_contents_are_consistent()
 	      "execute should report the expected number of generations for this configuration");
   expect_true(result.evaluations == 12,
 	      "execute should report the exact evaluation count for this configuration");
+  expect_true(result.generationReports.size() == static_cast<std::size_t>(result.generationsCompleted),
+	      "execute(true) should produce one generation report per completed generation");
   expect_true(result.generationSummaries.size() == static_cast<std::size_t>(result.generationsCompleted),
 	      "execute(true) should produce one summary per completed generation");
+  expect_true(result.generationReports.back().generation == 0,
+	      "Generation reports should preserve the generation index");
+  expect_true(result.generationReports.back().evaluations == result.evaluations,
+	      "Generation reports should preserve the evaluation count");
   expect_true(result.finalSummary.mostFit.size() == 5,
 	      "Final summary should cap most-fit entries at the configured summary count");
   expect_true(result.finalSummary.leastFit.size() == 5,
@@ -1233,6 +1256,42 @@ void test_population_execute_result_contents_are_consistent()
 	      "Final summary should match the last captured generation summary for this configuration");
   expect_true(result.generationSummaries.back().leastFit == result.finalSummary.leastFit,
 	      "Final least-fit summary should match the last captured generation summary");
+  expect_true(result.generationReports.back().summary.mostFit == result.finalSummary.mostFit,
+	      "Generation reports should carry the same most-fit summary data");
+  expect_true(result.generationReports.back().summary.leastFit == result.finalSummary.leastFit,
+	      "Generation reports should carry the same least-fit summary data");
+}
+
+void test_population_fixed_seed_makes_runs_reproducible()
+{
+  SilentStderr silence;
+
+  Population::Options options = make_population_options(Population::OperationMode::Maximize, 6, 20, 4, 0.05, 0.65,
+							Population::ReproductionMode::AllowDuplicates,
+							Population::ParentSelectionMode::RouletteWheel,
+							Population::DeletionMode::DeleteAll,
+							Population::FitnessMode::Evaluation,
+							Population::VariableLengthMode::Fixed, 2);
+  options.useFixedRandomSeed = true;
+  options.randomSeed = 20260424U;
+
+  InspectablePopulation first(options);
+  InspectablePopulation second(options);
+  Population::RunResult first_result = first.execute(true);
+  Population::RunResult second_result = second.execute(true);
+
+  expect_true(first_result.usedConfiguredSeed && second_result.usedConfiguredSeed,
+	      "Configured seeds should be reported as configured");
+  expect_true(first_result.randomSeed == second_result.randomSeed,
+	      "Configured runs should report the same seed");
+  expect_true(first_result.evaluations == second_result.evaluations,
+	      "Configured runs should report the same evaluation count");
+  expect_true(first_result.generationsCompleted == second_result.generationsCompleted,
+	      "Configured runs should report the same generation count");
+  expect_true(first_result.finalSummary.mostFit == second_result.finalSummary.mostFit,
+	      "Configured runs should produce the same final most-fit summary");
+  expect_true(first_result.finalSummary.leastFit == second_result.finalSummary.leastFit,
+	      "Configured runs should produce the same final least-fit summary");
 }
 
 void test_population_run_output_contains_progress_and_final_summary()
@@ -1247,8 +1306,8 @@ void test_population_run_output_contains_progress_and_final_summary()
   pop.run();
   std::string output = capture.str();
 
-  expect_true(output.find("Generation 0 Number of Evaluations 12") != std::string::npos,
-	      "run should print per-run generation progress");
+  expect_true(output.find("Generation 1 Number of Evaluations 12") != std::string::npos,
+	      "run should print final generation progress");
   expect_true(output.find("Chromosome:") != std::string::npos,
 	      "run should print chromosome summaries through FitnessPrint");
   expect_true(output.find("1.000000") != std::string::npos || output.find("0.000000") != std::string::npos,
@@ -1351,6 +1410,7 @@ int main()
   test_population_run_modes();
   test_population_execute_returns_structured_result();
   test_population_execute_result_contents_are_consistent();
+  test_population_fixed_seed_makes_runs_reproducible();
   test_population_run_output_contains_progress_and_final_summary();
   test_population_default_operator_hooks_are_explicitly_exercised();
   test_delete_all_but_best_runs();

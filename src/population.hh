@@ -13,6 +13,7 @@ class Chromosome;
 class Population {
 public:
    struct Options;
+   struct GenerationReport;
    enum OperationTechnique        { Minimize,Maximize };
    enum ReproductionTechniques    { DuplicatesAllowed, DuplicatesNotAllowed };
    enum ParrentSelectionTechnique { RouletteWheel,Random };
@@ -43,6 +44,8 @@ public:
       FitnessTechnique fitness = FitnessIsEvaluation;
       VariableLength variableLength = VariableLengthNotPermitted;
       int baseStates = 2;
+      bool useFixedRandomSeed = false;
+      unsigned int randomSeed = 0;
 
       Options toOptions() const;
    };
@@ -61,6 +64,8 @@ public:
       FitnessMode fitness = FitnessMode::Evaluation;
       VariableLengthMode variableLength = VariableLengthMode::Fixed;
       int baseStates = 2;
+      bool useFixedRandomSeed = false;
+      unsigned int randomSeed = 0;
 
       Configuration toConfiguration() const;
    };
@@ -76,10 +81,19 @@ public:
       // Structured execution result returned by `execute()`. This allows
       // callers to run the GA without coupling to the legacy stderr output in
       // `run()`.
+      unsigned int randomSeed = 0;
+      bool usedConfiguredSeed = false;
       int generationsCompleted = 0;
       int evaluations = 0;
+      std::vector<GenerationReport> generationReports;
       std::vector<PopulationSummary> generationSummaries;
       PopulationSummary finalSummary;
+   };
+   struct GenerationReport
+   {
+      int generation = 0;
+      int evaluations = 0;
+      PopulationSummary summary;
    };
 private:
    bool populationInitialized;
@@ -89,6 +103,7 @@ private:
    std::vector<double> linearNormalizedfitnessTable;
    Configuration config_;
    std::mt19937 randomGenerator;
+   unsigned int activeRandomSeed_;
    static const int kSummaryCount = 5;
    //
    // Private methods.
@@ -100,7 +115,10 @@ private:
    int replacementCount() const;
    int replacementSlotIndex(int offset) const;
    PopulationSummary buildPopulationSummary() const;
-   RunResult executeInternal(bool captureGenerationSummaries, bool logProgress, bool logSummaries);
+   RunResult executeInternal(bool captureGenerationSummaries);
+   void printConfigurationSummary() const;
+   void printGenerationProgress(const GenerationReport& report, bool printSummary);
+   void reportRun(const RunResult& result, bool printGenerationSummaries);
    void printPopulationSummary(const PopulationSummary& summary);
    void printFinalSummary(const RunResult& result);
    Chromosome *selectRandomParent(int *selected);
@@ -156,6 +174,8 @@ public:
    // Subclasses provide a human-readable rendering of a chromosome.
    virtual void FitnessPrint(BaseString *b)=0;
    const Configuration& configuration() const noexcept { return config_; }
+   unsigned int randomSeed() const noexcept { return activeRandomSeed_; }
+   void setRandomSeed(unsigned int seed);
    // Decode a contiguous range of genes as a base-2 integer.
    int decode(BaseString *b,int start,int end);
    // Run the GA silently and return a structured summary.
