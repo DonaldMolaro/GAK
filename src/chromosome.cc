@@ -110,15 +110,6 @@ Chromosome::Chromosome(unsigned int CLength,unsigned int vlength,unsigned int Pb
     }
 }
 
-Chromosome::Chromosome(BaseString *b,unsigned int vlength,unsigned int PbaseStates)
-{
-  //
-  ChromosomeLength = b->length();
-  ChromosomeString.reset(b);
-  variableLength = vlength;
-  baseStates     = PbaseStates;
-}
-
 Chromosome::Chromosome(std::unique_ptr<BaseString> b,unsigned int vlength,unsigned int PbaseStates)
 {
   ChromosomeLength = b->length();
@@ -337,12 +328,12 @@ Chromosome::uniformCrossOver(const BaseString *mother,const BaseString *father)
 // children. 
 //
 std::pair<Chromosome::ChromosomePtr, Chromosome::ChromosomePtr>
-Chromosome::matePair(Chromosome *father,double crossOverRate,CrossOverType crossType)
+Chromosome::mate(Chromosome& father,double crossOverRate,CrossOverType crossType)
 {
   Chromosome *mother = this;         // Just for notation purposes.
   //
   //
-  if (!(this->variableLength) && (mother->ChromosomeLen() != father->ChromosomeLen()))
+  if (!(this->variableLength) && (mother->ChromosomeLen() != father.ChromosomeLen()))
     {
       throw GAFatalException(__FILE__,__LINE__,"Missmatch in Chromosome strings");
     }
@@ -357,14 +348,14 @@ Chromosome::matePair(Chromosome *father,double crossOverRate,CrossOverType cross
       switch (crossType)
 	{
 	case SinglePoint:
-	  children = singlePointCrossOver(mother->ChromosomeStr(),father->ChromosomeStr());
+	  children = singlePointCrossOver(&mother->chromosomeString(),&father.chromosomeString());
 	  break;
 	case TwoPoint:
-	  children = twoPointCrossOver(mother->ChromosomeStr(),father->ChromosomeStr());
+	  children = twoPointCrossOver(&mother->chromosomeString(),&father.chromosomeString());
 	 
 	  break;
 	case Uniform:
-	  children = uniformCrossOver(mother->ChromosomeStr(),father->ChromosomeStr());
+	  children = uniformCrossOver(&mother->chromosomeString(),&father.chromosomeString());
 	  break;
 	default:
 	  throw GANonFatalException(__FILE__,__LINE__,"Unimplemented crossover type");
@@ -377,20 +368,12 @@ Chromosome::matePair(Chromosome *father,double crossOverRate,CrossOverType cross
       // the Father into the Son and the bits from the mother
       // into the daughter.
       //
-      children = std::make_pair(cloneBaseString(father->ChromosomeStr(),baseStates),
-                                cloneBaseString(mother->ChromosomeStr(),baseStates));
+      children = std::make_pair(cloneBaseString(&father.chromosomeString(),baseStates),
+                                cloneBaseString(&mother->chromosomeString(),baseStates));
     }
   return std::make_pair(
-      std::make_unique<Chromosome>(std::move(children.first),father->variableLength,baseStates),
+      std::make_unique<Chromosome>(std::move(children.first),father.variableLength,baseStates),
       std::make_unique<Chromosome>(std::move(children.second),mother->variableLength,baseStates));
-}
-
-void Chromosome::Mate(Chromosome *father,Chromosome **son,Chromosome **daughter,
-		       double crossOverRate,CrossOverType crossType)
-{
-  std::pair<ChromosomePtr, ChromosomePtr> children = matePair(father, crossOverRate, crossType);
-  *son = children.first.release();
-  *daughter = children.second.release();
 }
 
 bool Chromosome::compare(const Chromosome *candidate) const
@@ -399,7 +382,7 @@ bool Chromosome::compare(const Chromosome *candidate) const
     {
       for ( int i = 0 ; i < this->ChromosomeLen() ; i++ )
 	{
-	  if (this->ChromosomeStr()->test(i) != candidate->ChromosomeStr()->test(i)) return false;
+	  if (this->chromosomeString().test(i) != candidate->chromosomeString().test(i)) return false;
 	}
       return true;
     }

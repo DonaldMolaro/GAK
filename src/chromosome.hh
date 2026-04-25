@@ -35,19 +35,12 @@ private:
                                                             const BaseString *father);
   std::pair<BaseStringPtr, BaseStringPtr> uniformCrossOver(const BaseString *mother,
                                                            const BaseString *father);
-  std::pair<ChromosomePtr, ChromosomePtr> matePair(Chromosome *father,
-                                                   double crossOverRate,
-                                                   CrossOverType crossType);
 public:
   // Default is a 32-gene binary chromosome with fixed length.
   Chromosome(unsigned int ChromosomeLength = 32,
 	     unsigned int vlength = 0,
 	     unsigned int numStates = 2); 
    
-  // Adopt an existing encoded base string as the chromosome payload.
-  Chromosome(BaseString *b,
-	     unsigned int vlength = 0,
-	     unsigned int numStates = 2); 
   Chromosome(std::unique_ptr<BaseString> b,
 	     unsigned int vlength = 0,
 	     unsigned int numStates = 2);
@@ -57,13 +50,13 @@ public:
   int ChromosomeLen() const                { return ChromosomeLength; }
   BaseString& chromosomeString()           { return *ChromosomeString; }
   const BaseString& chromosomeString() const { return *ChromosomeString; }
-  BaseString *ChromosomeStr() const        { return ChromosomeString.get(); }
   // Apply the built-in point mutation operator across the chromosome.
   void SingleBitMutate(double probability = 0.008);
   // Produce two children using one of the built-in crossover strategies.
-  void Mate(Chromosome *father,Chromosome **son,Chromosome **daughter,
-	    double crossOverRate = 0.65,CrossOverType crossType = SinglePoint);
+  std::pair<ChromosomePtr, ChromosomePtr> mate(Chromosome& father,
+                                               double crossOverRate = 0.65,
+                                               CrossOverType crossType = SinglePoint);
   bool compare(const Chromosome *candidate) const;
-  void print(std::ostream &ostr) const     { ChromosomeStr()->printBits(ostr); ostr << '\n'; }
+  void print(std::ostream &ostr) const     { chromosomeString().printBits(ostr); ostr << '\n'; }
 };
 #endif

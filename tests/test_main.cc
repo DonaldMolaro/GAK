@@ -413,8 +413,8 @@ void test_exception_helpers()
 void test_mutation_rate_zero_preserves_chromosome()
 {
   Chromosome::seedRandom(1);
-  Chromosome chromosome(makeBinaryString("10101100"));
-  Chromosome original(makeBinaryString("10101100"));
+  Chromosome chromosome(std::unique_ptr<BaseString>(makeBinaryString("10101100")));
+  Chromosome original(std::unique_ptr<BaseString>(makeBinaryString("10101100")));
 
   chromosome.SingleBitMutate(0.0);
 
@@ -432,14 +432,14 @@ void test_chromosome_constructor_and_compare_paths()
     },
     "Overlong chromosome constructor should throw");
 
-  Chromosome left(makeBinaryString("1010"));
-  Chromosome right(makeBinaryString("0101"));
+  Chromosome left(std::unique_ptr<BaseString>(makeBinaryString("1010")));
+  Chromosome right(std::unique_ptr<BaseString>(makeBinaryString("0101")));
   Chromosome symbolic(5, 0, 4);
   expect_true(!left.compare(&right), "compare should return false for different chromosomes");
   expect_true(!left.compare(&symbolic), "compare should return false for mismatched lengths");
   for (int i = 0 ; i < symbolic.ChromosomeLen() ; i++)
     {
-      int value = symbolic.ChromosomeStr()->test(i);
+      int value = symbolic.chromosomeString().test(i);
       expect_true(value >= 0 && value < 4, "Non-binary constructor should initialize values in range");
     }
 
@@ -452,7 +452,7 @@ void test_invalid_mutation_probability_throws()
 {
   SilentStderr silence;
   Chromosome::seedRandom(3);
-  Chromosome chromosome(makeBinaryString("10101100"));
+  Chromosome chromosome(std::unique_ptr<BaseString>(makeBinaryString("10101100")));
 
   expect_throws<GANonFatalException>(
     [&chromosome]() { chromosome.SingleBitMutate(2.0); },
@@ -475,7 +475,7 @@ void test_non_binary_mutation_with_probability_one_stays_in_range()
 void test_binary_mutation_with_probability_one_changes_only_bits()
 {
   Chromosome::seedRandom(5);
-  Chromosome chromosome(makeBinaryString("000000"));
+  Chromosome chromosome(std::unique_ptr<BaseString>(makeBinaryString("000000")));
   chromosome.SingleBitMutate(1.0);
 
   for (int i = 0 ; i < chromosome.ChromosomeLen() ; i++)
@@ -488,67 +488,54 @@ void test_binary_mutation_with_probability_one_changes_only_bits()
 void test_mate_without_crossover_clones_parents()
 {
   Chromosome::seedRandom(6);
-  Chromosome mother(makeBinaryString("11110000"));
-  Chromosome father(makeBinaryString("00001111"));
-  Chromosome *son = 0;
-  Chromosome *daughter = 0;
+  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("11110000")));
+  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("00001111")));
+  std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+    mother.mate(father, 0.0, Chromosome::SinglePoint);
 
-  mother.Mate(&father, &son, &daughter, 0.0, Chromosome::SinglePoint);
-
-  expect_true(son != 0, "Mate should create a son");
-  expect_true(daughter != 0, "Mate should create a daughter");
-  expect_true(son->compare(&father), "Son should clone father when crossover rate is zero");
-  expect_true(daughter->compare(&mother), "Daughter should clone mother when crossover rate is zero");
-
-  delete son;
-  delete daughter;
+  expect_true(children.first.get() != 0, "Mate should create a son");
+  expect_true(children.second.get() != 0, "Mate should create a daughter");
+  expect_true(children.first->compare(&father), "Son should clone father when crossover rate is zero");
+  expect_true(children.second->compare(&mother), "Daughter should clone mother when crossover rate is zero");
 }
 
 void test_uniform_crossover_is_reachable_and_safe()
 {
   Chromosome::seedRandom(7);
-  Chromosome mother(makeBinaryString("11110000"));
-  Chromosome father(makeBinaryString("00001111"));
+  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("11110000")));
+  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("00001111")));
 
   for (int i = 0 ; i < 20 ; i++)
     {
-      Chromosome *son = 0;
-      Chromosome *daughter = 0;
-      mother.Mate(&father, &son, &daughter, 1.0, Chromosome::Uniform);
+      std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+        mother.mate(father, 1.0, Chromosome::Uniform);
 
-      expect_true(son != 0, "Uniform crossover should produce a son");
-      expect_true(daughter != 0, "Uniform crossover should produce a daughter");
-      expect_true(son->ChromosomeLen() == father.ChromosomeLen(),
+      expect_true(children.first.get() != 0, "Uniform crossover should produce a son");
+      expect_true(children.second.get() != 0, "Uniform crossover should produce a daughter");
+      expect_true(children.first->ChromosomeLen() == father.ChromosomeLen(),
 		  "Uniform crossover should preserve fixed-length son length");
-      expect_true(daughter->ChromosomeLen() == mother.ChromosomeLen(),
+      expect_true(children.second->ChromosomeLen() == mother.ChromosomeLen(),
 		  "Uniform crossover should preserve fixed-length daughter length");
-
-      delete son;
-      delete daughter;
     }
 }
 
 void test_two_point_crossover_is_reachable_and_safe()
 {
   Chromosome::seedRandom(8);
-  Chromosome mother(makeBinaryString("11110000"));
-  Chromosome father(makeBinaryString("00001111"));
+  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("11110000")));
+  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("00001111")));
 
   for (int i = 0 ; i < 20 ; i++)
     {
-      Chromosome *son = 0;
-      Chromosome *daughter = 0;
-      mother.Mate(&father, &son, &daughter, 1.0, Chromosome::TwoPoint);
+      std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+        mother.mate(father, 1.0, Chromosome::TwoPoint);
 
-      expect_true(son != 0, "Two-point crossover should produce a son");
-      expect_true(daughter != 0, "Two-point crossover should produce a daughter");
-      expect_true(son->ChromosomeLen() == father.ChromosomeLen(),
+      expect_true(children.first.get() != 0, "Two-point crossover should produce a son");
+      expect_true(children.second.get() != 0, "Two-point crossover should produce a daughter");
+      expect_true(children.first->ChromosomeLen() == father.ChromosomeLen(),
 		  "Fixed-length two-point crossover should preserve son length");
-      expect_true(daughter->ChromosomeLen() == mother.ChromosomeLen(),
+      expect_true(children.second->ChromosomeLen() == mother.ChromosomeLen(),
 		  "Fixed-length two-point crossover should preserve daughter length");
-
-      delete son;
-      delete daughter;
     }
 }
 
@@ -556,14 +543,12 @@ void test_mate_rejects_mismatched_fixed_lengths()
 {
   SilentStderr silence;
   Chromosome::seedRandom(9);
-  Chromosome mother(makeBinaryString("1111"));
-  Chromosome father(makeBinaryString("00001111"));
+  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("1111")));
+  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("00001111")));
 
   expect_throws<GAFatalException>(
     [&mother, &father]() {
-      Chromosome *son = 0;
-      Chromosome *daughter = 0;
-      mother.Mate(&father, &son, &daughter, 1.0, Chromosome::SinglePoint);
+      mother.mate(father, 1.0, Chromosome::SinglePoint);
     },
     "Fixed-length mating should reject mismatched parent lengths");
 }
@@ -571,78 +556,63 @@ void test_mate_rejects_mismatched_fixed_lengths()
 void test_variable_length_mating_supports_different_lengths()
 {
   Chromosome::seedRandom(10);
-  Chromosome mother(makeBinaryString("1111"), 1, 2);
-  Chromosome father(makeBinaryString("000011"), 1, 2);
+  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("1111")), 1, 2);
+  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("000011")), 1, 2);
 
   for (int i = 0 ; i < 20 ; i++)
     {
-      Chromosome *son = 0;
-      Chromosome *daughter = 0;
-      mother.Mate(&father, &son, &daughter, 1.0, Chromosome::SinglePoint);
+      std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+        mother.mate(father, 1.0, Chromosome::SinglePoint);
 
-      expect_true(son != 0, "Variable-length mating should produce a son");
-      expect_true(daughter != 0, "Variable-length mating should produce a daughter");
-      expect_true(son->ChromosomeLen() >= 1, "Variable-length son should have a valid length");
-      expect_true(daughter->ChromosomeLen() >= 1, "Variable-length daughter should have a valid length");
-
-      delete son;
-      delete daughter;
+      expect_true(children.first.get() != 0, "Variable-length mating should produce a son");
+      expect_true(children.second.get() != 0, "Variable-length mating should produce a daughter");
+      expect_true(children.first->ChromosomeLen() >= 1, "Variable-length son should have a valid length");
+      expect_true(children.second->ChromosomeLen() >= 1, "Variable-length daughter should have a valid length");
     }
 }
 
 void test_variable_length_uniform_crossover()
 {
   Chromosome::seedRandom(11);
-  Chromosome mother(makeBinaryString("1111"), 1, 2);
-  Chromosome father(makeBinaryString("000011"), 1, 2);
+  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("1111")), 1, 2);
+  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("000011")), 1, 2);
 
-  Chromosome *son = 0;
-  Chromosome *daughter = 0;
-  mother.Mate(&father, &son, &daughter, 1.0, Chromosome::Uniform);
+  std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+    mother.mate(father, 1.0, Chromosome::Uniform);
 
-  expect_true(son != 0 && daughter != 0, "Variable-length uniform crossover should produce children");
-  expect_true(son->ChromosomeLen() == father.ChromosomeLen(),
+  expect_true(children.first.get() != 0 && children.second.get() != 0, "Variable-length uniform crossover should produce children");
+  expect_true(children.first->ChromosomeLen() == father.ChromosomeLen(),
 	      "Variable-length uniform crossover should preserve son length");
-  expect_true(daughter->ChromosomeLen() == mother.ChromosomeLen(),
+  expect_true(children.second->ChromosomeLen() == mother.ChromosomeLen(),
 	      "Variable-length uniform crossover should preserve daughter length");
-
-  delete son;
-  delete daughter;
 }
 
 void test_variable_length_uniform_crossover_with_longer_mother()
 {
   Chromosome::seedRandom(13);
-  Chromosome mother(makeBinaryString("111100"), 1, 2);
-  Chromosome father(makeBinaryString("0000"), 1, 2);
+  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("111100")), 1, 2);
+  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("0000")), 1, 2);
 
-  Chromosome *son = 0;
-  Chromosome *daughter = 0;
-  mother.Mate(&father, &son, &daughter, 1.0, Chromosome::Uniform);
+  std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+    mother.mate(father, 1.0, Chromosome::Uniform);
 
-  expect_true(son != 0 && daughter != 0, "Variable-length uniform crossover should handle longer mothers");
-  expect_true(son->ChromosomeLen() == father.ChromosomeLen(),
+  expect_true(children.first.get() != 0 && children.second.get() != 0, "Variable-length uniform crossover should handle longer mothers");
+  expect_true(children.first->ChromosomeLen() == father.ChromosomeLen(),
 	      "Longer-mother uniform crossover should preserve son length");
-  expect_true(daughter->ChromosomeLen() == mother.ChromosomeLen(),
+  expect_true(children.second->ChromosomeLen() == mother.ChromosomeLen(),
 	      "Longer-mother uniform crossover should preserve daughter length");
-
-  delete son;
-  delete daughter;
 }
 
 void test_invalid_crossover_type_throws()
 {
   SilentStderr silence;
   Chromosome::seedRandom(12);
-  Chromosome mother(makeBinaryString("1111"));
-  Chromosome father(makeBinaryString("0000"));
+  Chromosome mother(std::unique_ptr<BaseString>(makeBinaryString("1111")));
+  Chromosome father(std::unique_ptr<BaseString>(makeBinaryString("0000")));
 
   expect_throws<GANonFatalException>(
     [&mother, &father]() {
-      Chromosome *son = 0;
-      Chromosome *daughter = 0;
-      mother.Mate(&father, &son, &daughter, 1.0,
-		  static_cast<Chromosome::CrossOverType>(99));
+      mother.mate(father, 1.0, static_cast<Chromosome::CrossOverType>(99));
     },
     "Unsupported crossover type should throw");
 }
@@ -1320,7 +1290,7 @@ void test_delete_all_but_best_runs()
 
   expect_true(pop.populationInitialized == true, "Population should initialize during run");
   expect_true(!pop.populationTable.empty(), "Population should retain its table after run");
-  expect_true(pop.populationTable[pop.configuration().numberOfIndividuals - 1].get()->ChromosomeStr()->test(0) == 1,
+  expect_true(pop.populationTable[pop.configuration().numberOfIndividuals - 1].get()->chromosomeString().test(0) == 1,
 	      "Best chromosome should remain present after DeleteAllButBest runs");
 }
 

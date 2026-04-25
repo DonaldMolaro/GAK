@@ -470,18 +470,18 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
     {
       if (givens[cell] != 0)
         {
-          expect_true(first->ChromosomeStr()->test(cell) + 1 == givens[cell],
+          expect_true(first->chromosomeString().test(cell) + 1 == givens[cell],
                       "Constrained Sudoku initialization should preserve givens");
-          expect_true(second->ChromosomeStr()->test(cell) + 1 == givens[cell],
+          expect_true(second->chromosomeString().test(cell) + 1 == givens[cell],
                       "Constrained Sudoku initialization should preserve givens across all individuals");
         }
     }
 
   for (int row = 0 ; row < 9 ; row++)
     {
-      expect_true(row_is_permutation(first->ChromosomeStr(), row),
+      expect_true(row_is_permutation(&first->chromosomeString(), row),
                   "Constrained Sudoku initialization should make each row a permutation");
-      expect_true(row_is_permutation(second->ChromosomeStr(), row),
+      expect_true(row_is_permutation(&second->chromosomeString(), row),
                   "Constrained Sudoku initialization should make each row a permutation for every individual");
     }
 
@@ -492,9 +492,9 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
 
   for (int row = 0 ; row < 9 ; row++)
     {
-      expect_true(row_is_permutation(children.first->ChromosomeStr(), row),
+      expect_true(row_is_permutation(&children.first->chromosomeString(), row),
                   "Constrained Sudoku crossover/mutation should preserve row permutations");
-      expect_true(row_is_permutation(children.second->ChromosomeStr(), row),
+      expect_true(row_is_permutation(&children.second->chromosomeString(), row),
                   "Constrained Sudoku crossover/mutation should preserve row permutations in both children");
     }
 
@@ -502,9 +502,9 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
     {
       if (givens[cell] != 0)
         {
-          expect_true(children.first->ChromosomeStr()->test(cell) + 1 == givens[cell],
+          expect_true(children.first->chromosomeString().test(cell) + 1 == givens[cell],
                       "Constrained Sudoku operators should keep givens locked in the first child");
-          expect_true(children.second->ChromosomeStr()->test(cell) + 1 == givens[cell],
+          expect_true(children.second->chromosomeString().test(cell) + 1 == givens[cell],
                       "Constrained Sudoku operators should keep givens locked in the second child");
         }
     }

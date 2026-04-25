@@ -578,11 +578,7 @@ std::unique_ptr<Chromosome> Population::createInitialChromosome()
 std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
 Population::mateChromosomes(Chromosome *mother, Chromosome *father)
 {
-   Chromosome *son = NULL;
-   Chromosome *daughter = NULL;
-   mother->Mate(father,&son,&daughter,config_.crossOverRate,Chromosome::SinglePoint);
-   return std::make_pair(std::unique_ptr<Chromosome>(son),
-                         std::unique_ptr<Chromosome>(daughter));
+   return mother->mate(*father,config_.crossOverRate,Chromosome::SinglePoint);
 }
 
 void Population::mutateChromosome(Chromosome *chromosome)

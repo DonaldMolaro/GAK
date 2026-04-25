@@ -252,7 +252,7 @@ std::unique_ptr<Chromosome> SudokuConstrained::createInitialChromosome()
    {
       initializeRow(board.get(), row);
    }
-   return std::make_unique<Chromosome>(board.release(),
+   return std::make_unique<Chromosome>(std::move(board),
                                        static_cast<unsigned int>(configuration().variableLength == Population::VariableLengthMode::Variable),
                                        configuration().baseStates);
 }
