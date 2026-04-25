@@ -147,7 +147,7 @@ double Sudoku::evaluateFitness(const BaseString& genes)
    return score;
 }
 
-void Sudoku::printCandidate(const BaseString& genes, std::ostream& out)
+void Sudoku::printCandidate(const BaseString& genes, std::ostream& out) const
 {
    out << "Sudoku candidate:\n";
    for ( int row = 0 ; row < kBoardSize ; row++ )

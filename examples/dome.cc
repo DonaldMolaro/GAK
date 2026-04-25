@@ -27,7 +27,7 @@ double Dome::evaluateFitness(const BaseString& genes)
 };
 
 
-void Dome::printCandidate(const BaseString& genes, std::ostream& out)
+void Dome::printCandidate(const BaseString& genes, std::ostream& out) const
 {
    int x1 = decode(genes,0,16);
    int y1 = decode(genes,16,32);

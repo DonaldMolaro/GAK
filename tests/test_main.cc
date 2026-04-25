@@ -176,7 +176,7 @@ public:
     return b.valueAt(0);
   }
 
-  void printCandidate(const BaseString&, std::ostream&) override
+  void printCandidate(const BaseString&, std::ostream&) const override
   {
   }
 };
@@ -198,7 +198,7 @@ public:
     return b.valueAt(0);
   }
 
-  void printCandidate(const BaseString& b, std::ostream& out) override
+  void printCandidate(const BaseString& b, std::ostream& out) const override
   {
     out << "Chromosome:" << b.valueAt(0) << '\n';
   }
@@ -224,7 +224,7 @@ public:
     return b.valueAt(0);
   }
 
-  void printCandidate(const BaseString&, std::ostream&) override
+  void printCandidate(const BaseString&, std::ostream&) const override
   {
   }
 };
@@ -1286,6 +1286,30 @@ void test_population_run_output_contains_progress_and_final_summary()
 	      "run should print chromosome summaries through FitnessPrint");
   expect_true(output.find("1.000000") != std::string::npos || output.find("0.000000") != std::string::npos,
 	      "run should print final summary fitness values");
+}
+
+void test_population_run_reporter_formats_execute_results()
+{
+  DefaultHookPopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+  Population::RunResult result = pop.execute(true);
+  std::ostringstream out;
+  Population::RunReporter::write(out,
+				 pop,
+				 result,
+				 Population::RunReportOptions{true, true});
+  const std::string output = out.str();
+
+  expect_true(output.find("Operation             :: Maximize") != std::string::npos,
+	      "RunReporter should be able to render settings");
+  expect_true(output.find("Generation 0 Number of Evaluations 12") != std::string::npos,
+	      "RunReporter should be able to render generation progress from execute results");
+  expect_true(output.find("Chromosome:") != std::string::npos,
+	      "RunReporter should render candidate output through printCandidate");
 }
 
 void test_population_default_operator_hooks_are_explicitly_exercised()

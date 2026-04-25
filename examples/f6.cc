@@ -36,7 +36,7 @@ double F6::evaluateFitness(const BaseString& genes)
 
 }
 
-void F6::printCandidate(const BaseString& genes, std::ostream& out)
+void F6::printCandidate(const BaseString& genes, std::ostream& out) const
 {
    double x1 = static_cast<double>(decode(genes,0,22));
    double y1 = static_cast<double>(decode(genes,22,44));
@@ -47,7 +47,6 @@ void F6::printCandidate(const BaseString& genes, std::ostream& out)
    
    out << "X ( " << x3 << " ) Y ( " << y3 << " ) ";
 }
-
 
 
 

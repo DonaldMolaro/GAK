@@ -219,7 +219,7 @@ double SudokuConstrained::evaluateFitness(const BaseString& genes)
    return score;
 }
 
-void SudokuConstrained::printCandidate(const BaseString& genes, std::ostream& out)
+void SudokuConstrained::printCandidate(const BaseString& genes, std::ostream& out) const
 {
    out << "Constraint-aware Sudoku candidate:\n";
    for ( int row = 0 ; row < kBoardSize ; row++ )

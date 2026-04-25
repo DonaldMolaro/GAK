@@ -90,7 +90,7 @@ double TravelingSalesman::evaluateFitness(const BaseString& genes)
 }
 
 
-void TravelingSalesman::printCandidate(const BaseString& genes, std::ostream& out)
+void TravelingSalesman::printCandidate(const BaseString& genes, std::ostream& out) const
 {
    for ( int i = 0 ; i < genes.length() ; i++ )
    {

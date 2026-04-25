@@ -82,7 +82,7 @@ double LatinSquare::evaluateFitness(const BaseString& genes)
    return score;
 }
 
-void LatinSquare::printCandidate(const BaseString& genes, std::ostream& out)
+void LatinSquare::printCandidate(const BaseString& genes, std::ostream& out) const
 {
    const int size = squareSize(genes);
    out << "Latin square (" << size << "x" << size << "):\n";

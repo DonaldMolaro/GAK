@@ -37,7 +37,7 @@ double Knapsack::evaluateFitness(const BaseString& genes)
    return value > penalty ? value - penalty : 0;
 }
 
-void Knapsack::printCandidate(const BaseString& genes, std::ostream& out)
+void Knapsack::printCandidate(const BaseString& genes, std::ostream& out) const
 {
    int weight = 0;
    int value = 0;

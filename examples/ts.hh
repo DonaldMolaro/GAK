@@ -23,7 +23,7 @@ public:
                      int gridSize = 0);
   
    double evaluateFitness(const BaseString& genes) override;
-   void printCandidate(const BaseString& genes, std::ostream& out) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) const override;
 private:
    using Coordinate = std::pair<int, int>;
 

@@ -33,7 +33,7 @@ double Alpha::evaluateFitness(const BaseString& genes)
    return res;
 }
 
-void Alpha::printCandidate(const BaseString& genes, std::ostream& out)
+void Alpha::printCandidate(const BaseString& genes, std::ostream& out) const
 {
    for ( int i = 0 ; i < genes.length() ; i++ )
    {

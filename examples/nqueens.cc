@@ -34,7 +34,7 @@ double NQueens::evaluateFitness(const BaseString& genes)
    return nonAttackingPairs;
 }
 
-void NQueens::printCandidate(const BaseString& genes, std::ostream& out)
+void NQueens::printCandidate(const BaseString& genes, std::ostream& out) const
 {
    out << "Queens:";
    for ( int column = 0 ; column < genes.length() ; column++ )

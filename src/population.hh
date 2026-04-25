@@ -87,7 +87,30 @@ public:
       int evaluations = 0;
       PopulationSummary summary;
    };
+
+   struct RunReportOptions
+   {
+      RunReportOptions(bool includeSettingsValue = false,
+                       bool includeGenerationSummariesValue = false)
+         : includeSettings(includeSettingsValue),
+           includeGenerationSummaries(includeGenerationSummariesValue)
+      {
+      }
+
+      bool includeSettings;
+      bool includeGenerationSummaries;
+   };
+
+   class RunReporter
+   {
+   public:
+      static void write(std::ostream& out,
+                        const Population& population,
+                        const RunResult& result,
+                        const RunReportOptions& options = RunReportOptions());
+   };
 private:
+   friend class RunReporter;
    bool populationInitialized;
    std::vector<std::unique_ptr<Chromosome> > populationTable;
    std::vector<double> fitnessTable;
@@ -111,11 +134,6 @@ private:
    int replacementSlotIndex(int offset) const;
    PopulationSummary buildPopulationSummary() const;
    RunResult executeInternal(bool captureGenerationSummaries);
-   void printSettingsSummary(std::ostream& out) const;
-   void printGenerationProgress(std::ostream& out, const GenerationReport& report, bool printSummary);
-   void reportRun(std::ostream& out, const RunResult& result, bool printGenerationSummaries);
-   void printPopulationSummary(std::ostream& out, const PopulationSummary& summary);
-   void printFinalSummary(std::ostream& out, const RunResult& result);
    int selectRandomParent();
    bool containsChromosome(const Chromosome& candidate,
                            const std::vector<std::unique_ptr<Chromosome> >& population,
@@ -148,7 +166,7 @@ public:
    explicit Population(const Settings& settings);
    virtual ~Population();
    virtual double evaluateFitness(const BaseString& genes)=0;
-   virtual void printCandidate(const BaseString& genes, std::ostream& out)=0;
+   virtual void printCandidate(const BaseString& genes, std::ostream& out) const=0;
    const Settings& settings() const noexcept { return settings_; }
    unsigned int randomSeed() const noexcept { return activeRandomSeed_; }
    std::mt19937& randomEngine() noexcept { return randomGenerator; }

@@ -45,7 +45,7 @@ double Spell::evaluateFitness(const BaseString& genes)
    return res;
 }
 
-void Spell::printCandidate(const BaseString& genes, std::ostream& out)
+void Spell::printCandidate(const BaseString& genes, std::ostream& out) const
 {
    for ( int i = 0 ; i < genes.length() ; i++ )
    {

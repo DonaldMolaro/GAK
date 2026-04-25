@@ -14,7 +14,7 @@ public:
    explicit SudokuConstrained(const Population::Settings& settings);
 
    double evaluateFitness(const BaseString& genes) override;
-   void printCandidate(const BaseString& genes, std::ostream& out) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) const override;
 
    static const int kBoardSize = 9;
    static const int kCellCount = 81;
