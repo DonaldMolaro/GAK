@@ -19,9 +19,10 @@ test:
 	$(MAKE) -C examples clean
 	$(MAKE) -C src clean
 	$(MAKE) -C src
-	$(MAKE) -C tests
-	$(MAKE) -C tests run
-	$(MAKE) -C examples test
+	$(MAKE) -C tests gak_tests
+	$(MAKE) -C examples example_tests
+	cd tests && ./gak_tests
+	cd examples && ./example_tests
 
 
 coverage:

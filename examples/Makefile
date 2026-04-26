@@ -15,7 +15,7 @@ EXAMPLE_SRCS = spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc lati
 EXAMPLE_OBJS = $(EXAMPLE_SRCS:.cc=.o)
 DEPS = $(OBJS:.o=.d) $(EXAMPLE_OBJS:.o=.d)
 
-.PHONY: all clean depen test run-tests
+.PHONY: all clean test run-tests
 
 all: $(OUTPUT)
 
@@ -32,9 +32,6 @@ $(TEST_OUTPUT): $(EXAMPLE_OBJS) ../src/libga.a
 
 %.o: %.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
-
-depen: $(DEPS)
-	cat $(DEPS) > all.depend
 
 run-tests: $(TEST_OUTPUT)
 	./$(TEST_OUTPUT)
