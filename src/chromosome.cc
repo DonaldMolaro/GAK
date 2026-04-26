@@ -1,25 +1,3 @@
-//
-// Genetic Algorithm Implementation.
-//
-// Author:
-//        Donald Molaro
-//
-// Genesis:        Sept 1994
-//
-// Added in other CrossOvers    Oct 2-3 1994
-//
-// Started implementation of variable length
-// chromosome strings.
-// Added in VERBOSE compilation flag.
-//                               Dec 23 1994
-// Completed implementation of variable length
-// chromosome strings...
-//                               Dec 24 1994
-//
-// Code cleanup. Added in exceptions.
-//                               January 2001
-//
-//
 #include <algorithm>
 #include <random>
 #include <utility>
@@ -64,9 +42,6 @@ Chromosome::BaseStringValue Chromosome::cloneBaseString(const BaseString& source
   return clone;
 }
 
-//
-// Chromosome implementation.
-//
 Chromosome::Chromosome(unsigned int requestedLength,
                        bool requestedVariableLength,
                        unsigned int requestedBaseStates,
@@ -76,19 +51,8 @@ Chromosome::Chromosome(unsigned int requestedLength,
     baseStates(requestedBaseStates),
     chromosomeString_(chromosomeLength,baseStates)
 {
-  //
-  // Randomly initialize the chromosome
-  // at the start of a population run.
-  //
-  /*
-   * There is no real practical limit on the length of a chromosome string.
-   * but a string that gets really too long is probably an error. Feel free
-   * to increase this limit.
-   */
   if (requestedLength > 2048)
-    throw GAFatalException(__FILE__,__LINE__,"Requested Chromosome Length over 2048. Proabably a mistake.");
-  //
-  //
+    throw GAFatalException(__FILE__,__LINE__,"Requested chromosome length over 2048. Probably a mistake.");
   std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
 
   if (baseStates == 2)
@@ -116,13 +80,6 @@ Chromosome::Chromosome(BaseString b, bool requestedVariableLength, unsigned int 
 {
 }
 
-//
-// based upon probablity, randomly set or clear a bit
-// in the string.
-//
-// Changes required for variable length chromosome support
-//            - none.
-//
 void Chromosome::mutate(double probability, std::mt19937* randomGenerator)
 {
   std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
@@ -150,43 +107,10 @@ void Chromosome::mutate(double probability, std::mt19937* randomGenerator)
       throw GANonFatalException(__FILE__,__LINE__,"SingleBitMutate called with an impossible probability. Ignored.");
     }
 }
-//
-// Private Internal function,
-//    Randomly deside if a chromosome pair will cross over.
-//
-//
 bool Chromosome::shouldCrossover(std::mt19937& randomGenerator, double crossoverRate)
 {
   return randomChance(randomGenerator, crossoverRate);
 }
-//
-//
-// Required Changes for variable length support.
-//
-//         - Select two crossover points; one spliting
-//           the father chromosomem one spliting the
-//           mother chromosome.
-//         - using these two cross over points cut
-//           the father into primary and secondary bitstrings
-//           cut mother into primary and secondary bitstrings.
-//
-//           01000101010001010101010101010101001010101     -- Father
-//           <<----FPrimary---->><<---FSecondary---->>
-//           1000101000100101010101010011010100            -- Mother
-//           <<--MPrimary-->><<--MSecondary-->>
-//
-//         - Generate two children son and daughter from the cut
-//           material.
-//
-//           01000101010001010101010101010011010100        -- Son
-//           <<----FPrimary---->><<--MSecondary-->>
-//           1000101000100101010101010101001010101         -- Daughter
-//           <<--MPrimary-->><<----FSecondary--->>
-//
-//
-//         - return the two children.
-//
-//
 std::pair<Chromosome::BaseStringValue, Chromosome::BaseStringValue>
 Chromosome::singlePointCrossOver(const BaseString& mother, const BaseString& father, std::mt19937& randomGenerator)
 {
@@ -243,19 +167,12 @@ Chromosome::singlePointCrossOver(const BaseString& mother, const BaseString& fat
     }
   return std::make_pair(std::move(boy), std::move(girl));
 }
-//
-//
 std::pair<Chromosome::BaseStringValue, Chromosome::BaseStringValue>
 Chromosome::twoPointCrossOver(const BaseString& mother, const BaseString& father, std::mt19937& randomGenerator)
 {
-  //
-  // A two point cross over is just two single points and some extra memory.
-  //
   std::pair<BaseStringValue, BaseStringValue> intermediate = singlePointCrossOver(mother,father,randomGenerator);
   return singlePointCrossOver(intermediate.second, intermediate.first,randomGenerator);
 }
-//
-//
 std::pair<Chromosome::BaseStringValue, Chromosome::BaseStringValue>
 Chromosome::uniformCrossOver(const BaseString& mother, const BaseString& father, std::mt19937& randomGenerator)
 {
@@ -263,14 +180,7 @@ Chromosome::uniformCrossOver(const BaseString& mother, const BaseString& father,
   BaseString girl(mother.length(),baseStates);
   if (this->variableLength)
     {
-      //
-      // A variable length uniform crossover randomly
-      // selects bits from the two parents until the end of
-      // one of the parent strings, it then copies the remaining
-      // bits into the appropriate sexed children.
-      //
       int copyLength = std::min(father.length(),mother.length());
-      // New chromosomes are made up of random bits of the two parents.
       for ( int i = 0 ; i < copyLength ; i++ )
 	{
 	  if (randomBit(randomGenerator) == 0)
@@ -295,7 +205,6 @@ Chromosome::uniformCrossOver(const BaseString& mother, const BaseString& father,
     }
   else
     {
-      // New chromosomes are made up of random bits of the two parents.
       for ( int i = 0 ; i < father.length() ; i++ )
 	{
 	  if (randomBit(randomGenerator) == 0)
@@ -312,28 +221,17 @@ Chromosome::uniformCrossOver(const BaseString& mother, const BaseString& father,
     }
   return std::make_pair(std::move(boy), std::move(girl));
 }
-//
-// Probabilsitcially mate two Chromosomes together, resultsing in two
-// children.
-//
 std::pair<Chromosome::ChromosomePtr, Chromosome::ChromosomePtr>
 Chromosome::mate(Chromosome& father,double crossoverRate,CrossoverType crossoverType,std::mt19937* randomGenerator)
 {
   std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
-  //
-  //
   if (!variableLength && (length() != father.length()))
     {
       throw GAFatalException(__FILE__,__LINE__,"Mismatch in chromosome strings");
     }
-  //
   std::pair<BaseStringValue, BaseStringValue> children =
     [&]() -> std::pair<BaseStringValue, BaseStringValue>
     {
-      //
-      // Only cross the chromosomes if we pass the
-      // crossOverRate test.
-      //
       if (shouldCrossover(generator,crossoverRate))
         {
           switch (crossoverType)
@@ -348,11 +246,6 @@ Chromosome::mate(Chromosome& father,double crossoverRate,CrossoverType crossover
 	      throw GANonFatalException(__FILE__,__LINE__,"Unimplemented crossover type");
 	    }
         }
-      //
-      // Failed the Cross over test. just copy the bits from
-      // the Father into the Son and the bits from the mother
-      // into the daughter.
-      //
       return std::make_pair(cloneBaseString(father.genes(),baseStates),
                             cloneBaseString(genes(),baseStates));
     }();

@@ -1,6 +1,5 @@
-#include <cstdio>
 #include <iostream>
-#include <random>
+
 #include "base.hh"
 #include "except.hh"
 #include "population.hh"
@@ -48,44 +47,4 @@ void Alpha::printCandidate(const BaseString& genes, std::ostream& out) const
       out << static_cast<char>(genes.valueAt(i) + 'a');
    }
    out << " ::";
-}
-
-int Alpha::runRandomAlgorithm(unsigned int seed, std::ostream& out)
-{
-   std::mt19937 generator(seed);
-   std::uniform_int_distribution<int> value_distribution(0, 12);
-   std::uniform_int_distribution<int> index_distribution(0, 12);
-   BaseString current(13,13);
-   BaseString next(13,13);
-   for ( int i = 0 ; i < 13 ; i++ )
-   {
-      current.setValue(i,value_distribution(generator));
-   }
-   int fitness = evaluateFitness(current);
-   int iter = 0;
-   while (fitness < 650)
-   {
-      for ( int i = 0 ; i < 13 ; i++ )
-      {
-	 next.setValue(i,current.valueAt(i));
-      }
-      int index = index_distribution(generator);
-      int value = value_distribution(generator);
-      next.setValue(index,value);
-      int nextFit = evaluateFitness(next);
-      if (nextFit > fitness)
-      {
-	 current = next;
-	 next = BaseString(13,13);
-	 fitness = nextFit;
-	 printCandidate(current, out);
-	 out << "Iteration " << iter << " New Fitness " << fitness << '\n';
-      }
-      if (( iter % 1000 ) == 0)
-      {
-	 out << "Iteration " << iter << '\n';
-      }
-      iter++;
-   }
-   return 0;
 }

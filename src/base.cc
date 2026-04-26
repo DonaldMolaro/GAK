@@ -1,20 +1,3 @@
-//
-// Genetic Algorithm Implementation.
-//
-// Author:
-//        Donald Molaro
-//
-// Genesis:        Sept 1994
-//
-// Changed bitstrings to a base string.
-//                 Dec 26 1994.
-//
-// Code Clean up & moved to lookup tables for
-// base locations. Moved to exceptions for
-// Error handling.
-//                 January 2001
-//
-
 #include <iostream>
 #include <string>
 
@@ -40,11 +23,11 @@ BaseString::BaseString(int length, int numStates)
 {
   if (length <= 0)
     {
-      throw GAFatalException(__FILE__,__LINE__,"Attempted to create non-sencical BaseString");
+      throw GAFatalException(__FILE__,__LINE__,"Attempted to create nonsensical BaseString");
     }
   if (numStates <= 1)
     {
-      throw GAFatalException(__FILE__,__LINE__,"Attempted to create non-sencical BaseString");
+      throw GAFatalException(__FILE__,__LINE__,"Attempted to create nonsensical BaseString");
     }
 
   stateCount   = numStates;
@@ -69,9 +52,6 @@ BaseString::BaseString(int length, int numStates)
 
 int BaseString::testBit(int i) const
 {
-  /*
-   * Dragons here...
-   */
   return ( ( i >= 0)&&(i < bitLength )
 	   ? ( ( bits[i >> 3] & ( 0x80 >> (i & 0x07) )) ? 1 : 0)
 	   : ( throw GAFatalException(__FILE__,__LINE__,"Attempted to TEST out of range bit"),0 ) );

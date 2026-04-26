@@ -1,22 +1,3 @@
-//
-// Population Module Genectic algorithim implementation.
-//
-// Author:
-//        Donald Molaro
-//
-// Revision History:
-//
-// Genesis         Sept 1994.
-// General Debugging and Documentation:
-//                 Sept 27 - 30 1994.
-//
-// Added in Options for not allowing duplicates in
-// population.     Oct 2-3 1994.
-//
-// Added in support for vaiable length chromosome strings
-// and symbolic ( rather than binary ) bases.
-//  
-//
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -201,18 +182,6 @@ bool Population::appendReplacement(std::vector<std::unique_ptr<Chromosome> >& re
 
    return false;
 }
-
-
-
-//
-// Outline of Genectic Algorithim taken from
-// 
-//    "Handbook of Genectic Algorithims"
-//     Ed. Lawrence Davis.
-//     Van Nostrand Reinhold, 1991.
-//
-// Expanded on significantly by author.
-//
 Population::RunResult Population::executeInternal(bool captureGenerationSummaries)
 {
    RunResult result;
