@@ -16,6 +16,7 @@ private:
   using ChromosomePtr = std::unique_ptr<Chromosome>;
   static int randomBit(std::mt19937& randomGenerator);
   static int randomIndex(std::mt19937& randomGenerator, int upperBoundExclusive);
+  static bool randomChance(std::mt19937& randomGenerator, double probability);
   int chromosomeLength;
   bool variableLength;
   int baseStates;

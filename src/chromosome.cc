@@ -48,6 +48,12 @@ int Chromosome::randomIndex(std::mt19937& randomGenerator, int upperBoundExclusi
   return distribution(randomGenerator);
 }
 
+bool Chromosome::randomChance(std::mt19937& randomGenerator, double probability)
+{
+  std::bernoulli_distribution distribution(probability);
+  return distribution(randomGenerator);
+}
+
 Chromosome::BaseStringValue Chromosome::cloneBaseString(const BaseString& source, int baseStates)
 {
   BaseString clone(source.length(), baseStates);
@@ -122,12 +128,9 @@ void Chromosome::mutate(double probability, std::mt19937* randomGenerator)
   std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
   if ((probability >= 0.0)&&(probability <= 1.0))
     {
-      int probabilityMask = static_cast<int>(probability * 65535.0);
-      std::uniform_int_distribution<int> distribution(0, 0xFFFF);
-
       for ( int i = 0 ; i < chromosomeLength ; i++ )
 	{
-	  if (distribution(generator) < probabilityMask)
+	  if (randomChance(generator, probability))
 	    {
 	      if (baseStates == 2)
 		{
@@ -154,9 +157,7 @@ void Chromosome::mutate(double probability, std::mt19937* randomGenerator)
 //
 bool Chromosome::shouldCrossover(std::mt19937& randomGenerator, double crossoverRate)
 {
-  int probabilityMask = static_cast<int>(crossoverRate * 65535.0);
-  std::uniform_int_distribution<int> distribution(0, 0xFFFF);
-  return distribution(randomGenerator) < probabilityMask;
+  return randomChance(randomGenerator, crossoverRate);
 }
 //
 //

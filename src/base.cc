@@ -15,7 +15,6 @@
 //                 January 2001
 //
 
-#include <cmath>
 #include <iostream>
 #include <string>
 
@@ -24,9 +23,16 @@
 
 namespace
 {
-double IntLog2(int x)
+int bitsRequiredForStates(int stateCount)
 {
-   return (std::log(static_cast<double>(x))/std::log(2.0));
+   int bits = 0;
+   int maxValue = stateCount - 1;
+   while (maxValue > 0)
+   {
+      ++bits;
+      maxValue >>= 1;
+   }
+   return bits > 0 ? bits : 1;
 }
 }
 
@@ -42,7 +48,7 @@ BaseString::BaseString(int length, int numStates)
     }
 
   stateCount   = numStates;
-  baseLength   = static_cast<int>(std::ceil(IntLog2(numStates)));
+  baseLength   = bitsRequiredForStates(numStates);
   stringLength = length;
   bitLength    = stringLength * baseLength;
   numBytes     = bitLength / 8;
