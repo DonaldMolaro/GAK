@@ -1,7 +1,7 @@
 .PHONY: all src examples tests example-tests test coverage coverage-lib clean
 
-LLVM_PROFDATA ?= $(shell xcrun --find llvm-profdata)
-LLVM_COV ?= $(shell xcrun --find llvm-cov)
+LLVM_PROFDATA ?= $(shell if command -v xcrun >/dev/null 2>&1; then xcrun --find llvm-profdata; else command -v llvm-profdata; fi)
+LLVM_COV ?= $(shell if command -v xcrun >/dev/null 2>&1; then xcrun --find llvm-cov; else command -v llvm-cov; fi)
 COVERAGE_DIR = coverage
 COMBINED_PROFDATA = $(COVERAGE_DIR)/combined.profdata
 COMBINED_REPORT = $(COVERAGE_DIR)/coverage.txt
