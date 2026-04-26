@@ -50,6 +50,13 @@ void expect_true(bool condition, const std::string& message)
     }
 }
 
+void expect_contains(const std::string& haystack,
+                     const std::string& needle,
+                     const std::string& message)
+{
+  expect_true(haystack.find(needle) != std::string::npos, message);
+}
+
 template <class ExceptionType, class Fn>
 void expect_throws(Fn fn, const std::string& message)
 {
@@ -120,9 +127,13 @@ void test_dome_fitness()
 {
   Dome dome;
   BaseString origin = makeBinaryString(std::string(32, '0'));
+  std::ostringstream out;
 
   expect_true(dome.evaluateFitness(origin) == 100,
               "Dome fitness at the origin should be 100");
+  dome.printCandidate(origin, out);
+  expect_contains(out.str(), "X ( 0 ) Y ( 0 )",
+                  "Dome should print decoded coordinates");
 }
 
 void test_f6_fitness_is_positive()
@@ -130,8 +141,12 @@ void test_f6_fitness_is_positive()
   F6 f6;
   BaseString origin = makeBinaryString(std::string(44, '0'));
   const double fitness = f6.evaluateFitness(origin);
+  std::ostringstream out;
 
   expect_true(fitness >= 1.0, "F6 fitness should stay positive");
+  f6.printCandidate(origin, out);
+  expect_contains(out.str(), "X ( -100 ) Y ( -100 )",
+                  "F6 should print shifted coordinates");
 }
 
 void test_spell_fitness_matches_target_word()
@@ -167,10 +182,29 @@ void test_alpha_prefers_sorted_alphabet()
     }
 
   const double sorted_fitness = alpha.evaluateFitness(sorted);
+  std::ostringstream out;
   expect_true(sorted_fitness > alpha.evaluateFitness(reversed),
               "Alpha fitness should prefer sorted sequences");
   expect_true(alpha.hasReachedSolution(population, sorted, sorted_fitness),
               "Alpha should report when a fully sorted alphabet has been found");
+  alpha.printCandidate(sorted, out);
+  expect_contains(out.str(), "abcdefghijklm ::",
+                  "Alpha should print symbolic candidates as letters");
+}
+
+void test_alpha_rejects_mismatched_population_settings()
+{
+  Population::Settings alpha_settings = make_options(Population::OperationMode::Maximize, 13,
+                                                     Population::VariableLengthMode::Variable, 13);
+  Population::Settings mismatched = alpha_settings;
+  mismatched.baseStates = 12;
+  Alpha alpha(alpha_settings);
+
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population invalid_population(mismatched, alpha);
+    },
+    "Alpha should reject mismatched population settings");
 }
 
 void test_traveling_salesman_construction_and_validation()
@@ -204,6 +238,19 @@ void test_traveling_salesman_construction_and_validation()
     }
   expect_true(tsp.evaluateFitness(route) > 0.0,
               "TravelingSalesman route fitness should be positive");
+  std::ostringstream route_out;
+  tsp.printCandidate(route, route_out);
+  expect_contains(route_out.str(), "abcde ::",
+                  "TravelingSalesman should print routes as symbolic city names");
+
+  std::ostringstream city_list_out;
+  tsp.writeCityList(city_list_out);
+  expect_contains(city_list_out.str(), "Problem input:",
+                  "TravelingSalesman should print an input section heading");
+  expect_contains(city_list_out.str(), "City list:",
+                  "TravelingSalesman should label its city list");
+  expect_contains(city_list_out.str(), "a:(",
+                  "TravelingSalesman should print named city coordinates");
 
   expect_throws<GAFatalException>(
     []() {
@@ -212,6 +259,17 @@ void test_traveling_salesman_construction_and_validation()
       TravelingSalesman impossible(bad_options, 2);
     },
     "TravelingSalesman should reject grids that cannot hold unique cities");
+
+  expect_throws<GAFatalException>(
+    []() {
+      Population::Settings bad_options = make_options(Population::OperationMode::Minimize, 5,
+                                                      Population::VariableLengthMode::Variable, 5);
+      TravelingSalesman impossible(bad_options, 0);
+      Population::Settings mismatched = bad_options;
+      mismatched.baseStates = 4;
+      Population invalid_population(mismatched, impossible);
+    },
+    "TravelingSalesman should reject mismatched population settings");
 }
 
 void test_traveling_salesman_fixed_seed_is_reproducible()
@@ -240,6 +298,7 @@ void test_nqueens_rewards_non_attacking_layouts()
   BaseString solution(8, 8);
   const int solved_rows[8] = {0, 4, 7, 5, 2, 6, 1, 3};
   BaseString bad(8, 8);
+  std::ostringstream out;
   for (int i = 0 ; i < 8 ; i++)
     {
       solution.setValue(i, solved_rows[i]);
@@ -252,6 +311,11 @@ void test_nqueens_rewards_non_attacking_layouts()
               "NQueens should rank a solved layout above a conflicting one");
   expect_true(queens.hasReachedSolution(population, solution, queens.evaluateFitness(solution)),
               "NQueens should report when a non-attacking layout has been found");
+  queens.printCandidate(solution, out);
+  expect_contains(out.str(), "Queens:",
+                  "NQueens should print row assignments");
+  expect_contains(out.str(), "Q",
+                  "NQueens should print a board view");
 }
 
 void test_knapsack_prefers_feasible_high_value_selections()
@@ -260,11 +324,22 @@ void test_knapsack_prefers_feasible_high_value_selections()
 
   BaseString feasible = makeBinaryString("111101100000");
   BaseString overweight = makeBinaryString("111111111111");
+  BaseString zeroed = makeBinaryString("000000000000");
+  std::ostringstream out;
 
   expect_true(knapsack.evaluateFitness(feasible) > 0.0,
               "Knapsack should assign positive fitness to a feasible selection");
   expect_true(knapsack.evaluateFitness(feasible) > knapsack.evaluateFitness(overweight),
               "Knapsack should penalize overweight selections");
+  expect_true(knapsack.evaluateFitness(zeroed) == 0.0,
+              "Knapsack should return zero for an empty selection");
+  knapsack.printCandidate(feasible, out);
+  expect_contains(out.str(), "Items:",
+                  "Knapsack should print selected item labels");
+  expect_contains(out.str(), "weight=",
+                  "Knapsack should print total weight");
+  expect_contains(out.str(), "value=",
+                  "Knapsack should print total value");
 }
 
 void test_latin_square_rewards_unique_rows_and_columns()
@@ -279,6 +354,7 @@ void test_latin_square_rewards_unique_rows_and_columns()
     3, 0, 1, 2
   };
   BaseString bad(16, 4);
+  std::ostringstream out;
   for (int i = 0 ; i < 16 ; i++)
     {
       solution.setValue(i, solved_values[i]);
@@ -289,6 +365,32 @@ void test_latin_square_rewards_unique_rows_and_columns()
               "LatinSquare should score a solved 4x4 latin square at the maximum");
   expect_true(latin_square.evaluateFitness(solution) > latin_square.evaluateFitness(bad),
               "LatinSquare should rank a solved square above a degenerate one");
+  latin_square.printCandidate(solution, out);
+  expect_contains(out.str(), "Latin square (4x4):",
+                  "LatinSquare should print the board size");
+  expect_contains(out.str(), "0 1 2 3",
+                  "LatinSquare should print row values");
+}
+
+void test_latin_square_validation_rejects_bad_settings()
+{
+  LatinSquare latin_square;
+
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population::Settings bad = make_options(Population::OperationMode::Maximize, 15,
+                                              Population::VariableLengthMode::Fixed, 4);
+      Population invalid_population(bad, latin_square);
+    },
+    "LatinSquare should reject non-square chromosome lengths");
+
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population::Settings bad = make_options(Population::OperationMode::Maximize, 16,
+                                              Population::VariableLengthMode::Fixed, 5);
+      Population invalid_population(bad, latin_square);
+    },
+    "LatinSquare should reject base-state counts that do not match the square width");
 }
 
 void test_latin_square_run_path()
@@ -331,6 +433,7 @@ void test_sudoku_rewards_valid_solution_and_givens()
     2, 3, 4, 1, 7, 5, 0, 6, 8
   };
   BaseString bad(81, 9);
+  std::ostringstream out;
   for (int i = 0 ; i < 81 ; i++)
     {
       solution.setValue(i, actual_solution[i]);
@@ -344,6 +447,32 @@ void test_sudoku_rewards_valid_solution_and_givens()
               "Sudoku should rank a valid solved board above a degenerate one");
   expect_true(sudoku.hasReachedSolution(population, solution, solution_fitness),
               "Sudoku should report when a solved board has been found");
+  sudoku.printCandidate(solution, out);
+  expect_contains(out.str(), "Sudoku candidate:",
+                  "Sudoku should print a labeled board");
+  expect_contains(out.str(), "|",
+                  "Sudoku should print subgrid separators");
+}
+
+void test_sudoku_validation_rejects_bad_settings()
+{
+  Sudoku sudoku;
+
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population::Settings bad = make_options(Population::OperationMode::Maximize, 80,
+                                              Population::VariableLengthMode::Fixed, 9);
+      Population invalid_population(bad, sudoku);
+    },
+    "Sudoku should reject chromosome lengths other than 81");
+
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population::Settings bad = make_options(Population::OperationMode::Maximize, 81,
+                                              Population::VariableLengthMode::Fixed, 8);
+      Population invalid_population(bad, sudoku);
+    },
+    "Sudoku should reject base-state counts other than 9");
 }
 
 void test_sudoku_run_path()
@@ -486,6 +615,29 @@ void test_constrained_sudoku_fixed_seed_is_reproducible()
               "Constrained Sudoku should generate the same initial chromosome for a fixed seed");
 }
 
+void test_constrained_sudoku_validation_rejects_bad_settings()
+{
+  Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
+                                             Population::VariableLengthMode::Fixed, 9);
+  SudokuConstrained sudoku(options);
+
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population::Settings bad = options;
+      bad.chromosomeLength = 80;
+      Population invalid_population(bad, sudoku);
+    },
+    "Constrained Sudoku should reject chromosome lengths other than 81");
+
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population::Settings bad = options;
+      bad.baseStates = 8;
+      Population invalid_population(bad, sudoku);
+    },
+    "Constrained Sudoku should reject base-state counts other than 9");
+}
+
 }  // namespace
 
 int main()
@@ -494,17 +646,21 @@ int main()
   test_f6_fitness_is_positive();
   test_spell_fitness_matches_target_word();
   test_alpha_prefers_sorted_alphabet();
+  test_alpha_rejects_mismatched_population_settings();
   test_traveling_salesman_construction_and_validation();
   test_traveling_salesman_fixed_seed_is_reproducible();
   test_nqueens_rewards_non_attacking_layouts();
   test_knapsack_prefers_feasible_high_value_selections();
   test_latin_square_rewards_unique_rows_and_columns();
+  test_latin_square_validation_rejects_bad_settings();
   test_latin_square_run_path();
   test_sudoku_rewards_valid_solution_and_givens();
+  test_sudoku_validation_rejects_bad_settings();
   test_sudoku_run_path();
   test_constrained_sudoku_preserves_row_structure_and_givens();
   test_constrained_sudoku_run_path();
   test_constrained_sudoku_fixed_seed_is_reproducible();
+  test_constrained_sudoku_validation_rejects_bad_settings();
 
   if (g_failures != 0)
     {

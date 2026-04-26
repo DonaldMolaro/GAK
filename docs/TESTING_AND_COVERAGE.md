@@ -90,33 +90,34 @@ Generate coverage with:
 make coverage
 ```
 
-This rebuilds the library and the library test harness with LLVM coverage
-instrumentation enabled, runs the library tests, and writes reports under
-`tests/`.
+This rebuilds the library, the library test harness, and the example test
+harness with LLVM coverage instrumentation enabled. It then merges both test
+runs into one combined report focused on production `.cc` files.
 
 Generated coverage artifacts:
 
+- [coverage/combined.profdata](/Users/donaldmolaro/src/GAK/coverage/combined.profdata)
+- [coverage/coverage.txt](/Users/donaldmolaro/src/GAK/coverage/coverage.txt)
 - [tests/coverage.profraw](/Users/donaldmolaro/src/GAK/tests/coverage.profraw)
 - [tests/coverage.profdata](/Users/donaldmolaro/src/GAK/tests/coverage.profdata)
 - [tests/coverage.txt](/Users/donaldmolaro/src/GAK/tests/coverage.txt)
+- [examples/coverage.profraw](/Users/donaldmolaro/src/GAK/examples/coverage.profraw)
+- [examples/coverage.profdata](/Users/donaldmolaro/src/GAK/examples/coverage.profdata)
+- [examples/coverage.txt](/Users/donaldmolaro/src/GAK/examples/coverage.txt)
 
-The textual report in `coverage.txt` is the easiest place to inspect uncovered
-branches after a change.
+The combined annotated report in [coverage/coverage.txt](/Users/donaldmolaro/src/GAK/coverage/coverage.txt)
+is the easiest place to inspect uncovered branches after a change. The
+top-level combined report intentionally excludes test harness files and header
+files so the percentage reflects exercised production code.
 
-## Important Limitation
+If you want the original library-only flow, use:
 
-The current `make coverage` target measures the library test binary in `tests/`.
-It does not currently combine in the example test harness from `examples/`.
+```sh
+make coverage-lib
+```
 
-That means:
-
-- core library coverage is measured directly
-- example coverage should still be maintained with `make example-tests`
-- example-only code paths may be well tested without showing up in the coverage
-  percentage
-
-If you extend the examples significantly, it is still worth adding focused
-example tests even when those branches are not part of the coverage summary.
+That keeps the narrower `tests/`-only report when you only want to measure the
+core engine.
 
 ## Good Testing Habits In This Repo
 
