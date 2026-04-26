@@ -233,6 +233,9 @@ void test_traveling_salesman_fixed_seed_is_reproducible()
 void test_nqueens_rewards_non_attacking_layouts()
 {
   NQueens queens;
+  Population::Settings settings = make_options(Population::OperationMode::Maximize, 8,
+                                               Population::VariableLengthMode::Fixed, 8);
+  Population population(settings, queens);
 
   BaseString solution(8, 8);
   const int solved_rows[8] = {0, 4, 7, 5, 2, 6, 1, 3};
@@ -247,6 +250,8 @@ void test_nqueens_rewards_non_attacking_layouts()
               "NQueens should score a solved 8-queen layout with all non-attacking pairs");
   expect_true(queens.evaluateFitness(solution) > queens.evaluateFitness(bad),
               "NQueens should rank a solved layout above a conflicting one");
+  expect_true(queens.hasReachedSolution(population, solution, queens.evaluateFitness(solution)),
+              "NQueens should report when a non-attacking layout has been found");
 }
 
 void test_knapsack_prefers_feasible_high_value_selections()

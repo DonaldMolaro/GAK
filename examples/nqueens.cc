@@ -47,3 +47,10 @@ void NQueens::printCandidate(const BaseString& genes, std::ostream& out) const
       out << '\n';
    }
 }
+
+bool NQueens::hasReachedSolution(const Population&, const BaseString& genes, double fitness) const
+{
+   const int boardSize = genes.length();
+   const double maximumNonAttackingPairs = static_cast<double>(boardSize * (boardSize - 1) / 2);
+   return fitness >= maximumNonAttackingPairs;
+}
