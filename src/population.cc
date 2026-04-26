@@ -42,6 +42,25 @@ bool IsVerboseEnabled()
 
 Population::Population(const Settings& settings)
    : populationInitialized(false),
+     problem_(*this),
+     settings_(settings),
+     activeRandomSeed_(0)
+{
+   if (settings_.useFixedRandomSeed)
+   {
+      setRandomSeed(settings_.randomSeed);
+   }
+   else
+   {
+      std::time_t currenttime;
+      std::time(&currenttime);
+      setRandomSeed(static_cast<unsigned int>(currenttime));
+   }
+}
+
+Population::Population(const Settings& settings, PopulationProblem& problem)
+   : populationInitialized(false),
+     problem_(problem),
      settings_(settings),
      activeRandomSeed_(0)
 {
@@ -59,19 +78,44 @@ Population::Population(const Settings& settings)
 
 Population::~Population() = default;
 
-void Population::setInitializationStrategy(std::unique_ptr<InitializationStrategy> strategy)
+double Population::evaluateFitness(const BaseString& genes)
 {
-   initializationStrategy_ = std::move(strategy);
+   if (&problem_ == this)
+   {
+      throw GAFatalException(__FILE__,__LINE__,"Population requires a problem implementation");
+   }
+   return problem_.evaluateFitness(genes);
 }
 
-void Population::setMatingStrategy(std::unique_ptr<MatingStrategy> strategy)
+void Population::printCandidate(const BaseString& genes, std::ostream& out) const
 {
-   matingStrategy_ = std::move(strategy);
+   if (&problem_ == this)
+   {
+      throw GAFatalException(__FILE__,__LINE__,"Population requires a problem implementation");
+   }
+   problem_.printCandidate(genes, out);
 }
 
-void Population::setMutationStrategy(std::unique_ptr<MutationStrategy> strategy)
+std::unique_ptr<Chromosome> PopulationProblem::initializeCandidate(Population& population)
 {
-   mutationStrategy_ = std::move(strategy);
+   return std::make_unique<Chromosome>(population.settings().geneticDiversity,
+                                       population.settings().variableLength == Population::VariableLengthMode::Variable,
+                                       population.settings().baseStates,
+                                       &population.randomEngine());
+}
+
+std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+PopulationProblem::mateCandidates(Population& population, Chromosome& mother, Chromosome& father)
+{
+   return mother.mate(father,
+                      population.settings().crossOverRate,
+                      Chromosome::CrossoverType::SinglePoint,
+                      &population.randomEngine());
+}
+
+void PopulationProblem::mutateCandidate(Population& population, Chromosome& chromosome)
+{
+   chromosome.mutate(population.settings().bitMutationRate, &population.randomEngine());
 }
 
 void Population::setRandomSeed(unsigned int seed)
@@ -266,7 +310,7 @@ void Population::RunReporter::write(std::ostream& out,
 
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
-         population.printCandidate(population.populationTable[(population.settings_.numberOfIndividuals - 1) - i].get()->genes(), out);
+         population.problem_.printCandidate(population.populationTable[(population.settings_.numberOfIndividuals - 1) - i].get()->genes(), out);
          out << "(F = " << std::fixed << std::setprecision(8) << summary.mostFit[i]
              << ")\n" << std::defaultfloat;
       }
@@ -278,7 +322,7 @@ void Population::RunReporter::write(std::ostream& out,
 
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
-         population.printCandidate(population.populationTable[i].get()->genes(), out);
+         population.problem_.printCandidate(population.populationTable[i].get()->genes(), out);
          out << "(F = " << std::fixed << std::setprecision(8) << summary.leastFit[i]
              << ")\n" << std::defaultfloat;
       }
@@ -316,7 +360,7 @@ void Population::RunReporter::write(std::ostream& out,
       case Population::OperationMode::Maximize:
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
-	 population.printCandidate(population.populationTable[(population.settings_.numberOfIndividuals - 1) - i].get()->genes(), out);
+	 population.problem_.printCandidate(population.populationTable[(population.settings_.numberOfIndividuals - 1) - i].get()->genes(), out);
 	 out << std::fixed << std::setprecision(6) << result.finalSummary.mostFit[i]
              << '\n' << std::defaultfloat;
       }
@@ -324,7 +368,7 @@ void Population::RunReporter::write(std::ostream& out,
       case Population::OperationMode::Minimize:
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
-	 population.printCandidate(population.populationTable[i].get()->genes(), out);
+	 population.problem_.printCandidate(population.populationTable[i].get()->genes(), out);
 	 out << std::fixed << std::setprecision(6) << result.finalSummary.leastFit[i]
              << '\n' << std::defaultfloat;
       }
@@ -374,7 +418,7 @@ void Population::evaluatePopulation()
    {
       if (fitnessTable[i] < 0.0)
       {
-	 fitnessTable[i] = evaluateFitness(populationTable[i].get()->genes());
+	 fitnessTable[i] = problem_.evaluateFitness(populationTable[i].get()->genes());
       }
    }
    sortPopulation();
@@ -529,11 +573,7 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
 
 std::unique_ptr<Chromosome> Population::createInitialChromosome()
 {
-   if (initializationStrategy_)
-   {
-      return initializationStrategy_->create(*this);
-   }
-   return createDefaultChromosome();
+   return problem_.initializeCandidate(*this);
 }
 
 std::unique_ptr<Chromosome> Population::createDefaultChromosome()
@@ -547,11 +587,7 @@ std::unique_ptr<Chromosome> Population::createDefaultChromosome()
 std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
 Population::mateChromosomes(Chromosome& mother, Chromosome& father)
 {
-   if (matingStrategy_)
-   {
-      return matingStrategy_->mate(*this, mother, father);
-   }
-   return mateDefaultChromosomes(mother, father);
+   return problem_.mateCandidates(*this, mother, father);
 }
 
 std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
@@ -562,12 +598,7 @@ Population::mateDefaultChromosomes(Chromosome& mother, Chromosome& father)
 
 void Population::mutateChromosome(Chromosome& chromosome)
 {
-   if (mutationStrategy_)
-   {
-      mutationStrategy_->mutate(*this, chromosome);
-      return;
-   }
-   mutateDefaultChromosome(chromosome);
+   problem_.mutateCandidate(*this, chromosome);
 }
 
 void Population::mutateDefaultChromosome(Chromosome& chromosome)

@@ -9,31 +9,22 @@
 
 class BaseString;
 class Chromosome;
+class Population;
 
-class Population {
+class PopulationProblem
+{
 public:
-   class InitializationStrategy
-   {
-   public:
-      virtual ~InitializationStrategy() = default;
-      virtual std::unique_ptr<Chromosome> create(Population& population) = 0;
-   };
+   virtual ~PopulationProblem() = default;
+   virtual double evaluateFitness(const BaseString& genes) = 0;
+   virtual void printCandidate(const BaseString& genes, std::ostream& out) const = 0;
+   virtual std::unique_ptr<Chromosome> initializeCandidate(Population& population);
+   virtual std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+      mateCandidates(Population& population, Chromosome& mother, Chromosome& father);
+   virtual void mutateCandidate(Population& population, Chromosome& chromosome);
+};
 
-   class MatingStrategy
-   {
-   public:
-      virtual ~MatingStrategy() = default;
-      virtual std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-         mate(Population& population, Chromosome& mother, Chromosome& father) = 0;
-   };
-
-   class MutationStrategy
-   {
-   public:
-      virtual ~MutationStrategy() = default;
-      virtual void mutate(Population& population, Chromosome& chromosome) = 0;
-   };
-
+class Population : public PopulationProblem {
+public:
    struct Settings;
    struct GenerationReport;
    enum class OperationMode { Minimize, Maximize };
@@ -116,10 +107,8 @@ private:
    std::vector<double> fitnessTable;
    std::vector<double> windowedFitnessTable;
    std::vector<double> linearNormalizedfitnessTable;
+   PopulationProblem& problem_;
    Settings settings_;
-   std::unique_ptr<InitializationStrategy> initializationStrategy_;
-   std::unique_ptr<MatingStrategy> matingStrategy_;
-   std::unique_ptr<MutationStrategy> mutationStrategy_;
    std::mt19937 randomGenerator;
    unsigned int activeRandomSeed_;
    static const int kSummaryCount = 5;
@@ -139,9 +128,6 @@ protected:
 			  std::unique_ptr<Chromosome> candidate,
 			  int numberToReplace,
 			  bool allowDuplicates);
-   void setInitializationStrategy(std::unique_ptr<InitializationStrategy> strategy);
-   void setMatingStrategy(std::unique_ptr<MatingStrategy> strategy);
-   void setMutationStrategy(std::unique_ptr<MutationStrategy> strategy);
    std::unique_ptr<Chromosome> createInitialChromosome();
    std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
       mateChromosomes(Chromosome& mother, Chromosome& father);
@@ -162,9 +148,10 @@ protected:
    void setPopulationInitialized(bool initialized) noexcept { populationInitialized = initialized; }
 public:
    explicit Population(const Settings& settings);
+   Population(const Settings& settings, PopulationProblem& problem);
    virtual ~Population();
-   virtual double evaluateFitness(const BaseString& genes)=0;
-   virtual void printCandidate(const BaseString& genes, std::ostream& out) const=0;
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) const override;
    const Settings& settings() const noexcept { return settings_; }
    unsigned int randomSeed() const noexcept { return activeRandomSeed_; }
    std::mt19937& randomEngine() noexcept { return randomGenerator; }

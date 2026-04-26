@@ -10,61 +10,6 @@
 #include "population.hh"
 #include "sudoku_constrained.hh"
 
-namespace
-{
-class SudokuInitializationStrategy : public Population::InitializationStrategy
-{
-public:
-   explicit SudokuInitializationStrategy(SudokuConstrained& owner)
-      : owner_(owner)
-   {
-   }
-
-   std::unique_ptr<Chromosome> create(Population&) override
-   {
-      return owner_.createConstraintAwareInitialChromosome();
-   }
-
-private:
-   SudokuConstrained& owner_;
-};
-
-class SudokuMatingStrategy : public Population::MatingStrategy
-{
-public:
-   explicit SudokuMatingStrategy(SudokuConstrained& owner)
-      : owner_(owner)
-   {
-   }
-
-   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-   mate(Population&, Chromosome& mother, Chromosome& father) override
-   {
-      return owner_.mateConstraintAwareChromosomes(mother, father);
-   }
-
-private:
-   SudokuConstrained& owner_;
-};
-
-class SudokuMutationStrategy : public Population::MutationStrategy
-{
-public:
-   explicit SudokuMutationStrategy(SudokuConstrained& owner)
-      : owner_(owner)
-   {
-   }
-
-   void mutate(Population&, Chromosome& chromosome) override
-   {
-      owner_.mutateConstraintAwareChromosome(chromosome);
-   }
-
-private:
-   SudokuConstrained& owner_;
-};
-}
-
 const int SudokuConstrained::kPuzzle[SudokuConstrained::kCellCount] = {
    5, 3, 0, 0, 7, 0, 0, 0, 0,
    6, 0, 0, 1, 9, 5, 0, 0, 0,
@@ -109,10 +54,6 @@ SudokuConstrained::SudokuConstrained(const Population::Settings& settings)
          }
       }
    }
-
-   setInitializationStrategy(std::make_unique<SudokuInitializationStrategy>(*this));
-   setMatingStrategy(std::make_unique<SudokuMatingStrategy>(*this));
-   setMutationStrategy(std::make_unique<SudokuMutationStrategy>(*this));
 }
 
 void SudokuConstrained::validateSettings(const Population::Settings& settings) const
@@ -299,7 +240,7 @@ bool SudokuConstrained::rowIsValidPermutation(const BaseString& board, int row) 
    return true;
 }
 
-std::unique_ptr<Chromosome> SudokuConstrained::createConstraintAwareInitialChromosome()
+std::unique_ptr<Chromosome> SudokuConstrained::initializeCandidate(Population&)
 {
    BaseString board(kCellCount, kBoardSize);
    for ( int row = 0 ; row < kBoardSize ; row++ )
@@ -312,7 +253,7 @@ std::unique_ptr<Chromosome> SudokuConstrained::createConstraintAwareInitialChrom
 }
 
 std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-SudokuConstrained::mateConstraintAwareChromosomes(Chromosome& mother, Chromosome& father)
+SudokuConstrained::mateCandidates(Population&, Chromosome& mother, Chromosome& father)
 {
    std::uniform_real_distribution<double> probability(0.0, 1.0);
    std::uniform_int_distribution<int> parent_choice(0, 1);
@@ -347,7 +288,7 @@ SudokuConstrained::mateConstraintAwareChromosomes(Chromosome& mother, Chromosome
                                    settings().baseStates));
 }
 
-void SudokuConstrained::mutateConstraintAwareChromosome(Chromosome& chromosome)
+void SudokuConstrained::mutateCandidate(Population&, Chromosome& chromosome)
 {
    const double rowMutationRate = std::min(1.0, settings().bitMutationRate * kBoardSize);
    std::uniform_real_distribution<double> probability(0.0, 1.0);

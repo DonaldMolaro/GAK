@@ -136,9 +136,6 @@ public:
   using Population::createInitialChromosome;
   using Population::mateChromosomes;
   using Population::mutateChromosome;
-  using Population::setInitializationStrategy;
-  using Population::setMatingStrategy;
-  using Population::setMutationStrategy;
 
   double evaluateFitness(const BaseString& b) override
   {
@@ -148,12 +145,8 @@ public:
   void printCandidate(const BaseString&, std::ostream&) const override
   {
   }
-};
 
-class ConstantInitializationStrategy : public Population::InitializationStrategy
-{
-public:
-  std::unique_ptr<Chromosome> create(Population& population) override
+  std::unique_ptr<Chromosome> initializeCandidate(Population& population) override
   {
     BaseString genes(population.settings().geneticDiversity, population.settings().baseStates);
     for (int i = 0 ; i < genes.length() ; i++)
@@ -164,30 +157,36 @@ public:
                                         population.settings().variableLength == Population::VariableLengthMode::Variable,
                                         population.settings().baseStates);
   }
-};
 
-class SwappingMatingStrategy : public Population::MatingStrategy
-{
-public:
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-  mate(Population&, Chromosome& mother, Chromosome& father) override
+  mateCandidates(Population&, Chromosome& mother, Chromosome& father) override
   {
     BaseString first = father.genes();
     BaseString second = mother.genes();
     return std::make_pair(std::make_unique<Chromosome>(std::move(first)),
                           std::make_unique<Chromosome>(std::move(second)));
   }
-};
 
-class ZeroingMutationStrategy : public Population::MutationStrategy
-{
-public:
-  void mutate(Population&, Chromosome& chromosome) override
+  void mutateCandidate(Population&, Chromosome& chromosome) override
   {
     for (int i = 0 ; i < chromosome.length() ; i++)
       {
         chromosome.genes().clearValue(i);
       }
+  }
+};
+
+class ConstantProblem : public PopulationProblem
+{
+public:
+  double evaluateFitness(const BaseString& genes) override
+  {
+    return genes.valueAt(0);
+  }
+
+  void printCandidate(const BaseString& genes, std::ostream& out) const override
+  {
+    out << "External:" << genes.valueAt(0) << '\n';
   }
 };
 
@@ -301,6 +300,27 @@ void test_population_options_round_trip()
               "Settings should preserve fixed-seed mode");
   expect_true(settings.randomSeed == 4242U,
               "Settings should preserve the configured random seed");
+}
+
+void test_population_can_use_external_problem_object()
+{
+  ConstantProblem problem;
+  Population pop(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
+                                         Population::ReproductionMode::AllowDuplicates,
+                                         Population::ParentSelectionMode::RouletteWheel,
+                                         Population::DeletionMode::DeleteAll,
+                                         Population::FitnessMode::Evaluation,
+                                         Population::VariableLengthMode::Fixed, 2),
+                 problem);
+
+  Population::RunResult result = pop.execute(true);
+  expect_true(result.evaluations >= pop.settings().numberOfIndividuals,
+              "Population should be runnable with an external problem object");
+
+  std::ostringstream out;
+  pop.run(out, Population::RunReportOptions{true, true});
+  expect_true(out.str().find("External:") != std::string::npos,
+              "External problem objects should drive candidate formatting");
 }
 
 void test_base_string_error_paths()
@@ -1252,10 +1272,6 @@ void test_population_operator_strategies_override_default_hooks()
 						     Population::FitnessMode::Evaluation,
 						     Population::VariableLengthMode::Fixed, 2));
 
-  pop.setInitializationStrategy(std::make_unique<ConstantInitializationStrategy>());
-  pop.setMatingStrategy(std::make_unique<SwappingMatingStrategy>());
-  pop.setMutationStrategy(std::make_unique<ZeroingMutationStrategy>());
-
   std::unique_ptr<Chromosome> initial = pop.createInitialChromosome();
   for (int i = 0 ; i < initial->length() ; i++)
     {
@@ -1304,6 +1320,7 @@ int main()
 {
   test_base_string();
   test_population_options_round_trip();
+  test_population_can_use_external_problem_object();
   test_base_string_error_paths();
   test_base_string_print_helpers();
   test_exception_helpers();

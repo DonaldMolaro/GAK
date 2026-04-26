@@ -15,6 +15,10 @@ public:
 
    double evaluateFitness(const BaseString& genes) override;
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
+   std::unique_ptr<Chromosome> initializeCandidate(Population& population) override;
+   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+      mateCandidates(Population& population, Chromosome& mother, Chromosome& father) override;
+   void mutateCandidate(Population& population, Chromosome& chromosome) override;
 
    static const int kBoardSize = 9;
    static const int kCellCount = 81;
@@ -22,11 +26,6 @@ public:
    static const int kPuzzle[kCellCount];
 
    using RowColumns = std::vector<int>;
-
-   std::unique_ptr<Chromosome> createConstraintAwareInitialChromosome();
-   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-      mateConstraintAwareChromosomes(Chromosome& mother, Chromosome& father);
-   void mutateConstraintAwareChromosome(Chromosome& chromosome);
 
 private:
    void validateSettings(const Population::Settings& settings) const;
@@ -41,4 +40,3 @@ private:
    std::vector<RowColumns> mutableColumnsByRow_;
    std::vector<std::vector<int> > missingDigitsByRow_;
 };
-
