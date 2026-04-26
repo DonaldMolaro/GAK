@@ -15,7 +15,7 @@ double Square(double value)
 
 TravelingSalesman::TravelingSalesman(const Population::Settings& settings,
                                      int requestedGridSize)
-   : Population(settings),
+   : settings_(settings),
      numCities(settings.geneticDiversity),
      gridSize(requestedGridSize == 0 ? settings.geneticDiversity : requestedGridSize)
 {
@@ -34,9 +34,19 @@ TravelingSalesman::TravelingSalesman(const Population::Settings& settings,
       throw GAFatalException(__FILE__,__LINE__,"TravelingSalesman grid is too small for unique city coordinates");
    }
 
-   randomGenerator.seed(randomSeed());
-
+   randomGenerator.seed(settings_.useFixedRandomSeed ? settings_.randomSeed
+                                                     : std::random_device{}());
    initializeCityCoordinates();
+}
+
+void TravelingSalesman::validatePopulation(const Population& population) const
+{
+   if (population.settings().geneticDiversity != settings_.geneticDiversity ||
+       population.settings().baseStates != settings_.baseStates ||
+       population.settings().variableLength != settings_.variableLength)
+   {
+      throw GAFatalException(__FILE__,__LINE__,"TravelingSalesman problem settings do not match population settings");
+   }
 }
 
 double TravelingSalesman::evaluateFitness(const BaseString& genes)

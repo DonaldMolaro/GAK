@@ -387,8 +387,10 @@ int main(int argc,char *argv[])
     case 'A':
     case 'a':
       {
-        Alpha alpha(applyOverrides(make_alpha_options(), cli));
-        return runPopulation(alpha, cli.showSettings);
+        Population::Settings settings = applyOverrides(make_alpha_options(), cli);
+        Alpha alpha(settings);
+        Population population(settings, alpha);
+        return runPopulation(population, cli.showSettings);
       }
     case 'S':
     case 's':
@@ -401,9 +403,11 @@ int main(int argc,char *argv[])
     case 't':
       {
         const int gridSize = cli.gridProvided ? cli.grid : 500;
-        TravelingSalesman travelingSalesman(applyOverrides(make_traveling_salesman_options(), cli), gridSize);
+        Population::Settings settings = applyOverrides(make_traveling_salesman_options(), cli);
+        TravelingSalesman travelingSalesman(settings, gridSize);
+        Population population(settings, travelingSalesman);
         travelingSalesman.writeCityList(std::cout);
-        return runPopulation(travelingSalesman, cli.showSettings);
+        return runPopulation(population, cli.showSettings);
       }
     case 'Q':
     case 'q':

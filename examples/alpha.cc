@@ -1,16 +1,24 @@
 #include <cstdio>
-#include <cmath>
 #include <iostream>
-#include <memory>
 #include <random>
 #include "base.hh"
-#include "chromosome.hh"
+#include "except.hh"
 #include "population.hh"
 #include "alpha.hh"
 
 Alpha::Alpha(const Population::Settings& settings)
-   : Population(settings)
+   : settings_(settings)
 {
+}
+
+void Alpha::validatePopulation(const Population& population) const
+{
+   if (population.settings().geneticDiversity != settings_.geneticDiversity ||
+       population.settings().baseStates != settings_.baseStates ||
+       population.settings().variableLength != settings_.variableLength)
+   {
+      throw GAFatalException(__FILE__,__LINE__,"Alpha problem settings do not match population settings");
+   }
 }
 
 double Alpha::evaluateFitness(const BaseString& genes)
@@ -42,9 +50,9 @@ void Alpha::printCandidate(const BaseString& genes, std::ostream& out) const
    out << " ::";
 }
 
-int Alpha::RandomAlgorithm()
+int Alpha::runRandomAlgorithm(unsigned int seed, std::ostream& out)
 {
-   std::mt19937 generator(randomSeed());
+   std::mt19937 generator(seed);
    std::uniform_int_distribution<int> value_distribution(0, 12);
    std::uniform_int_distribution<int> index_distribution(0, 12);
    BaseString current(13,13);
@@ -70,12 +78,12 @@ int Alpha::RandomAlgorithm()
 	 current = next;
 	 next = BaseString(13,13);
 	 fitness = nextFit;
-	 printCandidate(current, std::cerr);
-	 std::cerr << "Iteration " << iter << " New Fitness " << fitness << '\n';
+	 printCandidate(current, out);
+	 out << "Iteration " << iter << " New Fitness " << fitness << '\n';
       }
       if (( iter % 1000 ) == 0)
       {
-	 std::cerr << "Iteration " << iter << '\n';
+	 out << "Iteration " << iter << '\n';
       }
       iter++;
    }

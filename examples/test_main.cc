@@ -164,8 +164,10 @@ void test_alpha_prefers_sorted_alphabet()
 
 void test_traveling_salesman_construction_and_validation()
 {
-  TravelingSalesman tsp(make_options(Population::OperationMode::Minimize, 5,
-                                     Population::VariableLengthMode::Variable, 5), 10);
+  Population::Settings options = make_options(Population::OperationMode::Minimize, 5,
+                                              Population::VariableLengthMode::Variable, 5);
+  TravelingSalesman tsp(options, 10);
+  Population population(options, tsp);
 
   expect_true(static_cast<int>(tsp.cityCoordinates().size()) == 5,
               "TravelingSalesman should allocate one coordinate per city");
@@ -194,8 +196,9 @@ void test_traveling_salesman_construction_and_validation()
 
   expect_throws<GAFatalException>(
     []() {
-      TravelingSalesman impossible(make_options(Population::OperationMode::Minimize, 5,
-                                                Population::VariableLengthMode::Variable, 5), 2);
+      Population::Settings bad_options = make_options(Population::OperationMode::Minimize, 5,
+                                                      Population::VariableLengthMode::Variable, 5);
+      TravelingSalesman impossible(bad_options, 2);
     },
     "TravelingSalesman should reject grids that cannot hold unique cities");
 }
@@ -209,6 +212,8 @@ void test_traveling_salesman_fixed_seed_is_reproducible()
 
   TravelingSalesman first(options, 10);
   TravelingSalesman second(options, 10);
+  Population first_population(options, first);
+  Population second_population(options, second);
 
   expect_true(first.cityCoordinates() == second.cityCoordinates(),
               "TravelingSalesman should generate the same city coordinates for a fixed seed");
