@@ -25,4 +25,10 @@ public:
                      const Population& population,
                      const Population::RunResult& result,
                      const PopulationRunReportOptions& options = PopulationRunReportOptions());
+   static void writeJson(std::ostream& out,
+                         const Population& population,
+                         const Population::RunResult& result);
+   static void writeGenerationCsv(std::ostream& out,
+                                  const Population& population,
+                                  const Population::RunResult& result);
 };

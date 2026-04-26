@@ -1409,6 +1409,48 @@ void test_population_run_reporter_formats_execute_results()
 	      "RunReporter should render candidate output through printCandidate");
 }
 
+void test_population_run_reporter_writes_json()
+{
+  DefaultHookPopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+  Population::RunResult result = pop.execute(true);
+  std::ostringstream out;
+  PopulationReporter::writeJson(out, pop, result);
+  const std::string json = out.str();
+
+  expect_true(json.find("\"settings\"") != std::string::npos,
+	      "RunReporter JSON should include settings");
+  expect_true(json.find("\"chromosome_length\": 1") != std::string::npos,
+	      "RunReporter JSON should include chromosome length");
+  expect_true(json.find("\"result\"") != std::string::npos,
+	      "RunReporter JSON should include result data");
+  expect_true(json.find("\"generation_reports\"") != std::string::npos,
+	      "RunReporter JSON should include generation reports");
+}
+
+void test_population_run_reporter_writes_csv()
+{
+  DefaultHookPopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+  Population::RunResult result = pop.execute(true);
+  std::ostringstream out;
+  PopulationReporter::writeGenerationCsv(out, pop, result);
+  const std::string csv = out.str();
+
+  expect_true(csv.find("generation,evaluations,best_fitness,worst_fitness") == 0,
+	      "RunReporter CSV should include a header row");
+  expect_true(csv.find("0,12,") != std::string::npos,
+	      "RunReporter CSV should include generation progress rows");
+}
+
 void test_population_default_operator_hooks_are_explicitly_exercised()
 {
   DefaultHookPopulation pop(make_population_options(Population::OperationMode::Maximize, 4, 4, 6, 1.0, 0.0,
@@ -1544,6 +1586,8 @@ int main()
   test_population_stops_early_when_problem_reports_solution();
   test_population_run_output_contains_progress_and_final_summary();
   test_population_run_reporter_formats_execute_results();
+  test_population_run_reporter_writes_json();
+  test_population_run_reporter_writes_csv();
   test_population_default_operator_hooks_are_explicitly_exercised();
   test_population_operator_strategies_override_default_hooks();
   test_delete_all_but_best_runs();

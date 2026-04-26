@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -50,6 +51,8 @@ struct CliOptions
   double crossover = 0.0;
   bool gridProvided = false;
   int grid = 0;
+  std::string reportJsonPath;
+  std::string reportCsvPath;
 };
 
 void printSectionHeading(const std::string& title)
@@ -435,6 +438,8 @@ void usage(std::ostream& out)
   out << "  --mutation R      Override mutation rate\n";
   out << "  --crossover R     Override crossover rate\n";
   out << "  --grid N          Override TSP grid size\n";
+  out << "  --report-json P   Write a structured JSON run report to path P\n";
+  out << "  --report-csv P    Write per-generation CSV progress to path P\n";
   out << "  --show-settings   Print the resolved settings report before the final summary\n";
   out << "  --help            Show this help\n";
 }
@@ -521,6 +526,14 @@ bool parseCliOptions(int argc, char* argv[], CliOptions& options)
       options.gridProvided = parseInt(value, options.grid);
       if (!options.gridProvided) return false;
     }
+    else if (arg == "--report-json")
+    {
+      options.reportJsonPath = value;
+    }
+    else if (arg == "--report-csv")
+    {
+      options.reportCsvPath = value;
+    }
     else
     {
       return false;
@@ -556,22 +569,41 @@ Population::Settings applyOverrides(Population::Settings options, const CliOptio
   return options;
 }
 
-int runPopulation(Population& population, bool showSettings)
+int runPopulation(Population& population, const CliOptions& cli)
 {
+  const bool verbose = std::getenv("GAK_VERBOSE") != nullptr;
+  const bool captureGenerationSummaries = verbose ||
+                                          !cli.reportJsonPath.empty() ||
+                                          !cli.reportCsvPath.empty();
   printGaParameters(population.settings());
-  if (showSettings)
+  Population::RunResult result = population.execute(captureGenerationSummaries);
+  PopulationReporter::write(std::cout,
+                            population,
+                            result,
+                            PopulationRunReportOptions(cli.showSettings, captureGenerationSummaries));
+
+  if (!cli.reportJsonPath.empty())
   {
-    Population::RunResult result = population.execute(false);
-    PopulationReporter::write(std::cout,
-                                   population,
-                                   result,
-                                   PopulationRunReportOptions(true, false));
+    std::ofstream jsonOut(cli.reportJsonPath.c_str());
+    if (!jsonOut)
+    {
+      std::cerr << "Failed to open JSON report path: " << cli.reportJsonPath << '\n';
+      return EXIT_FAILURE;
+    }
+    PopulationReporter::writeJson(jsonOut, population, result);
   }
-  else
+
+  if (!cli.reportCsvPath.empty())
   {
-    const bool verbose = std::getenv("GAK_VERBOSE") != nullptr;
-    population.run(std::cout, PopulationRunReportOptions{verbose, verbose});
+    std::ofstream csvOut(cli.reportCsvPath.c_str());
+    if (!csvOut)
+    {
+      std::cerr << "Failed to open CSV report path: " << cli.reportCsvPath << '\n';
+      return EXIT_FAILURE;
+    }
+    PopulationReporter::writeGenerationCsv(csvOut, population, result);
   }
+
   return EXIT_SUCCESS;
 }
 }
@@ -593,14 +625,14 @@ int main(int argc,char *argv[])
         printDomeInput();
         Dome dome;
         Population population(applyOverrides(make_dome_options(), cli), dome);
-        return runPopulation(population, cli.showSettings);
+        return runPopulation(population, cli);
       }
     case '6':
       {
         printF6Input();
         F6 f6;
         Population population(applyOverrides(make_f6_options(), cli), f6);
-        return runPopulation(population, cli.showSettings);
+        return runPopulation(population, cli);
       }
     case 'A':
     case 'a':
@@ -609,7 +641,7 @@ int main(int argc,char *argv[])
         Population::Settings settings = applyOverrides(make_alpha_options(), cli);
         Alpha alpha(settings);
         Population population(settings, alpha);
-        return runPopulation(population, cli.showSettings);
+        return runPopulation(population, cli);
       }
     case 'S':
     case 's':
@@ -617,7 +649,7 @@ int main(int argc,char *argv[])
         printSpellInput();
         Spell spell;
         Population population(applyOverrides(make_spell_options(), cli), spell);
-        return runPopulation(population, cli.showSettings);
+        return runPopulation(population, cli);
       }
     case 'T':
     case 't':
@@ -627,7 +659,7 @@ int main(int argc,char *argv[])
         TravelingSalesman travelingSalesman(settings, gridSize);
         Population population(settings, travelingSalesman);
         travelingSalesman.writeCityList(std::cout);
-        return runPopulation(population, cli.showSettings);
+        return runPopulation(population, cli);
       }
     case 'Q':
     case 'q':
@@ -635,7 +667,7 @@ int main(int argc,char *argv[])
         printNQueensInput();
         NQueens queens;
         Population population(applyOverrides(make_nqueens_options(), cli), queens);
-        return runPopulation(population, cli.showSettings);
+        return runPopulation(population, cli);
       }
     case 'K':
     case 'k':
@@ -643,7 +675,7 @@ int main(int argc,char *argv[])
         printKnapsackInput();
         Knapsack knapsack;
         Population population(applyOverrides(make_knapsack_options(), cli), knapsack);
-        return runPopulation(population, cli.showSettings);
+        return runPopulation(population, cli);
       }
     case 'L':
     case 'l':
@@ -651,7 +683,7 @@ int main(int argc,char *argv[])
         printLatinSquareInput();
         LatinSquare latinSquare;
         Population population(applyOverrides(make_latin_square_options(), cli), latinSquare);
-        return runPopulation(population, cli.showSettings);
+        return runPopulation(population, cli);
       }
     case 'U':
     case 'u':
@@ -659,7 +691,7 @@ int main(int argc,char *argv[])
         printSudokuPuzzle();
         Sudoku sudoku;
         Population population(applyOverrides(make_sudoku_options(), cli), sudoku);
-        return runPopulation(population, cli.showSettings);
+        return runPopulation(population, cli);
       }
     case 'C':
     case 'c':
@@ -668,7 +700,7 @@ int main(int argc,char *argv[])
         Population::Settings settings = applyOverrides(make_constrained_sudoku_options(), cli);
         SudokuConstrained sudoku(settings);
         Population population(settings, sudoku);
-        return runPopulation(population, cli.showSettings);
+        return runPopulation(population, cli);
       }
     default:
       usage(std::cerr);
