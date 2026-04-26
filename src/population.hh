@@ -7,6 +7,12 @@
 #include <utility>
 #include <vector>
 
+#if __cplusplus >= 201703L
+#define GAK_NODISCARD [[nodiscard]]
+#else
+#define GAK_NODISCARD
+#endif
+
 class BaseString;
 class Chromosome;
 class Population;
@@ -140,7 +146,7 @@ public:
    void setDeletionMode(DeletionMode mode) noexcept { settings_.deletion = mode; }
    void setFitnessMode(FitnessMode mode) noexcept { settings_.fitness = mode; }
    // Run the GA silently and return a structured summary.
-   [[nodiscard]] RunResult execute(bool captureGenerationSummaries = false);
+   GAK_NODISCARD RunResult execute(bool captureGenerationSummaries = false);
    void run(std::ostream& out, const class PopulationRunReportOptions& options);
    // Compatibility wrapper around `execute()` that prints progress/summaries.
    void run();
@@ -154,3 +160,5 @@ private:
    int bestCandidateIndex() const;
    bool hasReachedSolution() const;
 };
+
+#undef GAK_NODISCARD

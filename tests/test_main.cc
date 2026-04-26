@@ -1543,7 +1543,9 @@ int main()
   test_population_fixed_seed_makes_runs_reproducible();
   test_population_stops_early_when_problem_reports_solution();
   test_population_run_output_contains_progress_and_final_summary();
+  test_population_run_reporter_formats_execute_results();
   test_population_default_operator_hooks_are_explicitly_exercised();
+  test_population_operator_strategies_override_default_hooks();
   test_delete_all_but_best_runs();
 
   if (g_failures != 0)

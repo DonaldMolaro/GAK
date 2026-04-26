@@ -1,9 +1,12 @@
 AR ?= ar
 CXX ?= c++
 CXXFLAGS ?= -O2 -g -std=c++14
+WARNING_FLAGS = -Wall -Wextra -Wpedantic
 CPPFLAGS ?=
 CPPFLAGS += -I.
 DEPFLAGS = -MMD -MP
+
+CXXFLAGS += $(WARNING_FLAGS)
 
 ifeq ($(COVERAGE),1)
 CXXFLAGS += -fprofile-instr-generate -fcoverage-mapping

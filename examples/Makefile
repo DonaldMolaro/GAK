@@ -2,6 +2,7 @@ OUTPUT = GA
 TEST_OUTPUT = example_tests
 CXX ?= c++
 CXXFLAGS ?= -O2 -g -std=c++14
+WARNING_FLAGS = -Wall -Wextra -Wpedantic
 CPPFLAGS ?=
 CPPFLAGS += -I../include -I../src
 DEPFLAGS = -MMD -MP
@@ -13,6 +14,8 @@ LLVM_COV ?= $(shell xcrun --find llvm-cov)
 PROFRAW = coverage.profraw
 PROFDATA = coverage.profdata
 TEXT_REPORT = coverage.txt
+
+CXXFLAGS += $(WARNING_FLAGS)
 
 ifeq ($(COVERAGE),1)
 CXXFLAGS += -fprofile-instr-generate -fcoverage-mapping
