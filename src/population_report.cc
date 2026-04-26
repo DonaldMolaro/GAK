@@ -18,7 +18,7 @@ void PopulationReporter::write(std::ostream& out,
           << (settings.operation == Population::OperationMode::Minimize ? "Minimize" : "Maximize") << '\n';
       out << "Number of Individuals :: " << settings.numberOfIndividuals << '\n';
       out << "Number of Trials      :: " << settings.numberOfTrials << '\n';
-      out << "Genetic Diversity     :: " << settings.geneticDiversity << '\n';
+      out << "Chromosome Length     :: " << settings.chromosomeLength << '\n';
       out << "Mutation Rate         :: " << std::fixed << std::setprecision(4)
           << settings.bitMutationRate << '\n';
       out << "Cross Over Rate       :: " << std::fixed << std::setprecision(3)

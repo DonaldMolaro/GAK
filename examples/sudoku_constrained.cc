@@ -56,7 +56,7 @@ SudokuConstrained::SudokuConstrained(const Population::Settings& settings)
 void SudokuConstrained::validatePopulation(const Population& population) const
 {
    const Population::Settings& settings = population.settings();
-   if (settings.geneticDiversity != kCellCount)
+   if (settings.chromosomeLength != kCellCount)
    {
       throw GAFatalException(__FILE__,__LINE__,"SudokuConstrained expects 81 genes");
    }

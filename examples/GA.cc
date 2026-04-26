@@ -59,17 +59,17 @@ void printSectionHeading(const std::string& title)
 
 void printLabeledLine(const std::string& label, const std::string& value)
 {
-  std::cout << "  " << std::left << std::setw(16) << label << ": " << value << '\n';
+  std::cout << "  " << std::left << std::setw(18) << label << ": " << value << '\n';
 }
 
 void printLabeledLine(const std::string& label, int value)
 {
-  std::cout << "  " << std::left << std::setw(16) << label << ": " << value << '\n';
+  std::cout << "  " << std::left << std::setw(18) << label << ": " << value << '\n';
 }
 
 void printLabeledLine(const std::string& label, double value)
 {
-  std::cout << "  " << std::left << std::setw(16) << label << ": " << value << '\n';
+  std::cout << "  " << std::left << std::setw(18) << label << ": " << value << '\n';
 }
 
 void finishInputSection()
@@ -230,7 +230,7 @@ void printGaParameters(const Population::Settings& settings)
   printLabeledLine("operation", operationLabel(settings.operation));
   printLabeledLine("population", settings.numberOfIndividuals);
   printLabeledLine("trials", settings.numberOfTrials);
-  printLabeledLine("diversity", settings.geneticDiversity);
+  printLabeledLine("chromosome length", settings.chromosomeLength);
   printLabeledLine("base states", settings.baseStates);
   printLabeledLine("mutation", settings.bitMutationRate);
   printLabeledLine("crossover", settings.crossOverRate);
@@ -257,7 +257,7 @@ Population::Settings make_dome_options()
   options.operation = Population::OperationMode::Minimize;
   options.numberOfIndividuals = 100;
   options.numberOfTrials = 4000;
-  options.geneticDiversity = 32;
+  options.chromosomeLength = 32;
   options.bitMutationRate = 0.008;
   options.crossOverRate = 0.65;
   options.reproduction = Population::ReproductionMode::DisallowDuplicates;
@@ -273,7 +273,7 @@ Population::Settings make_f6_options()
 {
   Population::Settings options = make_dome_options();
   options.numberOfTrials = 5000;
-  options.geneticDiversity = 44;
+  options.chromosomeLength = 44;
   return options;
 }
 
@@ -283,7 +283,7 @@ Population::Settings make_alpha_options()
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 1000;
   options.numberOfTrials = 160000;
-  options.geneticDiversity = 26;
+  options.chromosomeLength = 26;
   options.bitMutationRate = 0.008;
   options.crossOverRate = 0.65;
   options.reproduction = Population::ReproductionMode::DisallowDuplicates;
@@ -301,7 +301,7 @@ Population::Settings make_spell_options()
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 100;
   options.numberOfTrials = 8000;
-  options.geneticDiversity = 7;
+  options.chromosomeLength = 7;
   options.bitMutationRate = 0.008;
   options.crossOverRate = 0.65;
   options.reproduction = Population::ReproductionMode::DisallowDuplicates;
@@ -319,7 +319,7 @@ Population::Settings make_traveling_salesman_options()
   options.operation = Population::OperationMode::Minimize;
   options.numberOfIndividuals = 500;
   options.numberOfTrials = 200000;
-  options.geneticDiversity = 26;
+  options.chromosomeLength = 26;
   options.bitMutationRate = 0.008;
   options.crossOverRate = 0.65;
   options.reproduction = Population::ReproductionMode::DisallowDuplicates;
@@ -337,7 +337,7 @@ Population::Settings make_nqueens_options()
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 250;
   options.numberOfTrials = 15000;
-  options.geneticDiversity = 8;
+  options.chromosomeLength = 8;
   options.bitMutationRate = 0.015;
   options.crossOverRate = 0.75;
   options.reproduction = Population::ReproductionMode::DisallowDuplicates;
@@ -355,7 +355,7 @@ Population::Settings make_knapsack_options()
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 150;
   options.numberOfTrials = 12000;
-  options.geneticDiversity = 12;
+  options.chromosomeLength = 12;
   options.bitMutationRate = 0.01;
   options.crossOverRate = 0.70;
   options.reproduction = Population::ReproductionMode::DisallowDuplicates;
@@ -373,7 +373,7 @@ Population::Settings make_latin_square_options()
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 250;
   options.numberOfTrials = 15000;
-  options.geneticDiversity = 25;
+  options.chromosomeLength = 25;
   options.bitMutationRate = 0.02;
   options.crossOverRate = 0.75;
   options.reproduction = Population::ReproductionMode::DisallowDuplicates;
@@ -391,7 +391,7 @@ Population::Settings make_sudoku_options()
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 400;
   options.numberOfTrials = 20000;
-  options.geneticDiversity = 81;
+  options.chromosomeLength = 81;
   options.bitMutationRate = 0.02;
   options.crossOverRate = 0.75;
   options.reproduction = Population::ReproductionMode::DisallowDuplicates;

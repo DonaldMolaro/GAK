@@ -11,13 +11,13 @@
 void LatinSquare::validatePopulation(const Population& population) const
 {
    const Population::Settings& settings = population.settings();
-   if (settings.geneticDiversity <= 0)
+   if (settings.chromosomeLength <= 0)
    {
-      throw GAFatalException(__FILE__,__LINE__,"LatinSquare requires a positive genetic diversity");
+      throw GAFatalException(__FILE__,__LINE__,"LatinSquare requires a positive chromosome length");
    }
 
-   const int size = static_cast<int>(std::sqrt(static_cast<double>(settings.geneticDiversity)));
-   if ((size * size) != settings.geneticDiversity)
+   const int size = static_cast<int>(std::sqrt(static_cast<double>(settings.chromosomeLength)));
+   if ((size * size) != settings.chromosomeLength)
    {
       throw GAFatalException(__FILE__,__LINE__,"LatinSquare expects a square chromosome length");
    }

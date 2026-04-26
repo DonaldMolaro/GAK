@@ -1,6 +1,7 @@
 # GAK
 
-`GAK` is a small C++ genetic algorithm library with a set of example optimization and constraint-satisfaction problems.
+`GAK` is a small C++ genetic algorithm library with a set of example
+optimization and constraint-satisfaction problems.
 
 The project started as an older GA codebase and has been modernized to build cleanly on a current macOS C++ toolchain, with tests, example tests, safer ownership, and a more usable public configuration API.
 
@@ -151,14 +152,39 @@ Most modes print generation progress and then a best candidate summary at the
 end. Constraint problems usually become easiest to judge by reading the final
 printed board rather than by the raw score alone.
 
-## Public library shape
+## What Problems Fit Well
 
-The core type is `Population`, which you subclass to define a problem-specific fitness function and output formatter.
+`GAK` works best for problems where:
+
+- candidates can be encoded as gene strings
+- partial progress can be scored meaningfully
+- mutation/crossover are useful search tools
+
+Strong fits include:
+
+- binary decision problems like knapsack
+- symbolic search problems like spelling or ordering
+- constraint problems like N-Queens, Latin squares, and Sudoku
+- black-box numeric optimization benchmarks
+
+Some problems are especially strong fits only when they use custom operators.
+Sudoku is the clearest example in this repo.
+
+For a fuller discussion of where the library fits well and where it does not,
+see [docs/PROBLEM_FIT.md](/Users/donaldmolaro/src/GAK/docs/PROBLEM_FIT.md).
+
+## Public Library Shape
+
+The core design is now composition-based:
+
+- `Population` is the GA engine
+- `PopulationProblem` describes a problem
+- `Population::Settings` configures a run
 
 Important pieces:
 
 - [src/population.hh](/Users/donaldmolaro/src/GAK/src/population.hh)
-  Main GA engine and public configuration types
+  Main GA engine, `PopulationProblem`, and public configuration types
 - [src/chromosome.hh](/Users/donaldmolaro/src/GAK/src/chromosome.hh)
   Generic chromosome representation and built-in crossover/mutation
 - [src/base.hh](/Users/donaldmolaro/src/GAK/src/base.hh)
@@ -166,30 +192,49 @@ Important pieces:
 - [src/genetic.hh](/Users/donaldmolaro/src/GAK/src/genetic.hh)
   Umbrella include for the public library surface
 
-### Modern configuration API
+### Configuration API
 
-New code should prefer `Population::Options` and the `enum class` configuration values rather than the old positional constructors.
+New code should use `Population::Settings`.
 
 Example:
 
 ```cpp
-Population::Options options;
-options.operation = Population::OperationMode::Maximize;
-options.numberOfIndividuals = 150;
-options.numberOfTrials = 12000;
-options.geneticDiversity = 12;
-options.baseStates = 2;
+Population::Settings settings;
+settings.operation = Population::OperationMode::Maximize;
+settings.numberOfIndividuals = 150;
+settings.numberOfTrials = 12000;
+settings.chromosomeLength = 12;
+settings.baseStates = 2;
 ```
 
-## Constraint-aware operators
+### Minimal usage
 
-The library now supports subclass-specific operator overrides in `Population`:
+```cpp
+class MyProblem : public PopulationProblem
+{
+public:
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) const override;
+};
 
-- `createInitialChromosome()`
-- `mateChromosomes(...)`
-- `mutateChromosome(...)`
+Population::Settings settings;
+MyProblem problem;
+Population population(settings, problem);
+population.run();
+```
 
-The default engine still uses the classic generic chromosome behavior, but constrained examples can now provide problem-specific operators without rewriting the whole GA loop.
+## Constraint-Aware Operators
+
+The library supports problem-specific operator hooks through
+`PopulationProblem`:
+
+- `initializeCandidate(...)`
+- `mateCandidates(...)`
+- `mutateCandidate(...)`
+
+The default engine still uses the generic chromosome behavior, but structured
+problems can provide problem-specific operators without rewriting the main GA
+loop.
 
 This is especially important for problems like Sudoku, where the generic operators waste most of their effort breaking invariants that could instead be preserved by construction.
 
@@ -200,6 +245,22 @@ see [docs/SUDOKU_DESIGN.md](/Users/donaldmolaro/src/GAK/docs/SUDOKU_DESIGN.md).
 
 For the generic crossover strategies built into `Chromosome`, see
 [docs/CROSSOVER_MODES.md](/Users/donaldmolaro/src/GAK/docs/CROSSOVER_MODES.md).
+
+## Exact-Solution Early Stop
+
+Some problems know when they have found an exact solution. Those problems can
+implement `PopulationProblem::hasReachedSolution(...)`.
+
+Current examples that do this include:
+
+- `Spell`
+- `Alpha`
+- `NQueens`
+- `Sudoku`
+- `SudokuConstrained`
+
+When a solution is found, the engine stops early and reports it in
+`Population::RunResult`.
 
 ## Recommended examples to study
 
@@ -213,6 +274,9 @@ If you want to understand the project by reading a few files instead of everythi
 
 If you want to add a new example, start with
 [docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md).
+
+If you want practical guidance on running and tuning the demos, see
+[docs/RUNNING_DEMOS.md](/Users/donaldmolaro/src/GAK/docs/RUNNING_DEMOS.md).
 
 ## Current status
 
@@ -228,10 +292,17 @@ Removed:
 - old CVS repository metadata
 - the unsupported `remodel/` subtree
 
-## Next documentation targets
+## Documentation Map
 
-Good next steps after this README:
-
-- add richer API comments for the constraint-aware override hooks
-- add a short architecture note for `Population::execute()` and `RunResult`
-- add a small contribution guide for adding tests and examples together
+- [docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md)
+  How to build a new problem and wire it into the repo
+- [docs/PROBLEM_FIT.md](/Users/donaldmolaro/src/GAK/docs/PROBLEM_FIT.md)
+  What kinds of problems fit GAK well
+- [docs/RUNNING_DEMOS.md](/Users/donaldmolaro/src/GAK/docs/RUNNING_DEMOS.md)
+  How to run and tune the example modes
+- [docs/SUDOKU_DESIGN.md](/Users/donaldmolaro/src/GAK/docs/SUDOKU_DESIGN.md)
+  Why generic and constraint-aware Sudoku behave differently
+- [docs/CROSSOVER_MODES.md](/Users/donaldmolaro/src/GAK/docs/CROSSOVER_MODES.md)
+  Built-in generic crossover behavior
+- [docs/TESTING_AND_COVERAGE.md](/Users/donaldmolaro/src/GAK/docs/TESTING_AND_COVERAGE.md)
+  Test and coverage workflow

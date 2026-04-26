@@ -96,7 +96,7 @@ BaseString makeSymbolicString(const std::string& letters)
 }
 
 Population::Settings make_options(Population::OperationMode operation,
-                                 int diversity,
+                                 int chromosome_length,
                                  Population::VariableLengthMode variable_length,
                                  int base_states)
 {
@@ -104,7 +104,7 @@ Population::Settings make_options(Population::OperationMode operation,
   options.operation = operation;
   options.numberOfIndividuals = 6;
   options.numberOfTrials = 12;
-  options.geneticDiversity = diversity;
+  options.chromosomeLength = chromosome_length;
   options.bitMutationRate = 0.0;
   options.crossOverRate = 0.0;
   options.reproduction = Population::ReproductionMode::AllowDuplicates;

@@ -12,7 +12,7 @@ Alpha::Alpha(const Population::Settings& settings)
 
 void Alpha::validatePopulation(const Population& population) const
 {
-   if (population.settings().geneticDiversity != settings_.geneticDiversity ||
+   if (population.settings().chromosomeLength != settings_.chromosomeLength ||
        population.settings().baseStates != settings_.baseStates ||
        population.settings().variableLength != settings_.variableLength)
    {

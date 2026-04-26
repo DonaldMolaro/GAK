@@ -1,158 +1,227 @@
 # Writing New GAK Examples
 
-This project is built around subclassing `Population` with a problem-specific
-fitness function and, when needed, problem-specific genetic operators.
+This project is now built around composition:
 
-The best files to study before adding a new example are:
+- `Population` is the GA engine
+- `PopulationProblem` describes a problem
+- the engine runs a problem with a chosen `Population::Settings`
+
+That means new examples should normally implement a problem object, not
+subclass `Population`.
+
+Good files to study before adding a new example:
 
 1. [examples/nqueens.hh](/Users/donaldmolaro/src/GAK/examples/nqueens.hh) and [examples/nqueens.cc](/Users/donaldmolaro/src/GAK/examples/nqueens.cc)
 2. [examples/knapsack.hh](/Users/donaldmolaro/src/GAK/examples/knapsack.hh) and [examples/knapsack.cc](/Users/donaldmolaro/src/GAK/examples/knapsack.cc)
 3. [examples/sudoku_constrained.hh](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.hh) and [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
+4. [examples/GA.cc](/Users/donaldmolaro/src/GAK/examples/GA.cc)
 
-## Decide Which Style Of Example You Need
+## Choose The Right Example Style
 
 There are two main patterns in this repo.
 
-### Generic operator examples
+### Generic-operator problems
 
-Use the built-in chromosome mutation and crossover when the problem tolerates
-arbitrary gene-level edits well.
+Use the built-in initialization, crossover, and mutation when arbitrary
+gene-level edits are acceptable.
 
 Good fits:
 
-- binary optimization problems
-- symbolic search problems with soft constraints
-- simple demos where the representation does not need to preserve invariants
+- binary optimization
+- symbolic search with soft constraints
+- small toy and benchmark problems
 
 Examples:
 
+- `Dome`
+- `F6`
 - `NQueens`
 - `Knapsack`
 - `LatinSquare`
 
-For this style, you usually only need to override:
+For this style, you usually implement:
 
-- `FitnessFunction(BaseString *b)`
-- `FitnessPrint(BaseString *b)`
+- `evaluateFitness(...)`
+- `printCandidate(...)`
+- optionally `hasReachedSolution(...)`
 
-### Constraint-aware examples
+### Constraint-aware problems
 
-Use custom operators when generic mutation and crossover spend most of their
-time breaking structure that the problem really wants to preserve.
+Use custom operators when the default GA spends most of its time breaking
+structure that should really be preserved.
 
 Good fits:
 
 - Sudoku
 - timetable construction
-- routing with hard feasibility rules
-- permutation problems where validity should hold by construction
+- route/order problems with validity rules
+- permutation-like problems with locked cells or fixed positions
 
 Examples:
 
 - `SudokuConstrained`
 
-For this style, override:
+For this style, you usually implement:
 
-- `createInitialChromosome()`
-- `mateChromosomes(...)`
-- `mutateChromosome(...)`
-- plus the normal `FitnessFunction(...)` and `FitnessPrint(...)`
+- `evaluateFitness(...)`
+- `printCandidate(...)`
+- `initializeCandidate(...)`
+- `mateCandidates(...)`
+- `mutateCandidate(...)`
+- optionally `hasReachedSolution(...)`
 
-## Choose A Representation Carefully
+## Choose An Encoding Before You Write Fitness
 
-Most of the quality of a GA example comes from the encoding, not just the
-fitness function.
+Most GA quality comes from the representation, not the scoring function.
 
 Questions to answer first:
 
-- What does one gene represent?
-- How many gene positions are there?
-- How many states can each gene take?
-- Which constraints can be guaranteed by construction instead of punished later?
+- What does one gene mean?
+- How many genes are there?
+- How many values can each gene take?
+- Which constraints can be preserved by construction?
+- Can the problem recognize an exact solution?
 
 Examples:
 
 - `Knapsack`: one binary gene per item, `baseStates = 2`
-- `LatinSquare`: one symbolic gene per cell, `baseStates = N`
-- `SudokuConstrained`: one symbolic gene per cell, but initialization and
-  mutation preserve row validity and locked givens
+- `NQueens`: one symbolic gene per column, value = row
+- `LatinSquare`: one symbolic gene per cell, `baseStates = board width`
+- `SudokuConstrained`: one symbolic gene per cell, but operators preserve row
+  validity and locked givens
 
-Remember that `geneticDiversity` is the chromosome length in genes, not the
-number of symbols available. The symbol count is controlled separately by
-`baseStates`.
+Remember:
 
-## Configure The Population
+- `chromosomeLength` is chromosome length
+- `baseStates` is the number of representable values per gene
 
-New examples should prefer `Population::Options`.
+## Configure The Engine
+
+New examples should use `Population::Settings`.
 
 ```cpp
-Population::Options options;
-options.operation = Population::OperationMode::Maximize;
-options.numberOfIndividuals = 150;
-options.numberOfTrials = 12000;
-options.geneticDiversity = 64;
-options.baseStates = 2;
+Population::Settings settings;
+settings.operation = Population::OperationMode::Maximize;
+settings.numberOfIndividuals = 150;
+settings.numberOfTrials = 12000;
+settings.chromosomeLength = 64;
+settings.baseStates = 2;
+settings.bitMutationRate = 0.01;
+settings.crossOverRate = 0.70;
 ```
 
-The most important fields to set intentionally are:
+The most important fields to choose intentionally are:
 
 - `operation`
 - `numberOfIndividuals`
 - `numberOfTrials`
-- `geneticDiversity`
+- `chromosomeLength`
+- `baseStates`
 - `bitMutationRate`
 - `crossOverRate`
-- `baseStates`
+- `variableLength`
 
 ## Minimal Example Skeleton
 
 ```cpp
-class MyExample : public Population
+class MyProblem : public PopulationProblem
 {
 public:
-   explicit MyExample(const Population::Options& options)
-      : Population(options) {}
-
-   double FitnessFunction(BaseString *b) override;
-   void FitnessPrint(BaseString *b) override;
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) const override;
 };
 ```
 
-If the problem needs structure-preserving operators, add:
+Run it with:
 
 ```cpp
-protected:
-   std::unique_ptr<Chromosome> createInitialChromosome() override;
-   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-      mateChromosomes(Chromosome *mother, Chromosome *father) override;
-   void mutateChromosome(Chromosome *chromosome) override;
+Population::Settings settings;
+// ... fill settings ...
+
+MyProblem problem;
+Population population(settings, problem);
+population.run();
 ```
 
-## Hook It Into The Example Runner
+## Exact-Solution Detection
+
+Some problems know when they are solved exactly.
+
+Examples in this repo:
+
+- `Spell`
+- `Alpha`
+- `NQueens`
+- `Sudoku`
+- `SudokuConstrained`
+
+Those problems implement:
+
+```cpp
+bool hasReachedSolution(const Population& population,
+                        const BaseString& genes,
+                        double fitness) const override;
+```
+
+When this returns `true`, the engine stops early and reports:
+
+- `RunResult::solutionFound`
+- `RunResult::stoppedEarly`
+
+Use this hook when:
+
+- there is a known exact optimum
+- the fitness function can cheaply detect it
+- continuing the search after success has no value
+
+## Constraint-Aware Operator Skeleton
+
+```cpp
+class MyStructuredProblem : public PopulationProblem
+{
+public:
+   double evaluateFitness(const BaseString& genes) override;
+   void printCandidate(const BaseString& genes, std::ostream& out) const override;
+
+   std::unique_ptr<Chromosome> initializeCandidate(Population& population) override;
+   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+      mateCandidates(Population& population, Chromosome& mother, Chromosome& father) override;
+   void mutateCandidate(Population& population, Chromosome& chromosome) override;
+};
+```
+
+Use this when the problem needs to preserve invariants that the generic
+operators do not understand.
+
+## Hook A New Example Into The Repo
 
 To make a new example part of the supported tree:
 
-1. Add the new `.cc` and `.hh` files under `examples/`.
-2. Update [examples/Makefile](/Users/donaldmolaro/src/GAK/examples/Makefile).
-3. Add a mode to [examples/GA.cc](/Users/donaldmolaro/src/GAK/examples/GA.cc).
-4. Add focused checks to [examples/test_main.cc](/Users/donaldmolaro/src/GAK/examples/test_main.cc).
+1. Add the `.hh` and `.cc` files under `examples/`
+2. Update [examples/Makefile](/Users/donaldmolaro/src/GAK/examples/Makefile)
+3. Add a mode in [examples/GA.cc](/Users/donaldmolaro/src/GAK/examples/GA.cc)
+4. Add focused checks in [examples/test_main.cc](/Users/donaldmolaro/src/GAK/examples/test_main.cc)
 
 ## Testing Guidance
 
-A good example test suite should verify at least:
+A good example test should verify at least:
 
-- the example can be constructed with a sensible `Population::Options`
-- `FitnessFunction(...)` behaves correctly on one or two known cases
-- custom operators preserve their intended invariants
-- the example participates in a short successful run
+- the problem can be constructed
+- known fitness behavior on a few hand-built candidates
+- exact-solution detection if the problem supports it
+- operator invariants for structured problems
+- participation in a short successful run
 
-For constraint-aware examples, invariants matter more than exact final scores.
-Test what must remain true after initialization, mutation, and crossover.
+For constraint-aware problems, invariants matter more than exact final search
+paths.
 
 ## Practical Advice
 
-- Start with a representation that makes invalid states hard to create.
-- Use fitness to rank good candidates, not to repair obviously bad ones forever.
-- Keep example output readable in `FitnessPrint(...)`; this is part of the demo.
-- If an example needs a lot of domain-specific operator logic, that is usually a
-  sign you chose the right problem for the override hooks.
+- Start with the cleanest encoding you can find.
+- Use fitness to rank candidates, not to endlessly repair obviously broken
+  ones.
+- Implement `hasReachedSolution(...)` whenever the problem truly knows it has
+  won.
+- Keep `printCandidate(...)` readable; it is part of the demo experience.
+- If your example needs a lot of structure-preserving logic, that is usually a
+  sign the override hooks are the right tool.

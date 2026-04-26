@@ -64,7 +64,7 @@ bool PopulationProblem::hasReachedSolution(const Population&, const BaseString&,
 
 std::unique_ptr<Chromosome> PopulationProblem::initializeCandidate(Population& population)
 {
-   return std::make_unique<Chromosome>(population.settings().geneticDiversity,
+   return std::make_unique<Chromosome>(population.settings().chromosomeLength,
                                        population.settings().variableLength == Population::VariableLengthMode::Variable,
                                        population.settings().baseStates,
                                        &population.randomEngine());
@@ -460,7 +460,7 @@ std::unique_ptr<Chromosome> Population::createInitialChromosome()
 
 std::unique_ptr<Chromosome> Population::createDefaultChromosome()
 {
-   return std::make_unique<Chromosome>(settings_.geneticDiversity,
+   return std::make_unique<Chromosome>(settings_.chromosomeLength,
                                        settings_.variableLength == Population::VariableLengthMode::Variable,
                                        settings_.baseStates,
                                        &randomGenerator);

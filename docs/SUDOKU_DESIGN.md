@@ -7,7 +7,7 @@ This repo contains two Sudoku examples:
 
 They solve the same fixed 9x9 puzzle, but they use very different genetic
 operator strategies. Reading them together is the clearest way to understand
-why the modern operator override hooks were added to `Population`.
+why the modern problem-operator hooks were added to the library.
 
 ## The Generic Sudoku Example
 
@@ -46,13 +46,13 @@ In other words, the fitness function is carrying too much responsibility.
 ## The Constraint-Aware Sudoku Example
 
 The constraint-aware example uses the same overall `Population` engine, but it
-overrides the places where generic operators are a bad fit for the domain.
+provides problem-specific operators through `PopulationProblem`.
 
 It customizes:
 
-- `createInitialChromosome()`
-- `mateChromosomes(...)`
-- `mutateChromosome(...)`
+- `initializeCandidate(...)`
+- `mateCandidates(...)`
+- `mutateCandidate(...)`
 
 ### Representation strategy
 
@@ -112,12 +112,12 @@ the constraint-aware Sudoku example is the better starting point.
 This comparison led directly to the modern extension points in
 [src/population.hh](/Users/donaldmolaro/src/GAK/src/population.hh):
 
-- `createInitialChromosome()`
-- `mateChromosomes(...)`
-- `mutateChromosome(...)`
+- `initializeCandidate(...)`
+- `mateCandidates(...)`
+- `mutateCandidate(...)`
 
 Those hooks keep the main GA loop generic while letting a domain-specific
-subclass preserve invariants that the library should not try to infer.
+problem object preserve invariants that the library should not try to infer.
 
 That is the intended modernization direction for this codebase:
 

@@ -45,7 +45,7 @@ public:
       OperationMode operation = OperationMode::Maximize;
       int numberOfIndividuals = 100;
       int numberOfTrials = 4000;
-      int geneticDiversity = 44;
+      int chromosomeLength = 44;
       double bitMutationRate = 0.008;
       double crossOverRate = 0.65;
       ReproductionMode reproduction = ReproductionMode::AllowDuplicates;

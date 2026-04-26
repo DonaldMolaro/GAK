@@ -182,7 +182,7 @@ BaseString makeBinaryString(const std::string& bits)
 Population::Settings make_population_options(Population::OperationMode operation,
 					    int individuals,
 					    int trials,
-					    int diversity,
+					    int chromosome_length,
 					    double mutation,
 					    double crossover,
 					    Population::ReproductionMode reproduction,
@@ -273,7 +273,7 @@ public:
 
   std::unique_ptr<Chromosome> initializeCandidate(Population& population) override
   {
-    BaseString genes(population.settings().geneticDiversity, population.settings().baseStates);
+    BaseString genes(population.settings().chromosomeLength, population.settings().baseStates);
     for (int i = 0 ; i < genes.length() ; i++)
       {
         genes.setValue(i, 1);
@@ -344,7 +344,7 @@ public:
 
   std::unique_ptr<Chromosome> initializeCandidate(Population& population) override
   {
-    BaseString genes(population.settings().geneticDiversity, population.settings().baseStates);
+    BaseString genes(population.settings().chromosomeLength, population.settings().baseStates);
     genes.setValue(0, 1);
     return std::make_unique<Chromosome>(std::move(genes),
                                         population.settings().variableLength == Population::VariableLengthMode::Variable,
@@ -355,7 +355,7 @@ public:
 Population::Settings make_population_options(Population::OperationMode operation,
 					    int individuals,
 					    int trials,
-					    int diversity,
+					    int chromosome_length,
 					    double mutation,
 					    double crossover,
 					    Population::ReproductionMode reproduction,
@@ -369,7 +369,7 @@ Population::Settings make_population_options(Population::OperationMode operation
   options.operation = operation;
   options.numberOfIndividuals = individuals;
   options.numberOfTrials = trials;
-  options.geneticDiversity = diversity;
+  options.chromosomeLength = chromosome_length;
   options.bitMutationRate = mutation;
   options.crossOverRate = crossover;
   options.reproduction = reproduction;
@@ -426,7 +426,7 @@ void test_population_options_round_trip()
   settings.operation = Population::OperationMode::Minimize;
   settings.numberOfIndividuals = 17;
   settings.numberOfTrials = 99;
-  settings.geneticDiversity = 23;
+  settings.chromosomeLength = 23;
   settings.bitMutationRate = 0.125;
   settings.crossOverRate = 0.75;
   settings.reproduction = Population::ReproductionMode::DisallowDuplicates;
@@ -454,8 +454,8 @@ void test_population_options_round_trip()
               "Settings should preserve individual count");
   expect_true(settings.numberOfTrials == 99,
               "Settings should preserve trial count");
-  expect_true(settings.geneticDiversity == 23,
-              "Settings should preserve diversity");
+  expect_true(settings.chromosomeLength == 23,
+              "Settings should preserve chromosome length");
   expect_true(settings.baseStates == 7,
               "Settings should preserve base state count");
   expect_true(settings.useFixedRandomSeed,
@@ -1420,8 +1420,8 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
 
   std::unique_ptr<Chromosome> initial = PopulationTestRig::createInitialChromosome(pop);
   expect_true(initial.get() != nullptr, "Default createInitialChromosome should produce a chromosome");
-  expect_true(initial->length() == pop.settings().geneticDiversity,
-	      "Default createInitialChromosome should use the configured diversity as chromosome length");
+  expect_true(initial->length() == pop.settings().chromosomeLength,
+	      "Default createInitialChromosome should use the configured chromosome length");
   for (int i = 0 ; i < initial->length() ; i++)
     {
       int value = initial->genes().valueAt(i);

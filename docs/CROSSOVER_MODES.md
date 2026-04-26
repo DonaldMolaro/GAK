@@ -2,7 +2,7 @@
 
 The built-in chromosome crossover strategies live in
 [src/chromosome.cc](/Users/donaldmolaro/src/GAK/src/chromosome.cc) and are
-selected through `Chromosome::CrossOverType` in
+selected through `Chromosome::CrossoverType` in
 [src/chromosome.hh](/Users/donaldmolaro/src/GAK/src/chromosome.hh).
 
 Available built-in modes:
@@ -13,8 +13,8 @@ Available built-in modes:
 
 These are generic operators. They work well for many toy problems and some
 practical problems, but they do not understand domain invariants. When a
-problem needs structure-preserving behavior, prefer overriding
-`Population::mateChromosomes(...)`.
+problem needs structure-preserving behavior, prefer implementing
+`PopulationProblem::mateCandidates(...)`.
 
 ## SinglePoint
 
@@ -79,7 +79,8 @@ Avoid relying on the built-in modes when:
 - some genes must never change
 - local structure matters more than individual gene independence
 
-Those are usually signs you want a problem-specific mating override instead.
+Those are usually signs you want a problem-specific mating implementation
+instead.
 
 ## Relationship To Constraint-Aware Examples
 
@@ -93,5 +94,6 @@ such as:
 
 They are a poor fit for highly constrained problems such as Sudoku, which is
 why [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
-implements row-wise crossover through `Population::mateChromosomes(...)`
-instead of relying on `Chromosome::Mate(...)`.
+implements row-wise crossover through
+`PopulationProblem::mateCandidates(...)` instead of relying on the generic
+chromosome crossover path.

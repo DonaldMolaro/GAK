@@ -23,7 +23,7 @@ const int Sudoku::kPuzzle[Sudoku::kCellCount] = {
 void Sudoku::validatePopulation(const Population& population) const
 {
    const Population::Settings& settings = population.settings();
-   if (settings.geneticDiversity != kCellCount)
+   if (settings.chromosomeLength != kCellCount)
    {
       throw GAFatalException(__FILE__,__LINE__,"Sudoku expects 81 genes");
    }

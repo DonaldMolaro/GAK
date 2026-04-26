@@ -16,8 +16,8 @@ double Square(double value)
 TravelingSalesman::TravelingSalesman(const Population::Settings& settings,
                                      int requestedGridSize)
    : settings_(settings),
-     numCities(settings.geneticDiversity),
-     gridSize(requestedGridSize == 0 ? settings.geneticDiversity : requestedGridSize)
+     numCities(settings.chromosomeLength),
+     gridSize(requestedGridSize == 0 ? settings.chromosomeLength : requestedGridSize)
 {
    if (gridSize <= 0)
    {
@@ -41,7 +41,7 @@ TravelingSalesman::TravelingSalesman(const Population::Settings& settings,
 
 void TravelingSalesman::validatePopulation(const Population& population) const
 {
-   if (population.settings().geneticDiversity != settings_.geneticDiversity ||
+   if (population.settings().chromosomeLength != settings_.chromosomeLength ||
        population.settings().baseStates != settings_.baseStates ||
        population.settings().variableLength != settings_.variableLength)
    {
