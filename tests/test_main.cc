@@ -325,6 +325,33 @@ public:
   }
 };
 
+class EarlyStopProblem : public PopulationProblem
+{
+public:
+  double evaluateFitness(const BaseString& genes) override
+  {
+    return genes.valueAt(0);
+  }
+
+  void printCandidate(const BaseString&, std::ostream&) const override
+  {
+  }
+
+  bool hasReachedSolution(const Population&, const BaseString&, double fitness) const override
+  {
+    return fitness >= 1.0;
+  }
+
+  std::unique_ptr<Chromosome> initializeCandidate(Population& population) override
+  {
+    BaseString genes(population.settings().geneticDiversity, population.settings().baseStates);
+    genes.setValue(0, 1);
+    return std::make_unique<Chromosome>(std::move(genes),
+                                        population.settings().variableLength == Population::VariableLengthMode::Variable,
+                                        population.settings().baseStates);
+  }
+};
+
 Population::Settings make_population_options(Population::OperationMode operation,
 					    int individuals,
 					    int trials,
@@ -1313,6 +1340,31 @@ void test_population_fixed_seed_makes_runs_reproducible()
 	      "Configured runs should produce the same final least-fit summary");
 }
 
+void test_population_stops_early_when_problem_reports_solution()
+{
+  EarlyStopProblem problem;
+  Population pop(make_population_options(Population::OperationMode::Maximize, 6, 100, 1, 0.0, 0.0,
+                                         Population::ReproductionMode::AllowDuplicates,
+                                         Population::ParentSelectionMode::RouletteWheel,
+                                         Population::DeletionMode::DeleteAll,
+                                         Population::FitnessMode::Evaluation,
+                                         Population::VariableLengthMode::Fixed, 2),
+                 problem);
+
+  Population::RunResult result = pop.execute(true);
+
+  expect_true(result.solutionFound,
+              "execute should report when a problem identifies a solution");
+  expect_true(result.stoppedEarly,
+              "execute should mark runs that stop because a solution was found");
+  expect_true(result.generationsCompleted == 0,
+              "execute should stop before breeding when the initial population already contains a solution");
+  expect_true(result.evaluations == pop.settings().numberOfIndividuals,
+              "execute should stop after the initial evaluation pass when a solution is already present");
+  expect_true(result.generationReports.empty(),
+              "execute should not record generation reports when it stops before the first breeding generation");
+}
+
 void test_population_run_output_contains_progress_and_final_summary()
 {
   DefaultHookPopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
@@ -1489,6 +1541,7 @@ int main()
   test_population_execute_returns_structured_result();
   test_population_execute_result_contents_are_consistent();
   test_population_fixed_seed_makes_runs_reproducible();
+  test_population_stops_early_when_problem_reports_solution();
   test_population_run_output_contains_progress_and_final_summary();
   test_population_default_operator_hooks_are_explicitly_exercised();
   test_delete_all_but_best_runs();

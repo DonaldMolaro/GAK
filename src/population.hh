@@ -20,6 +20,9 @@ public:
    virtual void validatePopulation(const Population& population) const;
    virtual double evaluateFitness(const BaseString& genes) = 0;
    virtual void printCandidate(const BaseString& genes, std::ostream& out) const = 0;
+   virtual bool hasReachedSolution(const Population& population,
+                                   const BaseString& genes,
+                                   double fitness) const;
    virtual std::unique_ptr<Chromosome> initializeCandidate(Population& population);
    virtual std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
       mateCandidates(Population& population, Chromosome& mother, Chromosome& father);
@@ -69,6 +72,8 @@ public:
       // `run()`.
       unsigned int randomSeed = 0;
       bool usedConfiguredSeed = false;
+      bool stoppedEarly = false;
+      bool solutionFound = false;
       int generationsCompleted = 0;
       int evaluations = 0;
       std::vector<GenerationReport> generationReports;
@@ -146,4 +151,6 @@ private:
    PopulationSummary buildPopulationSummary() const;
    RunResult executeInternal(bool captureGenerationSummaries);
    int selectRandomParent();
+   int bestCandidateIndex() const;
+   bool hasReachedSolution() const;
 };

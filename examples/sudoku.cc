@@ -166,3 +166,8 @@ void Sudoku::printCandidate(const BaseString& genes, std::ostream& out) const
       }
    }
 }
+
+bool Sudoku::hasReachedSolution(const Population&, const BaseString&, double fitness) const
+{
+   return fitness >= 513.0;
+}

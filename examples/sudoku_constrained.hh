@@ -16,6 +16,9 @@ public:
    void validatePopulation(const Population& population) const override;
    double evaluateFitness(const BaseString& genes) override;
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
+   bool hasReachedSolution(const Population& population,
+                           const BaseString& genes,
+                           double fitness) const override;
    std::unique_ptr<Chromosome> initializeCandidate(Population& population) override;
    std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
       mateCandidates(Population& population, Chromosome& mother, Chromosome& father) override;

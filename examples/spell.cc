@@ -48,3 +48,8 @@ void Spell::printCandidate(const BaseString& genes, std::ostream& out) const
    }
    out << " ::";
 }
+
+bool Spell::hasReachedSolution(const Population&, const BaseString&, double fitness) const
+{
+   return fitness >= 7.0;
+}

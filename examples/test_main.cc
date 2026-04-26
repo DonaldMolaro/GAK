@@ -137,19 +137,27 @@ void test_f6_fitness_is_positive()
 void test_spell_fitness_matches_target_word()
 {
   Spell spell;
+  Population::Settings settings = make_options(Population::OperationMode::Maximize, 7,
+                                               Population::VariableLengthMode::Fixed, 26);
+  Population population(settings, spell);
   BaseString target = makeSymbolicString("egghead");
   BaseString wrong = makeSymbolicString("aaaaaaa");
+  const double target_fitness = spell.evaluateFitness(target);
 
-  expect_true(spell.evaluateFitness(target) == 7,
+  expect_true(target_fitness == 7,
               "Spell fitness should reward the target word");
   expect_true(spell.evaluateFitness(wrong) < spell.evaluateFitness(target),
               "Spell fitness should rank the target word above a wrong word");
+  expect_true(spell.hasReachedSolution(population, target, target_fitness),
+              "Spell should report when the target word has been found");
 }
 
 void test_alpha_prefers_sorted_alphabet()
 {
-  Alpha alpha(make_options(Population::OperationMode::Maximize, 13,
-                           Population::VariableLengthMode::Variable, 13));
+  Population::Settings settings = make_options(Population::OperationMode::Maximize, 13,
+                                               Population::VariableLengthMode::Variable, 13);
+  Alpha alpha(settings);
+  Population population(settings, alpha);
   BaseString sorted(13, 13);
   BaseString reversed(13, 13);
   for (int i = 0 ; i < 13 ; i++)
@@ -158,8 +166,11 @@ void test_alpha_prefers_sorted_alphabet()
       reversed.setValue(i, 12 - i);
     }
 
-  expect_true(alpha.evaluateFitness(sorted) > alpha.evaluateFitness(reversed),
+  const double sorted_fitness = alpha.evaluateFitness(sorted);
+  expect_true(sorted_fitness > alpha.evaluateFitness(reversed),
               "Alpha fitness should prefer sorted sequences");
+  expect_true(alpha.hasReachedSolution(population, sorted, sorted_fitness),
+              "Alpha should report when a fully sorted alphabet has been found");
 }
 
 void test_traveling_salesman_construction_and_validation()
@@ -298,6 +309,9 @@ void test_latin_square_run_path()
 void test_sudoku_rewards_valid_solution_and_givens()
 {
   Sudoku sudoku;
+  Population::Settings settings = make_options(Population::OperationMode::Maximize, 81,
+                                               Population::VariableLengthMode::Fixed, 9);
+  Population population(settings, sudoku);
 
   BaseString solution(81, 9);
   const int actual_solution[81] = {
@@ -318,10 +332,13 @@ void test_sudoku_rewards_valid_solution_and_givens()
       bad.setValue(i, 0);
     }
 
-  expect_true(sudoku.evaluateFitness(solution) == 513,
+  const double solution_fitness = sudoku.evaluateFitness(solution);
+  expect_true(solution_fitness == 513,
               "Sudoku should score a solved board at the maximum");
   expect_true(sudoku.evaluateFitness(solution) > sudoku.evaluateFitness(bad),
               "Sudoku should rank a valid solved board above a degenerate one");
+  expect_true(sudoku.hasReachedSolution(population, solution, solution_fitness),
+              "Sudoku should report when a solved board has been found");
 }
 
 void test_sudoku_run_path()

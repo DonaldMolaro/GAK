@@ -183,6 +183,11 @@ void SudokuConstrained::printCandidate(const BaseString& genes, std::ostream& ou
    }
 }
 
+bool SudokuConstrained::hasReachedSolution(const Population&, const BaseString&, double fitness) const
+{
+   return fitness >= 513.0;
+}
+
 BaseString SudokuConstrained::cloneBoard(const BaseString& source) const
 {
    BaseString clone(kCellCount, kBoardSize);

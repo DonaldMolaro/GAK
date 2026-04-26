@@ -57,6 +57,11 @@ void PopulationProblem::validatePopulation(const Population&) const
 {
 }
 
+bool PopulationProblem::hasReachedSolution(const Population&, const BaseString&, double) const
+{
+   return false;
+}
+
 std::unique_ptr<Chromosome> PopulationProblem::initializeCandidate(Population& population)
 {
    return std::make_unique<Chromosome>(population.settings().geneticDiversity,
@@ -132,6 +137,27 @@ Population::PopulationSummary Population::buildPopulationSummary() const
    return summary;
 }
 
+int Population::bestCandidateIndex() const
+{
+   switch (settings_.operation)
+   {
+   case Population::OperationMode::Maximize:
+      return settings_.numberOfIndividuals - 1;
+   case Population::OperationMode::Minimize:
+      return 0;
+   default:
+      throw GAFatalException(__FILE__,__LINE__,"Unsupported operation technique");
+   }
+}
+
+bool Population::hasReachedSolution() const
+{
+   const int index = bestCandidateIndex();
+   return problem_.hasReachedSolution(*this,
+                                      populationTable[index].get()->genes(),
+                                      fitnessTable[index]);
+}
+
 int Population::selectRandomParent()
 {
    return randomIndex(settings_.numberOfIndividuals);
@@ -189,6 +215,15 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
    result.usedConfiguredSeed = settings_.useFixedRandomSeed;
    int numberBorn = initializePopulation();
    evaluatePopulation();
+   if (hasReachedSolution())
+   {
+      result.stoppedEarly = true;
+      result.solutionFound = true;
+      result.generationsCompleted = 0;
+      result.evaluations = numberBorn;
+      result.finalSummary = buildPopulationSummary();
+      return result;
+   }
    int numGen = 0;
    const int numToReplace = replacementCount();
    while ( numberBorn < settings_.numberOfTrials )
@@ -196,6 +231,7 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
       std::vector<std::unique_ptr<Chromosome> > replacementList = breedPopulation(numToReplace);
       numberBorn += insertNewPopulation(std::move(replacementList),numToReplace);
       evaluatePopulation();
+      const bool solutionFound = hasReachedSolution();
       if (captureGenerationSummaries)
       {
          PopulationSummary summary = buildPopulationSummary();
@@ -207,6 +243,12 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
          result.generationSummaries.push_back(summary);
       }
       ++numGen;
+      if (solutionFound)
+      {
+         result.stoppedEarly = true;
+         result.solutionFound = true;
+         break;
+      }
    }
 
    result.generationsCompleted = numGen;

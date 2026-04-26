@@ -48,3 +48,10 @@ void Alpha::printCandidate(const BaseString& genes, std::ostream& out) const
    }
    out << " ::";
 }
+
+bool Alpha::hasReachedSolution(const Population&, const BaseString& genes, double fitness) const
+{
+   const int length = genes.length();
+   const double perfectFitness = static_cast<double>(length * (length - 1));
+   return fitness >= perfectFitness;
+}
