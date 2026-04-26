@@ -285,10 +285,8 @@ void Population::evaluatePopulation()
 //
 int Population::selectParent(const std::vector<double>& rouletteTable)
 {
-  double totalFitness = 0;
-  double maximumFitness;
-  maximumFitness = 0;
-  int selected = -1;
+  double totalFitness = 0.0;
+  double maximumFitness = 0.0;
    
   for ( int i = 0 ; i < settings_.numberOfIndividuals ; i++ )
     {
@@ -306,7 +304,22 @@ int Population::selectParent(const std::vector<double>& rouletteTable)
        invertedTotalFitness += invertedFitness;
      }
    
-   long int selectValue;
+   auto selectFromWeights = [&](const std::vector<double>& weights, double totalWeight) -> int
+   {
+      std::uniform_real_distribution<double> distribution(0.0, totalWeight);
+      double selectValue = distribution(randomGenerator);
+      for ( int i = 0 ; i < settings_.numberOfIndividuals ; i++ )
+      {
+         selectValue -= weights[i];
+         if (selectValue <= 0.0)
+         {
+            return i;
+         }
+      }
+
+      throw GAFatalException(__FILE__,__LINE__,"Roulette selection produced an invalid index");
+   };
+
    switch (settings_.operation)
      {
      case Population::OperationMode::Maximize:
@@ -314,31 +327,16 @@ int Population::selectParent(const std::vector<double>& rouletteTable)
        {
           return randomIndex(settings_.numberOfIndividuals);
        }
-       selectValue = randomBelow(static_cast<long int>(std::rint(totalFitness)));
-       while (selectValue >= 0)
-	 {
-	   selectValue -= static_cast<long int>(std::rint(rouletteTable[++selected]));
-	 }
-       break;
+       return selectFromWeights(rouletteTable, totalFitness);
      case Population::OperationMode::Minimize:
        if (invertedTotalFitness <= 0.0)
        {
           return randomIndex(settings_.numberOfIndividuals);
        }
-       selectValue = randomBelow(static_cast<long int>(std::rint(invertedTotalFitness)));
-       while (selectValue >= 0)
-	 {
-	   selectValue -= static_cast<long int>(std::rint(invertedrouletteTable[++selected]));
-	 }
-       break;
+       return selectFromWeights(invertedrouletteTable, invertedTotalFitness);
      default:
        throw GAFatalException(__FILE__,__LINE__,"Unsupported operation technique");
      }
-   if (selected < 0 || selected >= settings_.numberOfIndividuals)
-   {
-      throw GAFatalException(__FILE__,__LINE__,"Roulette selection produced an invalid index");
-   }
-   return selected;
 }
 
 const std::vector<double>& Population::selectFitnessWeights()

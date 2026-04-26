@@ -1029,9 +1029,9 @@ void test_population_selection_guard_and_random_fitness_modes()
 							   Population::VariableLengthMode::Fixed, 2));
   PopulationTestRig::initializePopulation(fractional);
   std::vector<double> roulette(2, 0.4);
-  expect_throws<GAFatalException>(
-    [&fractional, &roulette]() { PopulationTestRig::selectParent(fractional, roulette); },
-    "Roulette selection should throw when rounded weights produce an invalid index");
+  int fractional_selected = PopulationTestRig::selectParent(fractional, roulette);
+  expect_true(fractional_selected >= 0 && fractional_selected < fractional.settings().numberOfIndividuals,
+              "Roulette selection should handle fractional weights without producing an invalid index");
 
   InspectablePopulation windowed(make_population_options(Population::OperationMode::Maximize, 4, 4, 1, 0.0, 0.0,
 							 Population::ReproductionMode::AllowDuplicates,
