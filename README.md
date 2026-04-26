@@ -10,7 +10,7 @@ The project started as an older GA codebase and has been modernized to build cle
 - `src/`
   The GA library itself.
 - `examples/`
-  Runnable example problems and an example test harness.
+  Runnable example problems, an example test harness, and course material.
 - `tests/`
   Library-focused unit tests and coverage support.
 - `Makefile`
@@ -277,6 +277,9 @@ If you want to add a new example, start with
 
 If you want practical guidance on running and tuning the demos, see
 [docs/RUNNING_DEMOS.md](/Users/donaldmolaro/src/GAK/docs/RUNNING_DEMOS.md).
+
+If you want a guided learning path through the examples, start with
+[examples/README.md](/Users/donaldmolaro/src/GAK/examples/README.md).
 
 ## Current status
 
