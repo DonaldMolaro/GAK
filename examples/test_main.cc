@@ -351,9 +351,10 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
   options.bitMutationRate = 0.05;
   options.crossOverRate = 0.80;
   SudokuConstrained sudoku(options);
+  Population population(options, sudoku);
 
-  std::unique_ptr<Chromosome> first = PopulationTestRig::createInitialChromosome(sudoku);
-  std::unique_ptr<Chromosome> second = PopulationTestRig::createInitialChromosome(sudoku);
+  std::unique_ptr<Chromosome> first = PopulationTestRig::createInitialChromosome(population);
+  std::unique_ptr<Chromosome> second = PopulationTestRig::createInitialChromosome(population);
 
   const int givens[81] = {
     5, 3, 0, 0, 7, 0, 0, 0, 0,
@@ -401,9 +402,9 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
     }
 
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-    PopulationTestRig::mateChromosomes(sudoku, *first, *second);
-  PopulationTestRig::mutateChromosome(sudoku, *children.first);
-  PopulationTestRig::mutateChromosome(sudoku, *children.second);
+    PopulationTestRig::mateChromosomes(population, *first, *second);
+  PopulationTestRig::mutateChromosome(population, *children.first);
+  PopulationTestRig::mutateChromosome(population, *children.second);
 
   for (int row = 0 ; row < 9 ; row++)
     {
@@ -438,7 +439,8 @@ void test_constrained_sudoku_run_path()
   options.fitness = Population::FitnessMode::LinearNormalized;
 
   SudokuConstrained sudoku(options);
-  Population::RunResult result = sudoku.execute(false);
+  Population population(options, sudoku);
+  Population::RunResult result = population.execute(false);
 
   expect_true(result.evaluations >= options.numberOfIndividuals,
               "Constrained Sudoku execute should complete a run without throwing");
@@ -453,8 +455,10 @@ void test_constrained_sudoku_fixed_seed_is_reproducible()
 
   SudokuConstrained first(options);
   SudokuConstrained second(options);
-  std::unique_ptr<Chromosome> first_board = PopulationTestRig::createInitialChromosome(first);
-  std::unique_ptr<Chromosome> second_board = PopulationTestRig::createInitialChromosome(second);
+  Population first_population(options, first);
+  Population second_population(options, second);
+  std::unique_ptr<Chromosome> first_board = PopulationTestRig::createInitialChromosome(first_population);
+  std::unique_ptr<Chromosome> second_board = PopulationTestRig::createInitialChromosome(second_population);
 
   expect_true(first_board->equals(*second_board),
               "Constrained Sudoku should generate the same initial chromosome for a fixed seed");

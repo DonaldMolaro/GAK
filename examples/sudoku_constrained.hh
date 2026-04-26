@@ -1,18 +1,19 @@
 #pragma once
 
 
-#include <random>
 #include <iosfwd>
+#include <random>
 #include <utility>
 #include <vector>
 
 #include "population.hh"
 
-class SudokuConstrained : public Population
+class SudokuConstrained : public PopulationProblem
 {
 public:
    explicit SudokuConstrained(const Population::Settings& settings);
 
+   void validatePopulation(const Population& population) const override;
    double evaluateFitness(const BaseString& genes) override;
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
    std::unique_ptr<Chromosome> initializeCandidate(Population& population) override;
@@ -28,15 +29,15 @@ public:
    using RowColumns = std::vector<int>;
 
 private:
-   void validateSettings(const Population::Settings& settings) const;
    int uniquenessScoreForColumn(const BaseString& genes, int column) const;
    int uniquenessScoreForBox(const BaseString& genes, int boxRow, int boxColumn) const;
    int givenConsistencyScore(const BaseString& genes) const;
    BaseString cloneBoard(const BaseString& source) const;
    void fillRowFromParent(BaseString& destination, const BaseString& source, int row) const;
-   void initializeRow(BaseString& board, int row);
+   void initializeRow(BaseString& board, int row, std::mt19937& randomGenerator);
    bool rowIsValidPermutation(const BaseString& board, int row) const;
 
    std::vector<RowColumns> mutableColumnsByRow_;
    std::vector<std::vector<int> > missingDigitsByRow_;
+   Population::Settings settings_;
 };

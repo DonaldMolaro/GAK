@@ -440,8 +440,10 @@ int main(int argc,char *argv[])
     case 'C':
     case 'c':
       {
-        SudokuConstrained sudoku(applyOverrides(make_constrained_sudoku_options(), cli));
-        return runPopulation(sudoku, cli.showSettings);
+        Population::Settings settings = applyOverrides(make_constrained_sudoku_options(), cli);
+        SudokuConstrained sudoku(settings);
+        Population population(settings, sudoku);
+        return runPopulation(population, cli.showSettings);
       }
     default:
       usage(std::cerr);
