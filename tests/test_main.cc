@@ -11,6 +11,7 @@
 #include "except.hh"
 
 #include "population.hh"
+#include "population_report.hh"
 
 namespace {
 
@@ -318,7 +319,7 @@ void test_population_can_use_external_problem_object()
               "Population should be runnable with an external problem object");
 
   std::ostringstream out;
-  pop.run(out, Population::RunReportOptions{true, true});
+  pop.run(out, PopulationRunReportOptions{true, true});
   expect_true(out.str().find("External:") != std::string::npos,
               "External problem objects should drive candidate formatting");
 }
@@ -1016,7 +1017,7 @@ void test_population_verbose_path()
 						    Population::FitnessMode::Evaluation,
 						    Population::VariableLengthMode::Fixed, 2));
   std::ostringstream out;
-  pop.run(out, Population::RunReportOptions{true, true});
+  pop.run(out, PopulationRunReportOptions{true, true});
   expect_true(pop.isPopulationInitialized(), "Verbose run path should still complete successfully");
 }
 
@@ -1029,7 +1030,7 @@ void test_population_verbose_minimize_path()
 						    Population::FitnessMode::Evaluation,
 						    Population::VariableLengthMode::Fixed, 2));
   std::ostringstream out;
-  pop.run(out, Population::RunReportOptions{true, true});
+  pop.run(out, PopulationRunReportOptions{true, true});
   expect_true(pop.isPopulationInitialized(), "Verbose minimize path should still complete successfully");
 }
 
@@ -1042,7 +1043,7 @@ void test_population_run_modes()
 							   Population::FitnessMode::Evaluation,
 							   Population::VariableLengthMode::Fixed, 2));
   std::ostringstream out;
-  delete_all.run(out, Population::RunReportOptions{false, false});
+  delete_all.run(out, PopulationRunReportOptions{false, false});
 
   InspectablePopulation delete_half(make_population_options(Population::OperationMode::Maximize, 6, 8, 1, 0.0, 0.0,
 							    Population::ReproductionMode::AllowDuplicates,
@@ -1050,7 +1051,7 @@ void test_population_run_modes()
 							    Population::DeletionMode::DeleteHalf,
 							    Population::FitnessMode::Evaluation,
 							    Population::VariableLengthMode::Fixed, 2));
-  delete_half.run(out, Population::RunReportOptions{false, false});
+  delete_half.run(out, PopulationRunReportOptions{false, false});
 
   InspectablePopulation delete_quarter(make_population_options(Population::OperationMode::Maximize, 8, 10, 1, 0.0, 0.0,
 							       Population::ReproductionMode::AllowDuplicates,
@@ -1058,7 +1059,7 @@ void test_population_run_modes()
 							       Population::DeletionMode::DeleteQuarter,
 							       Population::FitnessMode::Evaluation,
 							       Population::VariableLengthMode::Fixed, 2));
-  delete_quarter.run(out, Population::RunReportOptions{false, false});
+  delete_quarter.run(out, PopulationRunReportOptions{false, false});
 
   InspectablePopulation delete_last_min(make_population_options(Population::OperationMode::Minimize, 6, 8, 1, 0.0, 0.0,
 								Population::ReproductionMode::AllowDuplicates,
@@ -1066,7 +1067,7 @@ void test_population_run_modes()
 								Population::DeletionMode::DeleteLast,
 								Population::FitnessMode::Evaluation,
 								Population::VariableLengthMode::Fixed, 2));
-  delete_last_min.run(out, Population::RunReportOptions{false, false});
+  delete_last_min.run(out, PopulationRunReportOptions{false, false});
 
   expect_true(delete_last_min.isPopulationInitialized(), "Additional run modes should complete successfully");
 }
@@ -1187,7 +1188,7 @@ void test_population_run_output_contains_progress_and_final_summary()
 						    Population::FitnessMode::Evaluation,
 						    Population::VariableLengthMode::Fixed, 2));
   std::ostringstream output;
-  pop.run(output, Population::RunReportOptions{true, true});
+  pop.run(output, PopulationRunReportOptions{true, true});
   const std::string rendered = output.str();
 
   expect_true(rendered.find("Generation 0 Number of Evaluations 12") != std::string::npos,
@@ -1208,10 +1209,10 @@ void test_population_run_reporter_formats_execute_results()
 						    Population::VariableLengthMode::Fixed, 2));
   Population::RunResult result = pop.execute(true);
   std::ostringstream out;
-  Population::RunReporter::write(out,
+  PopulationReporter::write(out,
 				 pop,
 				 result,
-				 Population::RunReportOptions{true, true});
+				 PopulationRunReportOptions{true, true});
   const std::string output = out.str();
 
   expect_true(output.find("Operation             :: Maximize") != std::string::npos,
@@ -1306,7 +1307,7 @@ void test_delete_all_but_best_runs()
 						    Population::FitnessMode::Evaluation,
 						    Population::VariableLengthMode::Fixed, 2));
   std::ostringstream out;
-  pop.run(out, Population::RunReportOptions{false, false});
+  pop.run(out, PopulationRunReportOptions{false, false});
 
   expect_true(pop.isPopulationInitialized() == true, "Population should initialize during run");
   expect_true(!pop.chromosomes().empty(), "Population should retain its table after run");

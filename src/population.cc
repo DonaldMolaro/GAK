@@ -30,6 +30,7 @@
 #include "base.hh"
 #include "chromosome.hh"
 #include "population.hh"
+#include "population_report.hh"
 #include "except.hh"
 
 namespace
@@ -271,123 +272,16 @@ Population::RunResult Population::execute(bool captureGenerationSummaries)
    return executeInternal(captureGenerationSummaries);
 }
 
-void Population::RunReporter::write(std::ostream& out,
-                                    const Population& population,
-                                    const RunResult& result,
-                                    const RunReportOptions& options)
-{
-   if (options.includeSettings)
-   {
-      const Population::Settings& settings = population.settings_;
-      out << "Operation             :: "
-          << (settings.operation == Population::OperationMode::Minimize ? "Minimize" : "Maximize") << '\n';
-      out << "Number of Individuals :: " << settings.numberOfIndividuals << '\n';
-      out << "Number of Trials      :: " << settings.numberOfTrials << '\n';
-      out << "Genetic Diversity     :: " << settings.geneticDiversity << '\n';
-      out << "Mutation Rate         :: " << std::fixed << std::setprecision(4)
-          << settings.bitMutationRate << '\n';
-      out << "Cross Over Rate       :: " << std::fixed << std::setprecision(3)
-          << settings.crossOverRate << '\n' << std::defaultfloat;
-      out << "Duplicate Reproduction:: "
-          << (settings.reproduction == Population::ReproductionMode::DisallowDuplicates ? "NOT Ok." : " Ok.") << '\n';
-      out << "Variable              :: "
-          << (settings.variableLength == Population::VariableLengthMode::Fixed ? "NOT Ok." : " Ok.") << '\n';
-      out << "Random Seed           :: " << population.activeRandomSeed_
-          << (settings.useFixedRandomSeed ? " (configured)" : " (generated)") << '\n';
-   }
-
-   auto printPopulationSummary = [&](const PopulationSummary& summary) {
-      const int summaryCount = static_cast<int>(summary.mostFit.size());
-      if (summaryCount <= 0)
-      {
-         return;
-      }
-
-      if (population.settings_.operation == Population::OperationMode::Maximize)
-         out << "Best " << summaryCount << " Members are:\n";
-      else
-         out << "Worst " << summaryCount << " Members are:\n";
-
-      for ( int i = 0 ; i < summaryCount ; i++ )
-      {
-         population.problem_.printCandidate(population.populationTable[(population.settings_.numberOfIndividuals - 1) - i].get()->genes(), out);
-         out << "(F = " << std::fixed << std::setprecision(8) << summary.mostFit[i]
-             << ")\n" << std::defaultfloat;
-      }
-
-      if (population.settings_.operation == Population::OperationMode::Maximize)
-         out << "Worst " << summaryCount << " Members are:\n";
-      else
-         out << "Best " << summaryCount << " Members are:\n";
-
-      for ( int i = 0 ; i < summaryCount ; i++ )
-      {
-         population.problem_.printCandidate(population.populationTable[i].get()->genes(), out);
-         out << "(F = " << std::fixed << std::setprecision(8) << summary.leastFit[i]
-             << ")\n" << std::defaultfloat;
-      }
-   };
-
-   auto printGenerationProgress = [&](const GenerationReport& report, bool printSummary) {
-      out << "Generation " << report.generation
-          << " Number of Evaluations " << report.evaluations << " \n";
-      if (printSummary)
-      {
-         printPopulationSummary(report.summary);
-      }
-   };
-
-   if (options.includeGenerationSummaries)
-   {
-      for (std::size_t i = 0 ; i < result.generationReports.size() ; i++ )
-      {
-         printGenerationProgress(result.generationReports[i], true);
-      }
-   }
-   else
-   {
-      const GenerationReport finalProgress = {
-         result.generationsCompleted,
-         result.evaluations,
-         PopulationSummary()
-      };
-      printGenerationProgress(finalProgress, false);
-   }
-
-   const int summaryCount = static_cast<int>(result.finalSummary.mostFit.size());
-   switch(population.settings_.operation)
-   {
-      case Population::OperationMode::Maximize:
-      for ( int i = 0 ; i < summaryCount ; i++ )
-      {
-	 population.problem_.printCandidate(population.populationTable[(population.settings_.numberOfIndividuals - 1) - i].get()->genes(), out);
-	 out << std::fixed << std::setprecision(6) << result.finalSummary.mostFit[i]
-             << '\n' << std::defaultfloat;
-      }
-      break;
-      case Population::OperationMode::Minimize:
-      for ( int i = 0 ; i < summaryCount ; i++ )
-      {
-	 population.problem_.printCandidate(population.populationTable[i].get()->genes(), out);
-	 out << std::fixed << std::setprecision(6) << result.finalSummary.leastFit[i]
-             << '\n' << std::defaultfloat;
-      }
-      break;
-      default:
-      throw GAFatalException(__FILE__,__LINE__,"Unsupported operation technique");
-   }
-}
-
-void Population::run(std::ostream& out, const RunReportOptions& options)
+void Population::run(std::ostream& out, const PopulationRunReportOptions& options)
 {
    RunResult result = execute(options.includeGenerationSummaries);
-   RunReporter::write(out, *this, result, options);
+   PopulationReporter::write(out, *this, result, options);
 }
 
 void Population::run()
 {
    const bool verbose = IsVerboseEnabled();
-   run(std::cerr, RunReportOptions{verbose, verbose});
+   run(std::cerr, PopulationRunReportOptions{verbose, verbose});
 }
 //
 // Start Population with randomly generated population.

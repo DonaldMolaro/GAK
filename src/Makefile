@@ -12,7 +12,7 @@ LDFLAGS += -fprofile-instr-generate
 endif
 
 LIB = libga.a
-LIBSRC = base.cc chromosome.cc population.cc except.cc
+LIBSRC = base.cc chromosome.cc population.cc population_report.cc except.cc
 LIBOBJ = $(LIBSRC:.cc=.o)
 DEPS = $(LIBOBJ:.o=.d)
 

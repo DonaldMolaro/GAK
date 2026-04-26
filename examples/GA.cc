@@ -15,6 +15,7 @@
 #include "sudoku.hh"
 #include "sudoku_constrained.hh"
 #include "ts.hh"
+#include "population_report.hh"
 
 namespace
 {
@@ -347,10 +348,10 @@ int runExample(Example& example, bool showSettings)
   if (showSettings)
   {
     Population::RunResult result = example.execute(false);
-    Population::RunReporter::write(std::cout,
+    PopulationReporter::write(std::cout,
                                    example,
                                    result,
-                                   Population::RunReportOptions(true, false));
+                                   PopulationRunReportOptions(true, false));
   }
   else
   {

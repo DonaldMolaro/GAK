@@ -10,6 +10,8 @@
 class BaseString;
 class Chromosome;
 class Population;
+class PopulationRunReportOptions;
+class PopulationReporter;
 
 class PopulationProblem
 {
@@ -79,29 +81,8 @@ public:
       PopulationSummary summary;
    };
 
-   struct RunReportOptions
-   {
-      RunReportOptions(bool includeSettingsValue = false,
-                       bool includeGenerationSummariesValue = false)
-         : includeSettings(includeSettingsValue),
-           includeGenerationSummaries(includeGenerationSummariesValue)
-      {
-      }
-
-      bool includeSettings;
-      bool includeGenerationSummaries;
-   };
-
-   class RunReporter
-   {
-   public:
-      static void write(std::ostream& out,
-                        const Population& population,
-                        const RunResult& result,
-                        const RunReportOptions& options = RunReportOptions());
-   };
 private:
-   friend class RunReporter;
+   friend class PopulationReporter;
    bool populationInitialized;
    std::vector<std::unique_ptr<Chromosome> > populationTable;
    std::vector<double> fitnessTable;
@@ -162,7 +143,7 @@ public:
    void setFitnessMode(FitnessMode mode) noexcept { settings_.fitness = mode; }
    // Run the GA silently and return a structured summary.
    [[nodiscard]] RunResult execute(bool captureGenerationSummaries = false);
-   void run(std::ostream& out, const RunReportOptions& options);
+   void run(std::ostream& out, const class PopulationRunReportOptions& options);
    // Compatibility wrapper around `execute()` that prints progress/summaries.
    void run();
 private:
