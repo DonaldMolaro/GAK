@@ -26,7 +26,7 @@ public:
    virtual void mutateCandidate(Population& population, Chromosome& chromosome);
 };
 
-class Population : public PopulationProblem {
+class Population {
 public:
    struct Settings;
    struct GenerationReport;
@@ -122,11 +122,10 @@ private:
       mateDefaultChromosomes(Chromosome& mother, Chromosome& father);
    void mutateDefaultChromosome(Chromosome& chromosome);
 public:
-   explicit Population(const Settings& settings);
    Population(const Settings& settings, PopulationProblem& problem);
-   virtual ~Population();
-   double evaluateFitness(const BaseString& genes) override;
-   void printCandidate(const BaseString& genes, std::ostream& out) const override;
+   ~Population();
+   double evaluateFitness(const BaseString& genes);
+   void printCandidate(const BaseString& genes, std::ostream& out) const;
    const Settings& settings() const noexcept { return settings_; }
    unsigned int randomSeed() const noexcept { return activeRandomSeed_; }
    std::mt19937& randomEngine() noexcept { return randomGenerator; }

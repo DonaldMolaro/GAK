@@ -192,11 +192,11 @@ Population::Settings make_population_options(Population::OperationMode operation
 					    Population::VariableLengthMode variable_length,
 					    int states);
 
-class InspectablePopulation : public Population
+class InspectablePopulation : public PopulationProblem
 {
 public:
-  explicit InspectablePopulation(const Settings& settings)
-    : Population(settings)
+  explicit InspectablePopulation(const Population::Settings& settings)
+    : population_(settings, *this)
   {
   }
 
@@ -208,13 +208,28 @@ public:
   void printCandidate(const BaseString&, std::ostream&) const override
   {
   }
+
+  operator Population&() { return population_; }
+  operator const Population&() const { return population_; }
+  const Population::Settings& settings() const { return population_.settings(); }
+  Population::RunResult execute(bool captureGenerationSummaries = false) { return population_.execute(captureGenerationSummaries); }
+  void run(std::ostream& out, const PopulationRunReportOptions& options) { population_.run(out, options); }
+  void run() { population_.run(); }
+  void setDeletionMode(Population::DeletionMode mode) { population_.setDeletionMode(mode); }
+  void setFitnessMode(Population::FitnessMode mode) { population_.setFitnessMode(mode); }
+  void setParentSelectionMode(Population::ParentSelectionMode mode) { population_.setParentSelectionMode(mode); }
+  void setOperationMode(Population::OperationMode mode) { population_.setOperationMode(mode); }
+  void setRandomSeed(unsigned int seed) { population_.setRandomSeed(seed); }
+
+private:
+  Population population_;
 };
 
-class DefaultHookPopulation : public Population
+class DefaultHookPopulation : public PopulationProblem
 {
 public:
-  explicit DefaultHookPopulation(const Settings& settings)
-    : Population(settings)
+  explicit DefaultHookPopulation(const Population::Settings& settings)
+    : population_(settings, *this)
   {
   }
 
@@ -227,13 +242,23 @@ public:
   {
     out << "Chromosome:" << b.valueAt(0) << '\n';
   }
+
+  operator Population&() { return population_; }
+  operator const Population&() const { return population_; }
+  const Population::Settings& settings() const { return population_.settings(); }
+  Population::RunResult execute(bool captureGenerationSummaries = false) { return population_.execute(captureGenerationSummaries); }
+  void run(std::ostream& out, const PopulationRunReportOptions& options) { population_.run(out, options); }
+  void run() { population_.run(); }
+
+private:
+  Population population_;
 };
 
-class StrategyHookPopulation : public Population
+class StrategyHookPopulation : public PopulationProblem
 {
 public:
-  explicit StrategyHookPopulation(const Settings& settings)
-    : Population(settings)
+  explicit StrategyHookPopulation(const Population::Settings& settings)
+    : population_(settings, *this)
   {
   }
 
@@ -274,6 +299,16 @@ public:
         chromosome.genes().clearValue(i);
       }
   }
+
+  operator Population&() { return population_; }
+  operator const Population&() const { return population_; }
+  const Population::Settings& settings() const { return population_.settings(); }
+  Population::RunResult execute(bool captureGenerationSummaries = false) { return population_.execute(captureGenerationSummaries); }
+  void run(std::ostream& out, const PopulationRunReportOptions& options) { population_.run(out, options); }
+  void run() { population_.run(); }
+
+private:
+  Population population_;
 };
 
 class ConstantProblem : public PopulationProblem

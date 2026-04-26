@@ -41,25 +41,6 @@ bool IsVerboseEnabled()
 }
 }
 
-Population::Population(const Settings& settings)
-   : populationInitialized(false),
-     problem_(*this),
-     settings_(settings),
-     activeRandomSeed_(0)
-{
-   if (settings_.useFixedRandomSeed)
-   {
-      setRandomSeed(settings_.randomSeed);
-   }
-   else
-   {
-      std::time_t currenttime;
-      std::time(&currenttime);
-      setRandomSeed(static_cast<unsigned int>(currenttime));
-   }
-   problem_.validatePopulation(*this);
-}
-
 Population::Population(const Settings& settings, PopulationProblem& problem)
    : populationInitialized(false),
      problem_(problem),
@@ -83,19 +64,11 @@ Population::~Population() = default;
 
 double Population::evaluateFitness(const BaseString& genes)
 {
-   if (&problem_ == this)
-   {
-      throw GAFatalException(__FILE__,__LINE__,"Population requires a problem implementation");
-   }
    return problem_.evaluateFitness(genes);
 }
 
 void Population::printCandidate(const BaseString& genes, std::ostream& out) const
 {
-   if (&problem_ == this)
-   {
-      throw GAFatalException(__FILE__,__LINE__,"Population requires a problem implementation");
-   }
    problem_.printCandidate(genes, out);
 }
 
