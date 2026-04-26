@@ -33,6 +33,8 @@ $(TEST_OUTPUT): $(EXAMPLE_OBJS) ../src/libga.a
 %.o: %.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
 
+test_main.o: CPPFLAGS += -DGAK_TESTING
+
 run-tests: $(TEST_OUTPUT)
 	./$(TEST_OUTPUT)
 

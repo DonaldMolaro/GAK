@@ -46,7 +46,7 @@ void PopulationReporter::write(std::ostream& out,
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
          const int index = (population.settings().numberOfIndividuals - 1) - i;
-         population.printCandidate(population.chromosomes()[index].get()->genes(), out);
+         population.printCandidate(population.populationTable[index].get()->genes(), out);
          out << "(F = " << std::fixed << std::setprecision(8) << summary.mostFit[i]
              << ")\n" << std::defaultfloat;
       }
@@ -58,7 +58,7 @@ void PopulationReporter::write(std::ostream& out,
 
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
-         population.printCandidate(population.chromosomes()[i].get()->genes(), out);
+         population.printCandidate(population.populationTable[i].get()->genes(), out);
          out << "(F = " << std::fixed << std::setprecision(8) << summary.leastFit[i]
              << ")\n" << std::defaultfloat;
       }
@@ -97,7 +97,7 @@ void PopulationReporter::write(std::ostream& out,
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
          const int index = (population.settings().numberOfIndividuals - 1) - i;
-         population.printCandidate(population.chromosomes()[index].get()->genes(), out);
+         population.printCandidate(population.populationTable[index].get()->genes(), out);
          out << std::fixed << std::setprecision(6) << result.finalSummary.mostFit[i]
              << '\n' << std::defaultfloat;
       }
@@ -105,7 +105,7 @@ void PopulationReporter::write(std::ostream& out,
       case Population::OperationMode::Minimize:
       for ( int i = 0 ; i < summaryCount ; i++ )
       {
-         population.printCandidate(population.chromosomes()[i].get()->genes(), out);
+         population.printCandidate(population.populationTable[i].get()->genes(), out);
          out << std::fixed << std::setprecision(6) << result.finalSummary.leastFit[i]
              << '\n' << std::defaultfloat;
       }

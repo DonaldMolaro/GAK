@@ -17,6 +17,26 @@
 #include "ts.hh"
 #include "spell.hh"
 
+class PopulationTestRig
+{
+public:
+  static std::unique_ptr<Chromosome> createInitialChromosome(Population& population)
+  {
+    return population.createInitialChromosome();
+  }
+
+  static std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+  mateChromosomes(Population& population, Chromosome& mother, Chromosome& father)
+  {
+    return population.mateChromosomes(mother, father);
+  }
+
+  static void mutateChromosome(Population& population, Chromosome& chromosome)
+  {
+    population.mutateChromosome(chromosome);
+  }
+};
+
 namespace {
 
 int g_failures = 0;
@@ -47,19 +67,6 @@ void expect_throws(Fn fn, const std::string& message)
       expect_true(false, message + " (threw wrong exception type)");
     }
 }
-
-class InspectableSudokuConstrained : public SudokuConstrained
-{
-public:
-  explicit InspectableSudokuConstrained(const Population::Settings& options)
-    : SudokuConstrained(options)
-  {
-  }
-
-  using SudokuConstrained::createInitialChromosome;
-  using SudokuConstrained::mateChromosomes;
-  using SudokuConstrained::mutateChromosome;
-};
 
 BaseString makeBinaryString(const std::string& bits)
 {
@@ -338,10 +345,10 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
                                              Population::VariableLengthMode::Fixed, 9);
   options.bitMutationRate = 0.05;
   options.crossOverRate = 0.80;
-  InspectableSudokuConstrained sudoku(options);
+  SudokuConstrained sudoku(options);
 
-  std::unique_ptr<Chromosome> first = sudoku.createInitialChromosome();
-  std::unique_ptr<Chromosome> second = sudoku.createInitialChromosome();
+  std::unique_ptr<Chromosome> first = PopulationTestRig::createInitialChromosome(sudoku);
+  std::unique_ptr<Chromosome> second = PopulationTestRig::createInitialChromosome(sudoku);
 
   const int givens[81] = {
     5, 3, 0, 0, 7, 0, 0, 0, 0,
@@ -389,9 +396,9 @@ void test_constrained_sudoku_preserves_row_structure_and_givens()
     }
 
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-    sudoku.mateChromosomes(*first, *second);
-  sudoku.mutateChromosome(*children.first);
-  sudoku.mutateChromosome(*children.second);
+    PopulationTestRig::mateChromosomes(sudoku, *first, *second);
+  PopulationTestRig::mutateChromosome(sudoku, *children.first);
+  PopulationTestRig::mutateChromosome(sudoku, *children.second);
 
   for (int row = 0 ; row < 9 ; row++)
     {
@@ -439,10 +446,10 @@ void test_constrained_sudoku_fixed_seed_is_reproducible()
   options.useFixedRandomSeed = true;
   options.randomSeed = 271828U;
 
-  InspectableSudokuConstrained first(options);
-  InspectableSudokuConstrained second(options);
-  std::unique_ptr<Chromosome> first_board = first.createInitialChromosome();
-  std::unique_ptr<Chromosome> second_board = second.createInitialChromosome();
+  SudokuConstrained first(options);
+  SudokuConstrained second(options);
+  std::unique_ptr<Chromosome> first_board = PopulationTestRig::createInitialChromosome(first);
+  std::unique_ptr<Chromosome> second_board = PopulationTestRig::createInitialChromosome(second);
 
   expect_true(first_board->equals(*second_board),
               "Constrained Sudoku should generate the same initial chromosome for a fixed seed");

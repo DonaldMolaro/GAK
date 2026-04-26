@@ -13,6 +13,130 @@
 #include "population.hh"
 #include "population_report.hh"
 
+class PopulationTestRig
+{
+public:
+  static int initializePopulation(Population& population)
+  {
+    return population.initializePopulation();
+  }
+
+  static int insertNewPopulation(Population& population,
+                                 std::vector<std::unique_ptr<Chromosome> > replacements,
+                                 int number_to_replace)
+  {
+    return population.insertNewPopulation(std::move(replacements), number_to_replace);
+  }
+
+  static void evaluatePopulation(Population& population)
+  {
+    population.evaluatePopulation();
+  }
+
+  static int randomIndex(Population& population, int upper_bound_exclusive)
+  {
+    return population.randomIndex(upper_bound_exclusive);
+  }
+
+  static long randomBelow(Population& population, long upper_bound_exclusive)
+  {
+    return population.randomBelow(upper_bound_exclusive);
+  }
+
+  static const std::vector<double>& selectFitnessWeights(Population& population)
+  {
+    return population.selectFitnessWeights();
+  }
+
+  static int selectParent(Population& population, const std::vector<double>& roulette_table)
+  {
+    return population.selectParent(roulette_table);
+  }
+
+  static std::vector<std::unique_ptr<Chromosome> > breedPopulation(Population& population, int number_to_replace)
+  {
+    return population.breedPopulation(number_to_replace);
+  }
+
+  static bool containsChromosome(const Population& population,
+                                 const Chromosome& candidate,
+                                 const std::vector<std::unique_ptr<Chromosome> >& population_list,
+                                 int population_length)
+  {
+    return population.containsChromosome(candidate, population_list, population_length);
+  }
+
+  static bool appendReplacement(Population& population,
+                                std::vector<std::unique_ptr<Chromosome> >& replacement_list,
+                                std::unique_ptr<Chromosome> candidate,
+                                int number_to_replace,
+                                bool allow_duplicates)
+  {
+    return population.appendReplacement(replacement_list, std::move(candidate), number_to_replace, allow_duplicates);
+  }
+
+  static std::unique_ptr<Chromosome> createInitialChromosome(Population& population)
+  {
+    return population.createInitialChromosome();
+  }
+
+  static std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+  mateChromosomes(Population& population, Chromosome& mother, Chromosome& father)
+  {
+    return population.mateChromosomes(mother, father);
+  }
+
+  static void mutateChromosome(Population& population, Chromosome& chromosome)
+  {
+    population.mutateChromosome(chromosome);
+  }
+
+  static std::vector<std::unique_ptr<Chromosome> >& chromosomes(Population& population)
+  {
+    return population.populationTable;
+  }
+
+  static std::vector<double>& fitnessValues(Population& population)
+  {
+    return population.fitnessTable;
+  }
+
+  static const std::vector<double>& fitnessValues(const Population& population)
+  {
+    return population.fitnessTable;
+  }
+
+  static std::vector<double>& windowedFitnessValues(Population& population)
+  {
+    return population.windowedFitnessTable;
+  }
+
+  static const std::vector<double>& windowedFitnessValues(const Population& population)
+  {
+    return population.windowedFitnessTable;
+  }
+
+  static std::vector<double>& normalizedFitnessValues(Population& population)
+  {
+    return population.linearNormalizedfitnessTable;
+  }
+
+  static const std::vector<double>& normalizedFitnessValues(const Population& population)
+  {
+    return population.linearNormalizedfitnessTable;
+  }
+
+  static bool isPopulationInitialized(const Population& population)
+  {
+    return population.populationInitialized;
+  }
+
+  static void setPopulationInitialized(Population& population, bool initialized)
+  {
+    population.populationInitialized = initialized;
+  }
+};
+
 namespace {
 
 int g_failures = 0;
@@ -84,23 +208,6 @@ public:
   void printCandidate(const BaseString&, std::ostream&) const override
   {
   }
-
-  using Population::breedPopulation;
-  using Population::chromosomes;
-  using Population::evaluatePopulation;
-  using Population::fitnessValues;
-  using Population::initializePopulation;
-  using Population::insertNewPopulation;
-  using Population::isPopulationInitialized;
-  using Population::normalizedFitnessValues;
-  using Population::randomBelow;
-  using Population::randomIndex;
-  using Population::appendReplacement;
-  using Population::containsChromosome;
-  using Population::selectFitnessWeights;
-  using Population::selectParent;
-  using Population::setPopulationInitialized;
-  using Population::windowedFitnessValues;
 };
 
 class DefaultHookPopulation : public Population
@@ -110,10 +217,6 @@ public:
     : Population(settings)
   {
   }
-
-  using Population::createInitialChromosome;
-  using Population::mateChromosomes;
-  using Population::mutateChromosome;
 
   double evaluateFitness(const BaseString& b) override
   {
@@ -133,10 +236,6 @@ public:
     : Population(settings)
   {
   }
-
-  using Population::createInitialChromosome;
-  using Population::mateChromosomes;
-  using Population::mutateChromosome;
 
   double evaluateFitness(const BaseString& b) override
   {
@@ -637,21 +736,21 @@ void test_population_random_helpers()
 
   for (int i = 0 ; i < 20 ; i++)
     {
-      int index = pop.randomIndex(3);
+      int index = PopulationTestRig::randomIndex(pop, 3);
       expect_true(index >= 0 && index < 3, "randomIndex should stay within bounds");
     }
 
   for (int i = 0 ; i < 20 ; i++)
     {
-      long value = pop.randomBelow(7);
+      long value = PopulationTestRig::randomBelow(pop, 7);
       expect_true(value >= 0 && value < 7, "randomBelow should stay within bounds");
     }
 
   expect_throws<GAFatalException>(
-    [&pop]() { pop.randomIndex(0); },
+    [&pop]() { PopulationTestRig::randomIndex(pop, 0); },
     "randomIndex should reject non-positive bounds");
   expect_throws<GAFatalException>(
-    [&pop]() { pop.randomBelow(0); },
+    [&pop]() { PopulationTestRig::randomBelow(pop, 0); },
     "randomBelow should reject non-positive bounds");
 }
 
@@ -663,9 +762,9 @@ void test_population_zero_total_selection_falls_back_to_uniform()
 						    Population::DeletionMode::DeleteAll,
 						    Population::FitnessMode::Evaluation,
 						    Population::VariableLengthMode::Fixed, 2));
-  pop.initializePopulation();
+  PopulationTestRig::initializePopulation(pop);
   std::vector<double> roulette(2, 0.0);
-  const int selected = pop.selectParent(roulette);
+  const int selected = PopulationTestRig::selectParent(pop, roulette);
 
   expect_true(selected >= 0 && selected < pop.settings().numberOfIndividuals,
 	      "Uniform fallback selection should still return an in-range index");
@@ -680,18 +779,18 @@ void test_windowed_fitness_is_positive_for_maximize()
 						    Population::FitnessMode::Windowed,
 						    Population::VariableLengthMode::Fixed, 2));
 
-  pop.initializePopulation();
+  PopulationTestRig::initializePopulation(pop);
   for (int i = 0 ; i < 3 ; i++)
     {
-      pop.chromosomes()[i] = std::make_unique<Chromosome>(makeBinaryString(i == 0 ? "0" : "1"));
-      pop.fitnessValues()[i] = -1.0;
+      PopulationTestRig::chromosomes(pop)[i] = std::make_unique<Chromosome>(makeBinaryString(i == 0 ? "0" : "1"));
+      PopulationTestRig::fitnessValues(pop)[i] = -1.0;
     }
-  pop.setPopulationInitialized(true);
-  pop.evaluatePopulation();
+  PopulationTestRig::setPopulationInitialized(pop, true);
+  PopulationTestRig::evaluatePopulation(pop);
 
-  expect_true(pop.windowedFitnessValues()[0] > 0.0, "Windowed fitness should stay positive");
-  expect_true(pop.windowedFitnessValues()[1] > 0.0, "Windowed fitness should stay positive for middle members");
-  expect_true(pop.windowedFitnessValues()[2] > pop.windowedFitnessValues()[0],
+  expect_true(PopulationTestRig::windowedFitnessValues(pop)[0] > 0.0, "Windowed fitness should stay positive");
+  expect_true(PopulationTestRig::windowedFitnessValues(pop)[1] > 0.0, "Windowed fitness should stay positive for middle members");
+  expect_true(PopulationTestRig::windowedFitnessValues(pop)[2] > PopulationTestRig::windowedFitnessValues(pop)[0],
 	      "Best maximizing member should receive more windowed fitness than the worst");
 }
 
@@ -704,17 +803,17 @@ void test_windowed_fitness_is_positive_for_minimize()
 						    Population::FitnessMode::Windowed,
 						    Population::VariableLengthMode::Fixed, 2));
 
-  pop.initializePopulation();
+  PopulationTestRig::initializePopulation(pop);
   for (int i = 0 ; i < 3 ; i++)
     {
-      pop.chromosomes()[i] = std::make_unique<Chromosome>(makeBinaryString(i == 0 ? "0" : "1"));
-      pop.fitnessValues()[i] = -1.0;
+      PopulationTestRig::chromosomes(pop)[i] = std::make_unique<Chromosome>(makeBinaryString(i == 0 ? "0" : "1"));
+      PopulationTestRig::fitnessValues(pop)[i] = -1.0;
     }
-  pop.setPopulationInitialized(true);
-  pop.evaluatePopulation();
+  PopulationTestRig::setPopulationInitialized(pop, true);
+  PopulationTestRig::evaluatePopulation(pop);
 
-  expect_true(pop.windowedFitnessValues()[0] > 0.0, "Minimizing windowed fitness should stay positive");
-  expect_true(pop.windowedFitnessValues()[0] > pop.windowedFitnessValues()[2],
+  expect_true(PopulationTestRig::windowedFitnessValues(pop)[0] > 0.0, "Minimizing windowed fitness should stay positive");
+  expect_true(PopulationTestRig::windowedFitnessValues(pop)[0] > PopulationTestRig::windowedFitnessValues(pop)[2],
 	      "Best minimizing member should receive more windowed fitness than the worst");
 }
 
@@ -739,26 +838,26 @@ void test_fitness_table_selection()
 							   Population::FitnessMode::LinearNormalized,
 							   Population::VariableLengthMode::Fixed, 2));
 
-  expect_true(&evaluation.selectFitnessWeights() == &evaluation.fitnessValues(),
+  expect_true(&PopulationTestRig::selectFitnessWeights(evaluation) == &PopulationTestRig::fitnessValues(evaluation),
 	      "FitnessIsEvaluation should select the raw fitness table");
-  expect_true(&windowed.selectFitnessWeights() == &windowed.windowedFitnessValues(),
+  expect_true(&PopulationTestRig::selectFitnessWeights(windowed) == &PopulationTestRig::windowedFitnessValues(windowed),
 	      "WindowedFitness should select the windowed fitness table");
-  expect_true(&normalized.selectFitnessWeights() == &normalized.normalizedFitnessValues(),
+  expect_true(&PopulationTestRig::selectFitnessWeights(normalized) == &PopulationTestRig::normalizedFitnessValues(normalized),
 	      "LinearNormalizedFitness should select the normalized fitness table");
 }
 
 void prepare_population(InspectablePopulation& pop, const std::string& first_bits,
 			const std::string& second_bits)
 {
-  pop.initializePopulation();
-  pop.chromosomes()[0] = std::make_unique<Chromosome>(makeBinaryString(first_bits));
-  pop.chromosomes()[1] = std::make_unique<Chromosome>(makeBinaryString(second_bits));
+  PopulationTestRig::initializePopulation(pop);
+  PopulationTestRig::chromosomes(pop)[0] = std::make_unique<Chromosome>(makeBinaryString(first_bits));
+  PopulationTestRig::chromosomes(pop)[1] = std::make_unique<Chromosome>(makeBinaryString(second_bits));
   for (int i = 0 ; i < pop.settings().numberOfIndividuals ; i++)
     {
-      pop.fitnessValues()[i] = -1.0;
+      PopulationTestRig::fitnessValues(pop)[i] = -1.0;
     }
-  pop.setPopulationInitialized(true);
-  pop.evaluatePopulation();
+  PopulationTestRig::setPopulationInitialized(pop, true);
+  PopulationTestRig::evaluatePopulation(pop);
 }
 
 void test_population_selection_and_replacement_branches()
@@ -770,8 +869,8 @@ void test_population_selection_and_replacement_branches()
 							Population::FitnessMode::Evaluation,
 							Population::VariableLengthMode::Fixed, 2));
   prepare_population(min_pop, "1111", "0000");
-  int selected = min_pop.selectParent(min_pop.selectFitnessWeights());
-  Chromosome *chosen = min_pop.chromosomes()[selected].get();
+  int selected = PopulationTestRig::selectParent(min_pop, PopulationTestRig::selectFitnessWeights(min_pop));
+  Chromosome *chosen = PopulationTestRig::chromosomes(min_pop)[selected].get();
   expect_true(chosen != 0, "Minimize roulette selection should return a chromosome");
   expect_true(selected >= 0 && selected < min_pop.settings().numberOfIndividuals,
 	      "Minimize roulette selection should produce an in-range index");
@@ -783,15 +882,15 @@ void test_population_selection_and_replacement_branches()
 								Population::FitnessMode::Evaluation,
 								Population::VariableLengthMode::Fixed, 2));
   prepare_population(dup_not_allowed, "1111", "0000");
-  std::vector<std::unique_ptr<Chromosome> > bred = dup_not_allowed.breedPopulation(1);
+  std::vector<std::unique_ptr<Chromosome> > bred = PopulationTestRig::breedPopulation(dup_not_allowed, 1);
   expect_true(bred.size() == 1, "DuplicatesNotAllowed breeding should still generate requested children");
-  expect_true(dup_not_allowed.containsChromosome(*bred[0], bred, 1),
+  expect_true(PopulationTestRig::containsChromosome(dup_not_allowed, *bred[0], bred, 1),
 	      "containsChromosome should report a present chromosome");
 
   std::vector<std::unique_ptr<Chromosome> > replacements_max;
   replacements_max.push_back(std::make_unique<Chromosome>(makeBinaryString("1111")));
   replacements_max.push_back(std::make_unique<Chromosome>(makeBinaryString("0000")));
-  int replaced_max = dup_not_allowed.insertNewPopulation(std::move(replacements_max), 2);
+  int replaced_max = PopulationTestRig::insertNewPopulation(dup_not_allowed, std::move(replacements_max), 2);
   expect_true(replaced_max >= 0, "insertNewPopulation should handle duplicates-not-allowed maximize path");
 
   InspectablePopulation dup_not_allowed_min(make_population_options(Population::OperationMode::Minimize, 2, 2, 4, 0.0, 0.0,
@@ -804,7 +903,7 @@ void test_population_selection_and_replacement_branches()
   std::vector<std::unique_ptr<Chromosome> > replacements_min;
   replacements_min.push_back(std::make_unique<Chromosome>(makeBinaryString("1111")));
   replacements_min.push_back(std::make_unique<Chromosome>(makeBinaryString("0000")));
-  int replaced_min = dup_not_allowed_min.insertNewPopulation(std::move(replacements_min), 2);
+  int replaced_min = PopulationTestRig::insertNewPopulation(dup_not_allowed_min, std::move(replacements_min), 2);
   expect_true(replaced_min >= 0, "insertNewPopulation should handle duplicates-not-allowed minimize path");
 
   InspectablePopulation dup_not_allowed_new(make_population_options(Population::OperationMode::Maximize, 2, 2, 4, 0.0, 0.0,
@@ -817,7 +916,7 @@ void test_population_selection_and_replacement_branches()
   std::vector<std::unique_ptr<Chromosome> > replacements_new;
   replacements_new.push_back(std::make_unique<Chromosome>(makeBinaryString("0011")));
   replacements_new.push_back(std::make_unique<Chromosome>(makeBinaryString("1100")));
-  int replaced_new = dup_not_allowed_new.insertNewPopulation(std::move(replacements_new), 2);
+  int replaced_new = PopulationTestRig::insertNewPopulation(dup_not_allowed_new, std::move(replacements_new), 2);
   expect_true(replaced_new > 0, "Duplicates-not-allowed maximize path should insert new chromosomes");
 
   InspectablePopulation dup_not_allowed_new_min(make_population_options(Population::OperationMode::Minimize, 2, 2, 4, 0.0, 0.0,
@@ -830,7 +929,7 @@ void test_population_selection_and_replacement_branches()
   std::vector<std::unique_ptr<Chromosome> > replacements_new_min;
   replacements_new_min.push_back(std::make_unique<Chromosome>(makeBinaryString("0011")));
   replacements_new_min.push_back(std::make_unique<Chromosome>(makeBinaryString("1100")));
-  int replaced_new_min = dup_not_allowed_new_min.insertNewPopulation(std::move(replacements_new_min), 2);
+  int replaced_new_min = PopulationTestRig::insertNewPopulation(dup_not_allowed_new_min, std::move(replacements_new_min), 2);
   expect_true(replaced_new_min > 0, "Duplicates-not-allowed minimize path should insert new chromosomes");
 
 }
@@ -845,19 +944,19 @@ void test_population_append_replacement_helper()
 						    Population::VariableLengthMode::Fixed, 2));
 
   std::vector<std::unique_ptr<Chromosome> > replacement_list;
-  expect_true(pop.appendReplacement(replacement_list,
+  expect_true(PopulationTestRig::appendReplacement(pop, replacement_list,
 				    std::make_unique<Chromosome>(makeBinaryString("1111")),
 				    2, false),
 	      "appendReplacement should keep the first unique child");
-  expect_true(!pop.appendReplacement(replacement_list,
+  expect_true(!PopulationTestRig::appendReplacement(pop, replacement_list,
 				     std::make_unique<Chromosome>(makeBinaryString("1111")),
 				     2, false),
 	      "appendReplacement should reject duplicate unique-only children");
-  expect_true(pop.appendReplacement(replacement_list,
+  expect_true(PopulationTestRig::appendReplacement(pop, replacement_list,
 				    std::make_unique<Chromosome>(makeBinaryString("0000")),
 				    2, false),
 	      "appendReplacement should keep a second unique child");
-  expect_true(!pop.appendReplacement(replacement_list,
+  expect_true(!PopulationTestRig::appendReplacement(pop, replacement_list,
 				     std::make_unique<Chromosome>(makeBinaryString("0011")),
 				     2, true),
 	      "appendReplacement should reject overflow children when the replacement list is full");
@@ -880,7 +979,7 @@ void test_population_insert_new_population_rejects_overflow()
 
   expect_throws<GAFatalException>(
     [&pop, &replacements]() mutable {
-      pop.insertNewPopulation(std::move(replacements), 3);
+      PopulationTestRig::insertNewPopulation(pop, std::move(replacements), 3);
     },
     "insertNewPopulation should reject replacement counts larger than the population");
 }
@@ -893,10 +992,10 @@ void test_population_selection_guard_and_random_fitness_modes()
 							   Population::DeletionMode::DeleteAll,
 							   Population::FitnessMode::Evaluation,
 							   Population::VariableLengthMode::Fixed, 2));
-  fractional.initializePopulation();
+  PopulationTestRig::initializePopulation(fractional);
   std::vector<double> roulette(2, 0.4);
   expect_throws<GAFatalException>(
-    [&fractional, &roulette]() { fractional.selectParent(roulette); },
+    [&fractional, &roulette]() { PopulationTestRig::selectParent(fractional, roulette); },
     "Roulette selection should throw when rounded weights produce an invalid index");
 
   InspectablePopulation windowed(make_population_options(Population::OperationMode::Maximize, 4, 4, 1, 0.0, 0.0,
@@ -906,7 +1005,7 @@ void test_population_selection_guard_and_random_fitness_modes()
 							 Population::FitnessMode::Windowed,
 							 Population::VariableLengthMode::Fixed, 2));
   prepare_population(windowed, "1", "0");
-  int selected = windowed.selectParent(windowed.selectFitnessWeights());
+  int selected = PopulationTestRig::selectParent(windowed, PopulationTestRig::selectFitnessWeights(windowed));
   expect_true(selected >= 0 && selected < windowed.settings().numberOfIndividuals,
 	      "Windowed fitness selection should return an in-range parent index");
 
@@ -917,7 +1016,7 @@ void test_population_selection_guard_and_random_fitness_modes()
 							   Population::FitnessMode::LinearNormalized,
 							   Population::VariableLengthMode::Fixed, 2));
   prepare_population(normalized, "1", "0");
-  selected = normalized.selectParent(normalized.selectFitnessWeights());
+  selected = PopulationTestRig::selectParent(normalized, PopulationTestRig::selectFitnessWeights(normalized));
   expect_true(selected >= 0 && selected < normalized.settings().numberOfIndividuals,
 	      "Linear normalized fitness selection should return an in-range parent index");
 
@@ -928,7 +1027,7 @@ void test_population_selection_guard_and_random_fitness_modes()
 								 Population::FitnessMode::Evaluation,
 								 Population::VariableLengthMode::Fixed, 2));
   prepare_population(random_selection, "1111", "0000");
-  std::vector<std::unique_ptr<Chromosome> > random_bred = random_selection.breedPopulation(2);
+  std::vector<std::unique_ptr<Chromosome> > random_bred = PopulationTestRig::breedPopulation(random_selection, 2);
   expect_true(random_bred.size() == 2,
 	      "Random parent selection should generate the requested number of children");
 }
@@ -954,7 +1053,7 @@ void test_population_invalid_enum_paths()
 							    Population::VariableLengthMode::Fixed, 2));
   bad_fitness.setFitnessMode(static_cast<Population::FitnessMode>(99));
   expect_throws<GAFatalException>(
-    [&bad_fitness]() { bad_fitness.selectFitnessWeights(); },
+    [&bad_fitness]() { PopulationTestRig::selectFitnessWeights(bad_fitness); },
     "Unsupported fitness technique should throw");
 
   InspectablePopulation bad_parent(make_population_options(Population::OperationMode::Maximize, 2, 2, 4, 0.0, 0.0,
@@ -966,7 +1065,7 @@ void test_population_invalid_enum_paths()
   bad_parent.setParentSelectionMode(static_cast<Population::ParentSelectionMode>(99));
   prepare_population(bad_parent, "1111", "0000");
   expect_throws<GAFatalException>(
-    [&bad_parent]() { bad_parent.breedPopulation(1); },
+    [&bad_parent]() { PopulationTestRig::breedPopulation(bad_parent, 1); },
     "Unsupported parent selection technique should throw");
 
   InspectablePopulation bad_operation(make_population_options(Population::OperationMode::Maximize, 2, 2, 4, 0.0, 0.0,
@@ -979,7 +1078,7 @@ void test_population_invalid_enum_paths()
   bad_operation.setOperationMode(static_cast<Population::OperationMode>(99));
   expect_throws<GAFatalException>(
     [&bad_operation]() {
-      bad_operation.selectParent(bad_operation.selectFitnessWeights());
+      PopulationTestRig::selectParent(bad_operation, PopulationTestRig::selectFitnessWeights(bad_operation));
     },
     "Unsupported operation technique in selection should throw");
 
@@ -987,7 +1086,7 @@ void test_population_invalid_enum_paths()
   replacements.push_back(std::make_unique<Chromosome>(makeBinaryString("1111")));
   expect_throws<GAFatalException>(
     [&bad_operation, &replacements]() mutable {
-      bad_operation.insertNewPopulation(std::move(replacements), 1);
+      PopulationTestRig::insertNewPopulation(bad_operation, std::move(replacements), 1);
     },
     "Unsupported operation technique in replacement should throw");
 
@@ -1003,7 +1102,7 @@ void test_population_invalid_enum_paths()
   dup_replacements.push_back(std::make_unique<Chromosome>(makeBinaryString("0011")));
   expect_throws<GAFatalException>(
     [&bad_operation_dup, &dup_replacements]() mutable {
-      bad_operation_dup.insertNewPopulation(std::move(dup_replacements), 1);
+      PopulationTestRig::insertNewPopulation(bad_operation_dup, std::move(dup_replacements), 1);
     },
     "Unsupported operation technique in duplicate-filtered replacement should throw");
 }
@@ -1018,7 +1117,7 @@ void test_population_verbose_path()
 						    Population::VariableLengthMode::Fixed, 2));
   std::ostringstream out;
   pop.run(out, PopulationRunReportOptions{true, true});
-  expect_true(pop.isPopulationInitialized(), "Verbose run path should still complete successfully");
+  expect_true(PopulationTestRig::isPopulationInitialized(pop), "Verbose run path should still complete successfully");
 }
 
 void test_population_verbose_minimize_path()
@@ -1031,7 +1130,7 @@ void test_population_verbose_minimize_path()
 						    Population::VariableLengthMode::Fixed, 2));
   std::ostringstream out;
   pop.run(out, PopulationRunReportOptions{true, true});
-  expect_true(pop.isPopulationInitialized(), "Verbose minimize path should still complete successfully");
+  expect_true(PopulationTestRig::isPopulationInitialized(pop), "Verbose minimize path should still complete successfully");
 }
 
 void test_population_run_modes()
@@ -1069,7 +1168,7 @@ void test_population_run_modes()
 								Population::VariableLengthMode::Fixed, 2));
   delete_last_min.run(out, PopulationRunReportOptions{false, false});
 
-  expect_true(delete_last_min.isPopulationInitialized(), "Additional run modes should complete successfully");
+  expect_true(PopulationTestRig::isPopulationInitialized(delete_last_min), "Additional run modes should complete successfully");
 }
 
 void test_population_execute_returns_structured_result()
@@ -1232,7 +1331,7 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
 						    Population::FitnessMode::Evaluation,
 						    Population::VariableLengthMode::Fixed, 2));
 
-  std::unique_ptr<Chromosome> initial = pop.createInitialChromosome();
+  std::unique_ptr<Chromosome> initial = PopulationTestRig::createInitialChromosome(pop);
   expect_true(initial.get() != nullptr, "Default createInitialChromosome should produce a chromosome");
   expect_true(initial->length() == pop.settings().geneticDiversity,
 	      "Default createInitialChromosome should use the configured diversity as chromosome length");
@@ -1246,7 +1345,7 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
   std::unique_ptr<Chromosome> mother = std::make_unique<Chromosome>(makeBinaryString("111100"));
   std::unique_ptr<Chromosome> father = std::make_unique<Chromosome>(makeBinaryString("000011"));
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-    pop.mateChromosomes(*mother, *father);
+    PopulationTestRig::mateChromosomes(pop, *mother, *father);
 
   expect_true(children.first.get() != nullptr && children.second.get() != nullptr,
 	      "Default mateChromosomes should produce two children");
@@ -1255,7 +1354,7 @@ void test_population_default_operator_hooks_are_explicitly_exercised()
   expect_true(children.second->equals(*mother),
 	      "Default mateChromosomes should clone the mother into the second child when crossover is disabled");
 
-  pop.mutateChromosome(*children.first);
+  PopulationTestRig::mutateChromosome(pop, *children.first);
   for (int i = 0 ; i < children.first->length() ; i++)
     {
       int value = children.first->genes().valueAt(i);
@@ -1273,7 +1372,7 @@ void test_population_operator_strategies_override_default_hooks()
 						     Population::FitnessMode::Evaluation,
 						     Population::VariableLengthMode::Fixed, 2));
 
-  std::unique_ptr<Chromosome> initial = pop.createInitialChromosome();
+  std::unique_ptr<Chromosome> initial = PopulationTestRig::createInitialChromosome(pop);
   for (int i = 0 ; i < initial->length() ; i++)
     {
       expect_true(initial->genes().valueAt(i) == 1,
@@ -1283,14 +1382,14 @@ void test_population_operator_strategies_override_default_hooks()
   std::unique_ptr<Chromosome> mother = std::make_unique<Chromosome>(makeBinaryString("1111"));
   std::unique_ptr<Chromosome> father = std::make_unique<Chromosome>(makeBinaryString("0000"));
   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
-    pop.mateChromosomes(*mother, *father);
+    PopulationTestRig::mateChromosomes(pop, *mother, *father);
 
   expect_true(children.first->equals(*father),
 	      "Custom mating strategies should control the first child");
   expect_true(children.second->equals(*mother),
 	      "Custom mating strategies should control the second child");
 
-  pop.mutateChromosome(*children.first);
+  PopulationTestRig::mutateChromosome(pop, *children.first);
   for (int i = 0 ; i < children.first->length() ; i++)
     {
       expect_true(children.first->genes().valueAt(i) == 0,
@@ -1309,9 +1408,9 @@ void test_delete_all_but_best_runs()
   std::ostringstream out;
   pop.run(out, PopulationRunReportOptions{false, false});
 
-  expect_true(pop.isPopulationInitialized() == true, "Population should initialize during run");
-  expect_true(!pop.chromosomes().empty(), "Population should retain its table after run");
-  expect_true(pop.chromosomes()[pop.settings().numberOfIndividuals - 1].get()->genes().valueAt(0) == 1,
+  expect_true(PopulationTestRig::isPopulationInitialized(pop) == true, "Population should initialize during run");
+  expect_true(!PopulationTestRig::chromosomes(pop).empty(), "Population should retain its table after run");
+  expect_true(PopulationTestRig::chromosomes(pop)[pop.settings().numberOfIndividuals - 1].get()->genes().valueAt(0) == 1,
 	      "Best chromosome should remain present after DeleteAllButBest runs");
 }
 
