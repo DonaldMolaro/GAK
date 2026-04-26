@@ -5,11 +5,6 @@
 #include "population.hh"
 #include "dome.hh"
 
-Dome::Dome(const Population::Settings& settings)
-   : Population(settings)
-{
-}
-
 double Dome::sqr(double x)
 {
    return x * x;

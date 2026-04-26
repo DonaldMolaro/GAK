@@ -6,11 +6,6 @@
 #include "population.hh"
 #include "f6.hh"
 
-F6::F6(const Population::Settings& settings)
-   : Population(settings)
-{
-}
-
 double F6::sqr(double x)
 {
    return x * x;
@@ -47,6 +42,5 @@ void F6::printCandidate(const BaseString& genes, std::ostream& out) const
    
    out << "X ( " << x3 << " ) Y ( " << y3 << " ) ";
 }
-
 
 

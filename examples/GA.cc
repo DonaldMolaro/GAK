@@ -342,20 +342,19 @@ Population::Settings applyOverrides(Population::Settings options, const CliOptio
   return options;
 }
 
-template <typename Example>
-int runExample(Example& example, bool showSettings)
+int runPopulation(Population& population, bool showSettings)
 {
   if (showSettings)
   {
-    Population::RunResult result = example.execute(false);
+    Population::RunResult result = population.execute(false);
     PopulationReporter::write(std::cout,
-                                   example,
+                                   population,
                                    result,
                                    PopulationRunReportOptions(true, false));
   }
   else
   {
-    example.run();
+    population.run();
   }
   return EXIT_SUCCESS;
 }
@@ -375,25 +374,27 @@ int main(int argc,char *argv[])
     case 'd':
     case 'D':
       {
-        Dome dome(applyOverrides(make_dome_options(), cli));
-        return runExample(dome, cli.showSettings);
+        Dome dome;
+        Population population(applyOverrides(make_dome_options(), cli), dome);
+        return runPopulation(population, cli.showSettings);
       }
     case '6':
       {
-        F6 f6(applyOverrides(make_f6_options(), cli));
-        return runExample(f6, cli.showSettings);
+        F6 f6;
+        Population population(applyOverrides(make_f6_options(), cli), f6);
+        return runPopulation(population, cli.showSettings);
       }
     case 'A':
     case 'a':
       {
         Alpha alpha(applyOverrides(make_alpha_options(), cli));
-        return runExample(alpha, cli.showSettings);
+        return runPopulation(alpha, cli.showSettings);
       }
     case 'S':
     case 's':
       {
         Spell spell(applyOverrides(make_spell_options(), cli));
-        return runExample(spell, cli.showSettings);
+        return runPopulation(spell, cli.showSettings);
       }
     case 'T':
     case 't':
@@ -401,37 +402,37 @@ int main(int argc,char *argv[])
         const int gridSize = cli.gridProvided ? cli.grid : 500;
         TravelingSalesman travelingSalesman(applyOverrides(make_traveling_salesman_options(), cli), gridSize);
         travelingSalesman.writeCityList(std::cout);
-        return runExample(travelingSalesman, cli.showSettings);
+        return runPopulation(travelingSalesman, cli.showSettings);
       }
     case 'Q':
     case 'q':
       {
         NQueens queens(applyOverrides(make_nqueens_options(), cli));
-        return runExample(queens, cli.showSettings);
+        return runPopulation(queens, cli.showSettings);
       }
     case 'K':
     case 'k':
       {
         Knapsack knapsack(applyOverrides(make_knapsack_options(), cli));
-        return runExample(knapsack, cli.showSettings);
+        return runPopulation(knapsack, cli.showSettings);
       }
     case 'L':
     case 'l':
       {
         LatinSquare latinSquare(applyOverrides(make_latin_square_options(), cli));
-        return runExample(latinSquare, cli.showSettings);
+        return runPopulation(latinSquare, cli.showSettings);
       }
     case 'U':
     case 'u':
       {
         Sudoku sudoku(applyOverrides(make_sudoku_options(), cli));
-        return runExample(sudoku, cli.showSettings);
+        return runPopulation(sudoku, cli.showSettings);
       }
     case 'C':
     case 'c':
       {
         SudokuConstrained sudoku(applyOverrides(make_constrained_sudoku_options(), cli));
-        return runExample(sudoku, cli.showSettings);
+        return runPopulation(sudoku, cli.showSettings);
       }
     default:
       usage(std::cerr);

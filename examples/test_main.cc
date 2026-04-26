@@ -111,8 +111,7 @@ Population::Settings make_options(Population::OperationMode operation,
 
 void test_dome_fitness()
 {
-  Dome dome(make_options(Population::OperationMode::Minimize, 32,
-                         Population::VariableLengthMode::Fixed, 2));
+  Dome dome;
   BaseString origin = makeBinaryString(std::string(32, '0'));
 
   expect_true(dome.evaluateFitness(origin) == 100,
@@ -121,8 +120,7 @@ void test_dome_fitness()
 
 void test_f6_fitness_is_positive()
 {
-  F6 f6(make_options(Population::OperationMode::Maximize, 44,
-                     Population::VariableLengthMode::Fixed, 2));
+  F6 f6;
   BaseString origin = makeBinaryString(std::string(44, '0'));
   const double fitness = f6.evaluateFitness(origin);
 
