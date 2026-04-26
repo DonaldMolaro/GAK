@@ -1,4 +1,5 @@
 #include <cstdlib>
+#include <iomanip>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -19,6 +20,20 @@
 
 namespace
 {
+const int kKnapsackWeights[] = {2, 3, 5, 7, 1, 4, 1, 6, 9, 8, 3, 5};
+const int kKnapsackValues[] = {6, 5, 8, 9, 6, 7, 3, 7, 12, 10, 4, 8};
+const int kSudokuPuzzle[] = {
+  5, 3, 0, 0, 7, 0, 0, 0, 0,
+  6, 0, 0, 1, 9, 5, 0, 0, 0,
+  0, 9, 8, 0, 0, 0, 0, 6, 0,
+  8, 0, 0, 0, 6, 0, 0, 0, 3,
+  4, 0, 0, 8, 0, 3, 0, 0, 1,
+  7, 0, 0, 0, 2, 0, 0, 0, 6,
+  0, 6, 0, 0, 0, 0, 2, 8, 0,
+  0, 0, 0, 4, 1, 9, 0, 0, 5,
+  0, 0, 0, 0, 8, 0, 0, 7, 9
+};
+
 struct CliOptions
 {
   std::string mode;
@@ -36,6 +51,205 @@ struct CliOptions
   bool gridProvided = false;
   int grid = 0;
 };
+
+void printSectionHeading(const std::string& title)
+{
+  std::cout << title << '\n';
+}
+
+void printLabeledLine(const std::string& label, const std::string& value)
+{
+  std::cout << "  " << std::left << std::setw(16) << label << ": " << value << '\n';
+}
+
+void printLabeledLine(const std::string& label, int value)
+{
+  std::cout << "  " << std::left << std::setw(16) << label << ": " << value << '\n';
+}
+
+void printLabeledLine(const std::string& label, double value)
+{
+  std::cout << "  " << std::left << std::setw(16) << label << ": " << value << '\n';
+}
+
+void finishInputSection()
+{
+  std::cout << std::flush;
+}
+
+void printSudokuPuzzle()
+{
+  printSectionHeading("Problem input:");
+  std::cout << "Sudoku givens:\n";
+  for (int row = 0 ; row < 9 ; row++)
+  {
+    for (int column = 0 ; column < 9 ; column++)
+    {
+      const int value = kSudokuPuzzle[(row * 9) + column];
+      std::cout << (value == 0 ? '.' : static_cast<char>('0' + value));
+      if (column == 2 || column == 5)
+      {
+        std::cout << " | ";
+      }
+      else if (column + 1 < 9)
+      {
+        std::cout << ' ';
+      }
+    }
+    std::cout << '\n';
+    if (row == 2 || row == 5)
+    {
+      std::cout << "------+-------+------\n";
+    }
+  }
+  std::cout << '\n';
+  finishInputSection();
+}
+
+void printDomeInput()
+{
+  printSectionHeading("Problem input:");
+  printLabeledLine("problem", "Dome objective");
+  printLabeledLine("encoding", "16 bits for X, 16 bits for Y");
+  printLabeledLine("scaling", "decoded coordinates / 100");
+  std::cout << '\n';
+  finishInputSection();
+}
+
+void printF6Input()
+{
+  printSectionHeading("Problem input:");
+  printLabeledLine("problem", "F6 objective");
+  printLabeledLine("encoding", "22 bits for X, 22 bits for Y");
+  printLabeledLine("scaling", "decoded / 1000, then shift by -100");
+  std::cout << '\n';
+  finishInputSection();
+}
+
+void printAlphaInput()
+{
+  printSectionHeading("Problem input:");
+  printLabeledLine("target", "sorted 26-letter alphabet");
+  printLabeledLine("symbols", "a b c d e f g h i j k l m");
+  printLabeledLine("", "n o p q r s t u v w x y z");
+  std::cout << '\n';
+  finishInputSection();
+}
+
+void printSpellInput()
+{
+  printSectionHeading("Problem input:");
+  printLabeledLine("target word", "egghead");
+  printLabeledLine("alphabet", "a-z");
+  std::cout << '\n';
+  finishInputSection();
+}
+
+void printNQueensInput()
+{
+  printSectionHeading("Problem input:");
+  printLabeledLine("board", "8x8");
+  printLabeledLine("encoding", "one queen per column");
+  printLabeledLine("gene meaning", "row index for each column");
+  std::cout << '\n';
+  finishInputSection();
+}
+
+void printKnapsackInput()
+{
+  printSectionHeading("Problem input:");
+  printLabeledLine("capacity", 35);
+  std::cout << "  items:\n";
+  for (int i = 0 ; i < 12 ; i++)
+  {
+    std::cout << "    "
+              << std::left << std::setw(8) << ("item " + std::to_string(i))
+              << " weight=" << std::setw(2) << kKnapsackWeights[i]
+              << " value=" << kKnapsackValues[i] << '\n';
+  }
+  std::cout << '\n';
+  finishInputSection();
+}
+
+void printLatinSquareInput()
+{
+  printSectionHeading("Problem input:");
+  printLabeledLine("board", "5x5 Latin square");
+  printLabeledLine("symbols", "0 1 2 3 4");
+  std::cout << '\n';
+  finishInputSection();
+}
+
+const char* operationLabel(Population::OperationMode mode)
+{
+  return mode == Population::OperationMode::Minimize ? "minimize" : "maximize";
+}
+
+const char* reproductionLabel(Population::ReproductionMode mode)
+{
+  return mode == Population::ReproductionMode::DisallowDuplicates ? "disallow-duplicates" : "allow-duplicates";
+}
+
+const char* selectionLabel(Population::ParentSelectionMode mode)
+{
+  return mode == Population::ParentSelectionMode::Random ? "random" : "roulette";
+}
+
+const char* deletionLabel(Population::DeletionMode mode)
+{
+  switch (mode)
+  {
+    case Population::DeletionMode::DeleteAll: return "delete-all";
+    case Population::DeletionMode::DeleteAllButBest: return "delete-all-but-best";
+    case Population::DeletionMode::DeleteHalf: return "delete-half";
+    case Population::DeletionMode::DeleteQuarter: return "delete-quarter";
+    case Population::DeletionMode::DeleteLast: return "delete-last";
+  }
+  return "unknown";
+}
+
+const char* fitnessLabel(Population::FitnessMode mode)
+{
+  switch (mode)
+  {
+    case Population::FitnessMode::Evaluation: return "evaluation";
+    case Population::FitnessMode::Windowed: return "windowed";
+    case Population::FitnessMode::LinearNormalized: return "linear-normalized";
+  }
+  return "unknown";
+}
+
+const char* variableLengthLabel(Population::VariableLengthMode mode)
+{
+  return mode == Population::VariableLengthMode::Variable ? "variable" : "fixed";
+}
+
+void printGaParameters(const Population::Settings& settings)
+{
+  printSectionHeading("GA parameters:");
+  printLabeledLine("operation", operationLabel(settings.operation));
+  printLabeledLine("population", settings.numberOfIndividuals);
+  printLabeledLine("trials", settings.numberOfTrials);
+  printLabeledLine("diversity", settings.geneticDiversity);
+  printLabeledLine("base states", settings.baseStates);
+  printLabeledLine("mutation", settings.bitMutationRate);
+  printLabeledLine("crossover", settings.crossOverRate);
+  printLabeledLine("reproduction", reproductionLabel(settings.reproduction));
+  printLabeledLine("selection", selectionLabel(settings.parentSelection));
+  printLabeledLine("deletion", deletionLabel(settings.deletion));
+  printLabeledLine("fitness", fitnessLabel(settings.fitness));
+  printLabeledLine("length mode", variableLengthLabel(settings.variableLength));
+  if (settings.useFixedRandomSeed)
+  {
+    printLabeledLine("seed", std::to_string(settings.randomSeed) + " (fixed)");
+  }
+  else
+  {
+    printLabeledLine("seed", "generated at runtime");
+  }
+  std::cout << '\n';
+  finishInputSection();
+}
 
 Population::Settings make_dome_options()
 {
@@ -344,6 +558,7 @@ Population::Settings applyOverrides(Population::Settings options, const CliOptio
 
 int runPopulation(Population& population, bool showSettings)
 {
+  printGaParameters(population.settings());
   if (showSettings)
   {
     Population::RunResult result = population.execute(false);
@@ -354,7 +569,8 @@ int runPopulation(Population& population, bool showSettings)
   }
   else
   {
-    population.run();
+    const bool verbose = std::getenv("GAK_VERBOSE") != nullptr;
+    population.run(std::cout, PopulationRunReportOptions{verbose, verbose});
   }
   return EXIT_SUCCESS;
 }
@@ -374,12 +590,14 @@ int main(int argc,char *argv[])
     case 'd':
     case 'D':
       {
+        printDomeInput();
         Dome dome;
         Population population(applyOverrides(make_dome_options(), cli), dome);
         return runPopulation(population, cli.showSettings);
       }
     case '6':
       {
+        printF6Input();
         F6 f6;
         Population population(applyOverrides(make_f6_options(), cli), f6);
         return runPopulation(population, cli.showSettings);
@@ -387,6 +605,7 @@ int main(int argc,char *argv[])
     case 'A':
     case 'a':
       {
+        printAlphaInput();
         Population::Settings settings = applyOverrides(make_alpha_options(), cli);
         Alpha alpha(settings);
         Population population(settings, alpha);
@@ -395,6 +614,7 @@ int main(int argc,char *argv[])
     case 'S':
     case 's':
       {
+        printSpellInput();
         Spell spell;
         Population population(applyOverrides(make_spell_options(), cli), spell);
         return runPopulation(population, cli.showSettings);
@@ -412,6 +632,7 @@ int main(int argc,char *argv[])
     case 'Q':
     case 'q':
       {
+        printNQueensInput();
         NQueens queens;
         Population population(applyOverrides(make_nqueens_options(), cli), queens);
         return runPopulation(population, cli.showSettings);
@@ -419,6 +640,7 @@ int main(int argc,char *argv[])
     case 'K':
     case 'k':
       {
+        printKnapsackInput();
         Knapsack knapsack;
         Population population(applyOverrides(make_knapsack_options(), cli), knapsack);
         return runPopulation(population, cli.showSettings);
@@ -426,6 +648,7 @@ int main(int argc,char *argv[])
     case 'L':
     case 'l':
       {
+        printLatinSquareInput();
         LatinSquare latinSquare;
         Population population(applyOverrides(make_latin_square_options(), cli), latinSquare);
         return runPopulation(population, cli.showSettings);
@@ -433,6 +656,7 @@ int main(int argc,char *argv[])
     case 'U':
     case 'u':
       {
+        printSudokuPuzzle();
         Sudoku sudoku;
         Population population(applyOverrides(make_sudoku_options(), cli), sudoku);
         return runPopulation(population, cli.showSettings);
@@ -440,6 +664,7 @@ int main(int argc,char *argv[])
     case 'C':
     case 'c':
       {
+        printSudokuPuzzle();
         Population::Settings settings = applyOverrides(make_constrained_sudoku_options(), cli);
         SudokuConstrained sudoku(settings);
         Population population(settings, sudoku);

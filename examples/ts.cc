@@ -129,7 +129,8 @@ void TravelingSalesman::initializeCityCoordinates()
 
 void TravelingSalesman::writeCityList(std::ostream& out) const
 {
-   out << "City List is:\n";
+   out << "Problem input:\n";
+   out << "City list:\n";
    for ( int i = 0 ; i < numCities ; i++ )
    {
       out << static_cast<char>(i + 'a') << ":("
