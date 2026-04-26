@@ -20,14 +20,9 @@ const int Sudoku::kPuzzle[Sudoku::kCellCount] = {
    0, 0, 0, 0, 8, 0, 0, 7, 9
 };
 
-Sudoku::Sudoku(const Population::Settings& settings)
-   : Population(settings)
+void Sudoku::validatePopulation(const Population& population) const
 {
-   validateSettings(settings);
-}
-
-void Sudoku::validateSettings(const Population::Settings& settings) const
-{
+   const Population::Settings& settings = population.settings();
    if (settings.geneticDiversity != kCellCount)
    {
       throw GAFatalException(__FILE__,__LINE__,"Sudoku expects 81 genes");

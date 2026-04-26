@@ -241,8 +241,7 @@ void test_knapsack_prefers_feasible_high_value_selections()
 
 void test_latin_square_rewards_unique_rows_and_columns()
 {
-  LatinSquare latin_square(make_options(Population::OperationMode::Maximize, 16,
-                                        Population::VariableLengthMode::Fixed, 4));
+  LatinSquare latin_square;
 
   BaseString solution(16, 4);
   const int solved_values[16] = {
@@ -276,8 +275,9 @@ void test_latin_square_run_path()
   options.deletion = Population::DeletionMode::DeleteHalf;
   options.fitness = Population::FitnessMode::LinearNormalized;
 
-  LatinSquare latin_square(options);
-  Population::RunResult result = latin_square.execute(false);
+  LatinSquare latin_square;
+  Population population(options, latin_square);
+  Population::RunResult result = population.execute(false);
 
   expect_true(result.evaluations >= options.numberOfIndividuals,
               "LatinSquare execute should complete a run without throwing");
@@ -285,8 +285,7 @@ void test_latin_square_run_path()
 
 void test_sudoku_rewards_valid_solution_and_givens()
 {
-  Sudoku sudoku(make_options(Population::OperationMode::Maximize, 81,
-                             Population::VariableLengthMode::Fixed, 9));
+  Sudoku sudoku;
 
   BaseString solution(81, 9);
   const int actual_solution[81] = {
@@ -325,8 +324,9 @@ void test_sudoku_run_path()
   options.deletion = Population::DeletionMode::DeleteHalf;
   options.fitness = Population::FitnessMode::LinearNormalized;
 
-  Sudoku sudoku(options);
-  Population::RunResult result = sudoku.execute(false);
+  Sudoku sudoku;
+  Population population(options, sudoku);
+  Population::RunResult result = population.execute(false);
 
   expect_true(result.evaluations >= options.numberOfIndividuals,
               "Sudoku execute should complete a run without throwing");

@@ -3,15 +3,13 @@
 
 #include "population.hh"
 
-class LatinSquare : public Population
+class LatinSquare : public PopulationProblem
 {
 public:
-   explicit LatinSquare(const Population::Settings& settings);
-
+   void validatePopulation(const Population& population) const override;
    double evaluateFitness(const BaseString& genes) override;
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
 
 private:
    int squareSize(const BaseString& genes) const;
 };
-

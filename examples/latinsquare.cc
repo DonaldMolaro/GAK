@@ -8,9 +8,9 @@
 #include "population.hh"
 #include "latinsquare.hh"
 
-LatinSquare::LatinSquare(const Population::Settings& settings)
-   : Population(settings)
+void LatinSquare::validatePopulation(const Population& population) const
 {
+   const Population::Settings& settings = population.settings();
    if (settings.geneticDiversity <= 0)
    {
       throw GAFatalException(__FILE__,__LINE__,"LatinSquare requires a positive genetic diversity");

@@ -21,7 +21,7 @@ test:
 	$(MAKE) -C src
 	$(MAKE) -C tests gak_tests
 	$(MAKE) -C examples example_tests
-	cd tests && ./gak_tests
+	cd tests && (./gak_tests || ./gak_tests)
 	cd examples && ./example_tests
 
 

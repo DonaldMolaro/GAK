@@ -422,14 +422,16 @@ int main(int argc,char *argv[])
     case 'L':
     case 'l':
       {
-        LatinSquare latinSquare(applyOverrides(make_latin_square_options(), cli));
-        return runPopulation(latinSquare, cli.showSettings);
+        LatinSquare latinSquare;
+        Population population(applyOverrides(make_latin_square_options(), cli), latinSquare);
+        return runPopulation(population, cli.showSettings);
       }
     case 'U':
     case 'u':
       {
-        Sudoku sudoku(applyOverrides(make_sudoku_options(), cli));
-        return runPopulation(sudoku, cli.showSettings);
+        Sudoku sudoku;
+        Population population(applyOverrides(make_sudoku_options(), cli), sudoku);
+        return runPopulation(population, cli.showSettings);
       }
     case 'C':
     case 'c':

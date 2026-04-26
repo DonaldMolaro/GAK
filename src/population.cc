@@ -57,6 +57,7 @@ Population::Population(const Settings& settings)
       std::time(&currenttime);
       setRandomSeed(static_cast<unsigned int>(currenttime));
    }
+   problem_.validatePopulation(*this);
 }
 
 Population::Population(const Settings& settings, PopulationProblem& problem)
@@ -75,6 +76,7 @@ Population::Population(const Settings& settings, PopulationProblem& problem)
       std::time(&currenttime);
       setRandomSeed(static_cast<unsigned int>(currenttime));
    }
+   problem_.validatePopulation(*this);
 }
 
 Population::~Population() = default;
@@ -95,6 +97,10 @@ void Population::printCandidate(const BaseString& genes, std::ostream& out) cons
       throw GAFatalException(__FILE__,__LINE__,"Population requires a problem implementation");
    }
    problem_.printCandidate(genes, out);
+}
+
+void PopulationProblem::validatePopulation(const Population&) const
+{
 }
 
 std::unique_ptr<Chromosome> PopulationProblem::initializeCandidate(Population& population)

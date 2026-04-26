@@ -17,6 +17,7 @@ class PopulationProblem
 {
 public:
    virtual ~PopulationProblem() = default;
+   virtual void validatePopulation(const Population& population) const;
    virtual double evaluateFitness(const BaseString& genes) = 0;
    virtual void printCandidate(const BaseString& genes, std::ostream& out) const = 0;
    virtual std::unique_ptr<Chromosome> initializeCandidate(Population& population);
