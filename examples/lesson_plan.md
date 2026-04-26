@@ -45,6 +45,10 @@ Checkpoint:
 
 - learner can explain the difference between binary and symbolic genes
 
+Suggested follow-up:
+
+- [lab_symbolic.md](/Users/donaldmolaro/src/GAK/examples/lab_symbolic.md)
+
 ## Module 4: Numeric Benchmarks
 
 Run:
@@ -70,6 +74,10 @@ Run:
 Checkpoint:
 
 - learner can explain what partial progress means in a constraint problem
+
+Suggested follow-up:
+
+- [lab_constraints.md](/Users/donaldmolaro/src/GAK/examples/lab_constraints.md)
 
 ## Module 6: Representation Matters
 

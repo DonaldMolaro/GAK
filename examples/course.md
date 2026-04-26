@@ -222,4 +222,6 @@ Best templates:
 - [lesson_plan.md](/Users/donaldmolaro/src/GAK/examples/lesson_plan.md)
 - [prerequisites.md](/Users/donaldmolaro/src/GAK/examples/prerequisites.md)
 - [lab_knapsack.md](/Users/donaldmolaro/src/GAK/examples/lab_knapsack.md)
+- [lab_symbolic.md](/Users/donaldmolaro/src/GAK/examples/lab_symbolic.md)
+- [lab_constraints.md](/Users/donaldmolaro/src/GAK/examples/lab_constraints.md)
 - [lab_sudoku.md](/Users/donaldmolaro/src/GAK/examples/lab_sudoku.md)

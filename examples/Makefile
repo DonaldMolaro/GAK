@@ -28,7 +28,7 @@ EXAMPLE_SRCS = spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc lati
 EXAMPLE_OBJS = $(EXAMPLE_SRCS:.cc=.o)
 DEPS = $(OBJS:.o=.d) $(EXAMPLE_OBJS:.o=.d)
 
-.PHONY: all clean test run-tests coverage
+.PHONY: all clean test run-tests coverage course-check
 
 all: $(OUTPUT)
 
@@ -50,6 +50,9 @@ test_main.o: CPPFLAGS += -DGAK_TESTING
 
 run-tests: $(TEST_OUTPUT)
 	./$(TEST_OUTPUT)
+
+course-check: $(OUTPUT)
+	./check_labs.sh
 
 coverage: $(TEST_OUTPUT)
 	LLVM_PROFILE_FILE=$(PROFRAW) ./$(TEST_OUTPUT)

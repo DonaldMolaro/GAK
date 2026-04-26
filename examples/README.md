@@ -23,8 +23,14 @@ If you are new to genetic algorithms, start with:
   key GA terms mapped to plain-language intuition
 - [lab_knapsack.md](/Users/donaldmolaro/src/GAK/examples/lab_knapsack.md):
   guided first lab on binary decision vectors and penalties
+- [lab_symbolic.md](/Users/donaldmolaro/src/GAK/examples/lab_symbolic.md):
+  guided lab on symbolic genes and exact-solution problems
+- [lab_constraints.md](/Users/donaldmolaro/src/GAK/examples/lab_constraints.md):
+  guided lab on graded constraint scoring
 - [lab_sudoku.md](/Users/donaldmolaro/src/GAK/examples/lab_sudoku.md):
   guided comparison between generic and constraint-aware operators
+- [visual_walkthroughs.md](/Users/donaldmolaro/src/GAK/examples/visual_walkthroughs.md):
+  quick conceptual map of the example categories
 
 ## Demo Modes
 
@@ -67,6 +73,12 @@ Run the example-target tests:
 
 ```sh
 make example-tests
+```
+
+Run the course/lab smoke checks:
+
+```sh
+./check_labs.sh
 ```
 
 For more tuning guidance, see
