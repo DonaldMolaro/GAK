@@ -8,6 +8,17 @@ This project has two supported test layers:
 The top-level [Makefile](/Users/donaldmolaro/src/GAK/Makefile) provides the
 main entry points.
 
+## Known Build Environments
+
+The current codebase has been validated in at least these environments:
+
+- macOS with Apple Clang / Command Line Tools
+- Fedora Linux on `aarch64`
+  Reported working on `Linux fedora 6.19.8-200.fc43.aarch64`
+
+If you validate another compiler or platform, it is useful to capture it in
+the top-level README and here.
+
 ## Common Commands
 
 Run the full supported test flow:

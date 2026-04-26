@@ -36,6 +36,26 @@ Clean build artifacts:
 make clean
 ```
 
+## Toolchain And Portability
+
+The project is intentionally lightweight and currently builds with a plain
+`make`-based workflow and a modern C++ compiler.
+
+Known good environments:
+
+- macOS with the Apple Clang toolchain from Command Line Tools
+- Fedora Linux on `aarch64`
+  Verified on `Linux fedora 6.19.8-200.fc43.aarch64`
+
+Current compiler expectations:
+
+- C++14 support
+- standard library support for `std::unique_ptr`, `std::mt19937`, and related
+  modern C++ facilities
+
+If a new platform builds cleanly, it is worth adding it here so the repo keeps
+an explicit portability record.
+
 ## Test
 
 Run the full supported test suite:
@@ -50,13 +70,14 @@ Run only the example-target tests:
 make example-tests
 ```
 
-Generate library coverage:
+Generate coverage:
 
 ```sh
 make coverage
 ```
 
-The coverage report is written to [tests/coverage.txt](/Users/donaldmolaro/src/GAK/tests/coverage.txt).
+The combined production-code coverage report is written to
+[coverage/coverage.txt](/Users/donaldmolaro/src/GAK/coverage/coverage.txt).
 
 For a more detailed developer workflow, see
 [docs/TESTING_AND_COVERAGE.md](/Users/donaldmolaro/src/GAK/docs/TESTING_AND_COVERAGE.md).
