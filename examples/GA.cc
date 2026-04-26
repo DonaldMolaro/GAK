@@ -393,8 +393,9 @@ int main(int argc,char *argv[])
     case 'S':
     case 's':
       {
-        Spell spell(applyOverrides(make_spell_options(), cli));
-        return runPopulation(spell, cli.showSettings);
+        Spell spell;
+        Population population(applyOverrides(make_spell_options(), cli), spell);
+        return runPopulation(population, cli.showSettings);
       }
     case 'T':
     case 't':
@@ -407,14 +408,16 @@ int main(int argc,char *argv[])
     case 'Q':
     case 'q':
       {
-        NQueens queens(applyOverrides(make_nqueens_options(), cli));
-        return runPopulation(queens, cli.showSettings);
+        NQueens queens;
+        Population population(applyOverrides(make_nqueens_options(), cli), queens);
+        return runPopulation(population, cli.showSettings);
       }
     case 'K':
     case 'k':
       {
-        Knapsack knapsack(applyOverrides(make_knapsack_options(), cli));
-        return runPopulation(knapsack, cli.showSettings);
+        Knapsack knapsack;
+        Population population(applyOverrides(make_knapsack_options(), cli), knapsack);
+        return runPopulation(population, cli.showSettings);
       }
     case 'L':
     case 'l':

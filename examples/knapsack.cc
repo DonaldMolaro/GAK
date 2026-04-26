@@ -8,11 +8,6 @@
 const int Knapsack::kWeights[Knapsack::kItemCount] = {2, 3, 5, 7, 1, 4, 1, 6, 9, 8, 3, 5};
 const int Knapsack::kValues[Knapsack::kItemCount] = {6, 5, 8, 9, 6, 7, 3, 7, 12, 10, 4, 8};
 
-Knapsack::Knapsack(const Population::Settings& settings)
-   : Population(settings)
-{
-}
-
 double Knapsack::evaluateFitness(const BaseString& genes)
 {
    int weight = 0;

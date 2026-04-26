@@ -6,11 +6,6 @@
 #include "population.hh"
 #include "nqueens.hh"
 
-NQueens::NQueens(const Population::Settings& settings)
-   : Population(settings)
-{
-}
-
 double NQueens::evaluateFitness(const BaseString& genes)
 {
    const int boardSize = genes.length();

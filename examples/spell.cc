@@ -4,11 +4,6 @@
 #include "population.hh"
 #include "spell.hh"
 
-Spell::Spell(const Population::Settings& settings)
-   : Population(settings)
-{
-}
-
 double Spell::evaluateFitness(const BaseString& genes)
 {
    int res = 0;

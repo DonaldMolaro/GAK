@@ -5,11 +5,9 @@
 
 #include "population.hh"
 
-class Knapsack : public Population
+class Knapsack : public PopulationProblem
 {
 public:
-   explicit Knapsack(const Population::Settings& settings);
-
    double evaluateFitness(const BaseString& genes) override;
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
 
@@ -19,4 +17,3 @@ private:
    static const int kWeights[kItemCount];
    static const int kValues[kItemCount];
 };
-

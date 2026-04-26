@@ -129,8 +129,7 @@ void test_f6_fitness_is_positive()
 
 void test_spell_fitness_matches_target_word()
 {
-  Spell spell(make_options(Population::OperationMode::Maximize, 7,
-                           Population::VariableLengthMode::Variable, 26));
+  Spell spell;
   BaseString target = makeSymbolicString("egghead");
   BaseString wrong = makeSymbolicString("aaaaaaa");
 
@@ -210,8 +209,7 @@ void test_traveling_salesman_fixed_seed_is_reproducible()
 
 void test_nqueens_rewards_non_attacking_layouts()
 {
-  NQueens queens(make_options(Population::OperationMode::Maximize, 8,
-                              Population::VariableLengthMode::Fixed, 8));
+  NQueens queens;
 
   BaseString solution(8, 8);
   const int solved_rows[8] = {0, 4, 7, 5, 2, 6, 1, 3};
@@ -230,8 +228,7 @@ void test_nqueens_rewards_non_attacking_layouts()
 
 void test_knapsack_prefers_feasible_high_value_selections()
 {
-  Knapsack knapsack(make_options(Population::OperationMode::Maximize, 12,
-                                 Population::VariableLengthMode::Fixed, 2));
+  Knapsack knapsack;
 
   BaseString feasible = makeBinaryString("111101100000");
   BaseString overweight = makeBinaryString("111111111111");
