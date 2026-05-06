@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GAK Run Viewer</title>
+  <style>
+    :root {
+      --bg: #f4f1ea;
+      --panel: #fffdf8;
+      --ink: #1d1b18;
+      --muted: #6a655d;
+      --accent: #1b6f5f;
+      --accent-soft: #d7ebe6;
+      --line: #d7d0c6;
+      --warn: #b6422e;
+      --warn-soft: #f5ddd8;
+      --given: #d9e5f7;
+      --shadow: 0 10px 30px rgba(29, 27, 24, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(27, 111, 95, 0.08), transparent 28rem),
+        linear-gradient(180deg, #faf7f1 0%, var(--bg) 100%);
+    }
+
+    .page {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 2rem;
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    .hero,
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 1.2rem;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 1.5rem 1.75rem;
+      display: grid;
+      gap: 0.8rem;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    h1 {
+      font-size: 2.1rem;
+    }
+
+    p {
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .panel {
+      padding: 1.25rem;
+    }
+
+    .stack {
+      display: grid;
+      gap: 0.9rem;
+    }
+
+    .file-row,
+    .slider-row {
+      display: flex;
+      gap: 0.8rem;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .dropzone {
+      border: 2px dashed var(--line);
+      border-radius: 1rem;
+      padding: 1rem;
+      background: #fcfbf7;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    input[type="file"],
+    textarea,
+    button,
+    input[type="range"] {
+      font: inherit;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 10rem;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 0.8rem;
+      padding: 0.9rem 1rem;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 0.75rem 1rem;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #ece6dd;
+      color: var(--ink);
+    }
+
+    .viewer {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    .stats {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .stat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.7rem;
+    }
+
+    .stat {
+      padding: 0.85rem;
+      border-radius: 0.9rem;
+      border: 1px solid var(--line);
+      background: #fffcf7;
+    }
+
+    .stat .label {
+      display: block;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.28rem;
+    }
+
+    .stat .value {
+      font-size: 1.2rem;
+      font-weight: 600;
+    }
+
+    .settings-list,
+    .notes-list {
+      display: grid;
+      gap: 0.4rem;
+      font-size: 0.95rem;
+    }
+
+    .settings-list div {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.8rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 1px dotted var(--line);
+    }
+
+    .canvas-wrap {
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      background: linear-gradient(180deg, #fff, #faf7f1);
+      padding: 1rem;
+      min-height: 32rem;
+      display: grid;
+      gap: 1rem;
+    }
+
+    canvas {
+      width: 100%;
+      display: block;
+      border-radius: 0.8rem;
+      background: #fff;
+      border: 1px solid #e6dfd5;
+    }
+
+    .fitness-chart {
+      height: 180px;
+    }
+
+    .viz-surface {
+      min-height: 28rem;
+      display: grid;
+      place-items: center;
+    }
+
+    .sudoku-board {
+      display: grid;
+      grid-template-columns: repeat(9, 1fr);
+      width: min(100%, 34rem);
+      aspect-ratio: 1 / 1;
+      border: 3px solid var(--ink);
+      background: #fff;
+    }
+
+    .sudoku-cell {
+      display: grid;
+      place-items: center;
+      border: 1px solid #cfc7bd;
+      font-size: clamp(0.9rem, 2vw, 1.3rem);
+      font-weight: 500;
+      position: relative;
+    }
+
+    .sudoku-cell.given {
+      background: var(--given);
+      font-weight: 700;
+    }
+
+    .sudoku-cell.conflict {
+      background: var(--warn-soft);
+      color: var(--warn);
+    }
+
+    .sudoku-cell.subgrid-right {
+      border-right: 3px solid var(--ink);
+    }
+
+    .sudoku-cell.subgrid-bottom {
+      border-bottom: 3px solid var(--ink);
+    }
+
+    .gene-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(4.2rem, 1fr));
+      gap: 0.6rem;
+      width: 100%;
+    }
+
+    .gene-card {
+      border: 1px solid var(--line);
+      border-radius: 0.8rem;
+      padding: 0.65rem 0.55rem;
+      background: #fff;
+      text-align: center;
+    }
+
+    .gene-card .gene-index {
+      color: var(--muted);
+      font-size: 0.78rem;
+      margin-bottom: 0.2rem;
+    }
+
+    .gene-card .gene-value {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .placeholder {
+      color: var(--muted);
+      text-align: center;
+      max-width: 32rem;
+      line-height: 1.6;
+    }
+
+    @media (max-width: 960px) {
+      .controls,
+      .viewer {
+        grid-template-columns: 1fr;
+      }
+
+      .page {
+        padding: 1rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <h1>GAK Run Viewer</h1>
+      <p class="muted">
+        Load a JSON report generated with <code>./GA &lt;mode&gt; --report-json ...</code>
+        and scrub through the best candidate found at each generation.
+      </p>
+      <p class="muted">
+        Custom visual rendering is currently supported for traveling salesman and
+        constraint-aware Sudoku. Other problems fall back to a generic gene view.
+      </p>
+    </section>
+
+    <section class="controls">
+      <div class="panel stack">
+        <h2>Load Report</h2>
+        <div class="dropzone" id="dropzone">
+          <div class="stack">
+            <div class="file-row">
+              <input id="file-input" type="file" accept=".json,application/json">
+              <button id="load-file-button" class="secondary" type="button">Load Selected File</button>
+            </div>
+            <p class="muted">You can also drag a JSON file onto this panel.</p>
+          </div>
+        </div>
+        <div class="stack">
+          <label for="json-input"><strong>Or paste JSON directly</strong></label>
+          <textarea id="json-input" placeholder='Paste a GAK report JSON payload here'></textarea>
+          <div class="file-row">
+            <button id="load-text-button" type="button">Load Pasted JSON</button>
+            <button id="clear-button" class="secondary" type="button">Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel stack">
+        <h2>Report Notes</h2>
+        <div class="notes-list">
+          <div><strong>Best use:</strong> compare improvements over time, not just final output.</div>
+          <div><strong>Inputs:</strong> JSON reports generated with <code>--report-json</code>.</div>
+          <div><strong>Key data:</strong> settings, seed, generation summaries, visualization payloads.</div>
+          <div><strong>Good first demos:</strong> <code>T</code> for route plots and <code>C</code> for Sudoku board evolution.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="viewer">
+      <aside class="panel stats">
+        <h2>Run Summary</h2>
+        <div class="stat-grid">
+          <div class="stat"><span class="label">Mode</span><span class="value" id="mode-value">-</span></div>
+          <div class="stat"><span class="label">Operation</span><span class="value" id="operation-value">-</span></div>
+          <div class="stat"><span class="label">Generation</span><span class="value" id="generation-value">-</span></div>
+          <div class="stat"><span class="label">Evaluations</span><span class="value" id="evaluations-value">-</span></div>
+          <div class="stat"><span class="label">Best Fitness</span><span class="value" id="best-value">-</span></div>
+          <div class="stat"><span class="label">Worst Fitness</span><span class="value" id="worst-value">-</span></div>
+        </div>
+
+        <div class="slider-row">
+          <label for="generation-slider"><strong>Generation</strong></label>
+          <input id="generation-slider" type="range" min="0" max="0" value="0" disabled>
+        </div>
+
+        <div class="settings-list" id="settings-list"></div>
+      </aside>
+
+      <section class="panel canvas-wrap">
+        <h2>Evolution View</h2>
+        <canvas id="fitness-chart" class="fitness-chart" width="900" height="180"></canvas>
+        <div id="viz-surface" class="viz-surface">
+          <div class="placeholder">
+            Load a report to start browsing generation-by-generation progress.
+          </div>
+        </div>
+      </section>
+    </section>
+  </div>
+
+  <script>
+    const state = {
+      report: null,
+      generationIndex: 0
+    };
+
+    const elements = {
+      fileInput: document.getElementById("file-input"),
+      loadFileButton: document.getElementById("load-file-button"),
+      loadTextButton: document.getElementById("load-text-button"),
+      clearButton: document.getElementById("clear-button"),
+      jsonInput: document.getElementById("json-input"),
+      dropzone: document.getElementById("dropzone"),
+      slider: document.getElementById("generation-slider"),
+      modeValue: document.getElementById("mode-value"),
+      operationValue: document.getElementById("operation-value"),
+      generationValue: document.getElementById("generation-value"),
+      evaluationsValue: document.getElementById("evaluations-value"),
+      bestValue: document.getElementById("best-value"),
+      worstValue: document.getElementById("worst-value"),
+      settingsList: document.getElementById("settings-list"),
+      vizSurface: document.getElementById("viz-surface"),
+      fitnessChart: document.getElementById("fitness-chart")
+    };
+
+    function clearViewer() {
+      state.report = null;
+      state.generationIndex = 0;
+      elements.slider.disabled = true;
+      elements.slider.min = "0";
+      elements.slider.max = "0";
+      elements.slider.value = "0";
+      elements.modeValue.textContent = "-";
+      elements.operationValue.textContent = "-";
+      elements.generationValue.textContent = "-";
+      elements.evaluationsValue.textContent = "-";
+      elements.bestValue.textContent = "-";
+      elements.worstValue.textContent = "-";
+      elements.settingsList.innerHTML = "";
+      elements.vizSurface.innerHTML = '<div class="placeholder">Load a report to start browsing generation-by-generation progress.</div>';
+      const ctx = elements.fitnessChart.getContext("2d");
+      ctx.clearRect(0, 0, elements.fitnessChart.width, elements.fitnessChart.height);
+    }
+
+    function guessMode(settings, firstVisualization) {
+      if (!settings) {
+        return "unknown";
+      }
+      if (firstVisualization && firstVisualization.type === "traveling_salesman") {
+        return "traveling salesman";
+      }
+      if (firstVisualization && firstVisualization.type === "graph_coloring") {
+        return "graph coloring";
+      }
+      if (firstVisualization && firstVisualization.type === "timetable") {
+        return "timetable";
+      }
+      if (firstVisualization && firstVisualization.type === "sudoku") {
+        return firstVisualization.variant === "constraint_aware"
+          ? "constraint-aware sudoku"
+          : "sudoku";
+      }
+      if (settings.chromosome_length === 8 && settings.base_states === 3) {
+        return "graph coloring";
+      }
+      if (settings.chromosome_length === 8 && settings.base_states === 4) {
+        return "timetable";
+      }
+      if (settings.chromosome_length === 12 && settings.base_states === 2) {
+        return "knapsack";
+      }
+      return "generic";
+    }
+
+    function parseReport(text) {
+      const parsed = JSON.parse(text);
+      if (!parsed || !parsed.settings || !parsed.result || !Array.isArray(parsed.result.generation_reports)) {
+        throw new Error("This does not look like a GAK report JSON file.");
+      }
+      return parsed;
+    }
+
+    function loadReportFromText(text) {
+      const parsed = parseReport(text);
+      state.report = parsed;
+      state.generationIndex = 0;
+      const reportCount = parsed.result.generation_reports.length;
+      elements.slider.disabled = reportCount === 0;
+      elements.slider.min = "0";
+      elements.slider.max = String(Math.max(0, reportCount - 1));
+      elements.slider.value = "0";
+      render();
+    }
+
+    function renderSettings(settings, firstVisualization) {
+      const rows = [
+        ["random seed", String(state.report.result.random_seed)],
+        ["population", String(settings.number_of_individuals)],
+        ["trials", String(settings.number_of_trials)],
+        ["chromosome length", String(settings.chromosome_length)],
+        ["base states", String(settings.base_states)],
+        ["mutation", String(settings.bit_mutation_rate)],
+        ["crossover", String(settings.cross_over_rate)],
+        ["selection", settings.parent_selection],
+        ["deletion", settings.deletion],
+        ["fitness", settings.fitness],
+        ["length mode", settings.variable_length],
+        ["detected view", guessMode(settings, firstVisualization)]
+      ];
+
+      elements.settingsList.innerHTML = rows.map(([label, value]) =>
+        `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
+      ).join("");
+    }
+
+    function render() {
+      const report = state.report;
+      if (!report) {
+        clearViewer();
+        return;
+      }
+
+      const generations = report.result.generation_reports;
+      if (generations.length === 0) {
+        elements.modeValue.textContent = guessMode(report.settings, null);
+        elements.operationValue.textContent = report.settings.operation;
+        elements.generationValue.textContent = "0";
+        elements.evaluationsValue.textContent = String(report.result.evaluations);
+        elements.bestValue.textContent = "-";
+        elements.worstValue.textContent = "-";
+        renderSettings(report.settings, null);
+        elements.vizSurface.innerHTML = '<div class="placeholder">This report has no per-generation snapshots. Re-run with generation capture enabled.</div>';
+        drawFitnessChart([]);
+        return;
+      }
+
+      const frame = generations[state.generationIndex];
+      elements.modeValue.textContent = guessMode(report.settings, frame.visualization);
+      elements.operationValue.textContent = report.settings.operation;
+      elements.generationValue.textContent = String(frame.generation);
+      elements.evaluationsValue.textContent = String(frame.evaluations);
+      elements.bestValue.textContent = formatFitness(frame.best_candidate_fitness);
+      const worst = Array.isArray(frame.least_fit) && frame.least_fit.length > 0 ? frame.least_fit[0] : 0;
+      elements.worstValue.textContent = formatFitness(worst);
+      renderSettings(report.settings, frame.visualization);
+      drawFitnessChart(generations);
+      renderVisualization(frame.visualization, frame.best_candidate_genes || []);
+    }
+
+    function formatFitness(value) {
+      return Number(value).toFixed(3);
+    }
+
+    function renderVisualization(visualization, genes) {
+      elements.vizSurface.innerHTML = "";
+      if (!visualization) {
+        renderGenericGenes(genes);
+        return;
+      }
+
+      switch (visualization.type) {
+        case "traveling_salesman":
+          renderTravelingSalesman(visualization);
+          break;
+        case "graph_coloring":
+          renderGraphColoring(visualization);
+          break;
+        case "timetable":
+          renderTimetable(visualization);
+          break;
+        case "sudoku":
+          renderSudoku(visualization);
+          break;
+        default:
+          renderGenericGenes(Array.isArray(visualization.gene_values) ? visualization.gene_values : genes);
+          break;
+      }
+    }
+
+    function renderGenericGenes(genes) {
+      const wrapper = document.createElement("div");
+      wrapper.className = "gene-grid";
+      const values = Array.isArray(genes) ? genes : [];
+
+      values.forEach((value, index) => {
+        const card = document.createElement("div");
+        card.className = "gene-card";
+        card.innerHTML = `
+          <div class="gene-index">gene ${index}</div>
+          <div class="gene-value">${escapeHtml(String(value))}</div>
+        `;
+        wrapper.appendChild(card);
+      });
+
+      if (values.length === 0) {
+        wrapper.innerHTML = '<div class="placeholder">No visualization payload for this frame.</div>';
+      }
+
+      elements.vizSurface.appendChild(wrapper);
+    }
+
+    function renderTravelingSalesman(visualization) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 900;
+      canvas.height = 520;
+      elements.vizSurface.appendChild(canvas);
+
+      const ctx = canvas.getContext("2d");
+      const cities = visualization.cities || [];
+      const route = visualization.route || [];
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (cities.length === 0) {
+        return;
+      }
+
+      const padding = 48;
+      const xs = cities.map(city => city.x);
+      const ys = cities.map(city => city.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      const scaleX = (canvas.width - padding * 2) / Math.max(1, maxX - minX);
+      const scaleY = (canvas.height - padding * 2) / Math.max(1, maxY - minY);
+
+      const points = cities.map(city => ({
+        label: city.name,
+        x: padding + (city.x - minX) * scaleX,
+        y: canvas.height - padding - (city.y - minY) * scaleY
+      }));
+
+      ctx.strokeStyle = "#1b6f5f";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      route.forEach((cityIndex, routeIndex) => {
+        const point = points[cityIndex];
+        if (!point) {
+          return;
+        }
+        if (routeIndex === 0) {
+          ctx.moveTo(point.x, point.y);
+        } else {
+          ctx.lineTo(point.x, point.y);
+        }
+      });
+      ctx.stroke();
+
+      points.forEach(point => {
+        ctx.fillStyle = "#1d1b18";
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#1d1b18";
+        ctx.font = "16px Georgia, serif";
+        ctx.fillText(point.label, point.x + 10, point.y - 10);
+      });
+    }
+
+    function renderSudoku(visualization) {
+      const board = visualization.board || [];
+      const givens = visualization.givens || [];
+      const conflicts = findSudokuConflicts(board);
+      const wrapper = document.createElement("div");
+      wrapper.className = "sudoku-board";
+
+      for (let cell = 0; cell < 81; cell += 1) {
+        const row = Math.floor(cell / 9);
+        const column = cell % 9;
+        const value = board[cell] || 0;
+        const given = givens[cell] || 0;
+        const div = document.createElement("div");
+        div.className = "sudoku-cell";
+        if (given !== 0) {
+          div.classList.add("given");
+        }
+        if (conflicts.has(cell)) {
+          div.classList.add("conflict");
+        }
+        if (column === 2 || column === 5) {
+          div.classList.add("subgrid-right");
+        }
+        if (row === 2 || row === 5) {
+          div.classList.add("subgrid-bottom");
+        }
+        div.textContent = String(value);
+        wrapper.appendChild(div);
+      }
+
+      elements.vizSurface.appendChild(wrapper);
+    }
+
+    function renderGraphColoring(visualization) {
+      const canvas = document.createElement("canvas");
+      canvas.width = 900;
+      canvas.height = 520;
+      elements.vizSurface.appendChild(canvas);
+
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const palette = ["#cc5a3d", "#2f7f65", "#3d63b8", "#b08d2b"];
+      const nodes = visualization.nodes || [];
+      const edges = visualization.edges || [];
+      const positions = [
+        { x: 180, y: 110 }, { x: 360, y: 80 }, { x: 560, y: 110 }, { x: 680, y: 240 },
+        { x: 560, y: 390 }, { x: 360, y: 430 }, { x: 180, y: 360 }, { x: 100, y: 220 }
+      ];
+
+      ctx.lineWidth = 4;
+      edges.forEach(edge => {
+        const left = positions[edge.left];
+        const right = positions[edge.right];
+        if (!left || !right) {
+          return;
+        }
+        ctx.strokeStyle = edge.conflict ? "#b6422e" : "#c7c0b5";
+        ctx.beginPath();
+        ctx.moveTo(left.x, left.y);
+        ctx.lineTo(right.x, right.y);
+        ctx.stroke();
+      });
+
+      nodes.forEach((node, index) => {
+        const point = positions[index];
+        if (!point) {
+          return;
+        }
+        ctx.fillStyle = palette[node.color_index % palette.length];
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, 32, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#1d1b18";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 22px Georgia, serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(node.name, point.x, point.y);
+
+        ctx.fillStyle = "#1d1b18";
+        ctx.font = "15px Georgia, serif";
+        ctx.fillText(node.color_name, point.x, point.y + 50);
+      });
+    }
+
+    function renderTimetable(visualization) {
+      const courses = visualization.courses || [];
+      const slotCount = visualization.slot_count || 0;
+      const conflicts = visualization.conflicts || [];
+      const conflictPairs = new Set(
+        conflicts.filter(conflict => conflict.active)
+          .map(conflict => `${Math.min(conflict.left, conflict.right)}:${Math.max(conflict.left, conflict.right)}`)
+      );
+
+      const slotMap = Array.from({ length: slotCount }, () => []);
+      courses.forEach((course, index) => {
+        if (course.slot >= 0 && course.slot < slotCount) {
+          slotMap[course.slot].push({ ...course, index });
+        }
+      });
+
+      const wrapper = document.createElement("div");
+      wrapper.style.width = "100%";
+      wrapper.style.display = "grid";
+      wrapper.style.gridTemplateColumns = `repeat(${Math.max(1, slotCount)}, minmax(0, 1fr))`;
+      wrapper.style.gap = "0.9rem";
+
+      slotMap.forEach((slotCourses, slot) => {
+        const column = document.createElement("div");
+        column.style.border = "1px solid var(--line)";
+        column.style.borderRadius = "0.9rem";
+        column.style.background = "#fff";
+        column.style.padding = "0.9rem";
+        column.style.display = "grid";
+        column.style.gap = "0.7rem";
+
+        const heading = document.createElement("div");
+        heading.innerHTML = `<strong>Slot ${slot}</strong>`;
+        column.appendChild(heading);
+
+        if (slotCourses.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "muted";
+          empty.textContent = "No courses assigned";
+          column.appendChild(empty);
+        }
+
+        slotCourses.forEach(course => {
+          const card = document.createElement("div");
+          card.style.borderRadius = "0.8rem";
+          card.style.padding = "0.75rem";
+          card.style.border = `1px solid ${course.preferred ? "#8bc2b4" : "var(--line)"}`;
+          card.style.background = course.preferred ? "var(--accent-soft)" : "#fcfaf5";
+
+          const hasConflict = slotCourses.some(other =>
+            other.index !== course.index &&
+            conflictPairs.has(`${Math.min(course.index, other.index)}:${Math.max(course.index, other.index)}`)
+          );
+
+          if (hasConflict) {
+            card.style.background = "var(--warn-soft)";
+            card.style.border = "1px solid #d79d92";
+          }
+
+          card.innerHTML = `
+            <div style="font-weight:600">${escapeHtml(course.name)}</div>
+            <div class="muted" style="font-size:0.9rem">
+              preferred slot: ${course.preferred_slot}
+              ${course.preferred ? " | preferred" : ""}
+              ${hasConflict ? " | conflict" : ""}
+            </div>
+          `;
+          column.appendChild(card);
+        });
+
+        wrapper.appendChild(column);
+      });
+
+      elements.vizSurface.appendChild(wrapper);
+    }
+
+    function findSudokuConflicts(board) {
+      const conflicts = new Set();
+
+      function markDuplicates(indices) {
+        const seen = new Map();
+        indices.forEach(index => {
+          const value = board[index];
+          if (!value) {
+            return;
+          }
+          if (!seen.has(value)) {
+            seen.set(value, [index]);
+          } else {
+            seen.get(value).push(index);
+          }
+        });
+        seen.forEach(entries => {
+          if (entries.length > 1) {
+            entries.forEach(index => conflicts.add(index));
+          }
+        });
+      }
+
+      for (let row = 0; row < 9; row += 1) {
+        markDuplicates(Array.from({ length: 9 }, (_, column) => row * 9 + column));
+      }
+      for (let column = 0; column < 9; column += 1) {
+        markDuplicates(Array.from({ length: 9 }, (_, row) => row * 9 + column));
+      }
+      for (let boxRow = 0; boxRow < 3; boxRow += 1) {
+        for (let boxColumn = 0; boxColumn < 3; boxColumn += 1) {
+          const indices = [];
+          for (let row = 0; row < 3; row += 1) {
+            for (let column = 0; column < 3; column += 1) {
+              indices.push((boxRow * 3 + row) * 9 + (boxColumn * 3 + column));
+            }
+          }
+          markDuplicates(indices);
+        }
+      }
+
+      return conflicts;
+    }
+
+    function drawFitnessChart(generations) {
+      const canvas = elements.fitnessChart;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (!generations || generations.length === 0) {
+        return;
+      }
+
+      const values = generations.map(report => Number(report.best_candidate_fitness || ((report.most_fit || [0])[0] || 0)));
+      const minValue = Math.min(...values);
+      const maxValue = Math.max(...values);
+      const padding = 22;
+      const plotWidth = canvas.width - padding * 2;
+      const plotHeight = canvas.height - padding * 2;
+
+      ctx.strokeStyle = "#c9c1b5";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(padding, padding, plotWidth, plotHeight);
+
+      ctx.strokeStyle = "#1b6f5f";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      values.forEach((value, index) => {
+        const x = padding + (index / Math.max(1, values.length - 1)) * plotWidth;
+        const normalized = (value - minValue) / Math.max(1e-9, maxValue - minValue);
+        const y = padding + plotHeight - normalized * plotHeight;
+        if (index === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+      ctx.stroke();
+
+      const selectedValue = values[state.generationIndex];
+      const selectedX = padding + (state.generationIndex / Math.max(1, values.length - 1)) * plotWidth;
+      const selectedNormalized = (selectedValue - minValue) / Math.max(1e-9, maxValue - minValue);
+      const selectedY = padding + plotHeight - selectedNormalized * plotHeight;
+
+      ctx.fillStyle = "#b6422e";
+      ctx.beginPath();
+      ctx.arc(selectedX, selectedY, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#6a655d";
+      ctx.font = "13px Georgia, serif";
+      ctx.fillText(`min ${minValue.toFixed(2)}`, padding, canvas.height - 6);
+      ctx.fillText(`max ${maxValue.toFixed(2)}`, padding, 14);
+    }
+
+    function escapeHtml(text) {
+      return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    async function loadFromFile(file) {
+      const text = await file.text();
+      elements.jsonInput.value = text;
+      loadReportFromText(text);
+    }
+
+    elements.loadFileButton.addEventListener("click", () => {
+      const [file] = elements.fileInput.files || [];
+      if (file) {
+        loadFromFile(file).catch(error => alert(error.message));
+      }
+    });
+
+    elements.loadTextButton.addEventListener("click", () => {
+      try {
+        loadReportFromText(elements.jsonInput.value);
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+
+    elements.clearButton.addEventListener("click", () => {
+      elements.fileInput.value = "";
+      elements.jsonInput.value = "";
+      clearViewer();
+    });
+
+    elements.slider.addEventListener("input", () => {
+      state.generationIndex = Number(elements.slider.value);
+      render();
+    });
+
+    elements.dropzone.addEventListener("dragover", event => {
+      event.preventDefault();
+      elements.dropzone.classList.add("dragover");
+    });
+
+    elements.dropzone.addEventListener("dragleave", () => {
+      elements.dropzone.classList.remove("dragover");
+    });
+
+    elements.dropzone.addEventListener("drop", event => {
+      event.preventDefault();
+      elements.dropzone.classList.remove("dragover");
+      const [file] = event.dataTransfer.files || [];
+      if (file) {
+        loadFromFile(file).catch(error => alert(error.message));
+      }
+    });
+
+    clearViewer();
+  </script>
+</body>
+</html>

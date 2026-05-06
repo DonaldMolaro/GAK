@@ -18,6 +18,7 @@ public:
    void validatePopulation(const Population& population) const override;
    double evaluateFitness(const BaseString& genes) override;
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
+   void writeVisualizationJson(const BaseString& genes, std::ostream& out) const override;
    int cityCount() const noexcept { return numCities; }
    int cityGridSize() const noexcept { return gridSize; }
    const std::vector<Coordinate>& cityCoordinates() const noexcept { return cityCoordinates_; }

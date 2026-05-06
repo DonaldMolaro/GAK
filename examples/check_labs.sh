@@ -38,6 +38,29 @@ check_constraints() {
   output_l="$(./GA L --seed 1 --population 24 --trials 120)"
   printf '%s\n' "$output_l"
   printf '%s' "$output_l" | grep -q "Latin square"
+
+  output_g="$(./GA G --seed 1 --population 24 --trials 120)"
+  printf '%s\n' "$output_g"
+  printf '%s' "$output_g" | grep -q "graph coloring\|3-color graph coloring"
+}
+
+check_scheduling() {
+  output_m="$(./GA M --seed 1 --population 24 --trials 120)"
+  printf '%s\n' "$output_m"
+  printf '%s' "$output_m" | grep -q "course timetabling\|Timetable:"
+}
+
+check_numeric() {
+  output_d="$(./GA D --seed 1 --population 24 --trials 120)"
+  printf '%s\n' "$output_d"
+  printf '%s' "$output_d" | grep -q "Problem input:"
+  printf '%s' "$output_d" | grep -q "GA parameters:"
+  printf '%s' "$output_d" | grep -q "chromosome length"
+
+  output_f6="$(./GA 6 --seed 1 --population 24 --trials 120)"
+  printf '%s\n' "$output_f6"
+  printf '%s' "$output_f6" | grep -q "Problem input:"
+  printf '%s' "$output_f6" | grep -q "GA parameters:"
 }
 
 check_sudoku() {
@@ -54,7 +77,9 @@ case "$MODE" in
   all)
     check_knapsack
     check_symbolic
+    check_numeric
     check_constraints
+    check_scheduling
     check_sudoku
     ;;
   knapsack)
@@ -66,11 +91,17 @@ case "$MODE" in
   constraints)
     check_constraints
     ;;
+  scheduling)
+    check_scheduling
+    ;;
+  numeric)
+    check_numeric
+    ;;
   sudoku)
     check_sudoku
     ;;
   *)
-    echo "usage: ./check_labs.sh [all|knapsack|symbolic|constraints|sudoku]" >&2
+    echo "usage: ./check_labs.sh [all|knapsack|symbolic|numeric|constraints|scheduling|sudoku]" >&2
     exit 1
     ;;
 esac

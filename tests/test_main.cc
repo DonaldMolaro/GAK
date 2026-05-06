@@ -101,6 +101,16 @@ public:
     return population.fitnessTable;
   }
 
+  static std::vector<bool>& evaluatedFitness(Population& population)
+  {
+    return population.fitnessEvaluated;
+  }
+
+  static const std::vector<bool>& evaluatedFitness(const Population& population)
+  {
+    return population.fitnessEvaluated;
+  }
+
   static const std::vector<double>& fitnessValues(const Population& population)
   {
     return population.fitnessTable;
@@ -554,16 +564,12 @@ void test_base_string_print_helpers()
 void test_exception_helpers()
 {
   GAFatalException fatal(__FILE__, __LINE__, "fatal-reason");
-  GANonFatalException nonfatal(__FILE__, __LINE__, "nonfatal-reason");
-  GAComplete complete(__FILE__, __LINE__, "complete-reason");
   std::ostringstream out;
 
   out << fatal.what();
   fatal << out;
 
   expect_true(std::string(fatal.what()) == "fatal-reason", "Fatal exception should preserve its reason");
-  expect_true(std::string(nonfatal.what()) == "nonfatal-reason", "Non-fatal exception should preserve its reason");
-  expect_true(std::string(complete.what()) == "complete-reason", "Complete exception should preserve its reason");
   expect_true(out.str().find("fatal-reason") != std::string::npos, "Exception stream operator should print the reason");
 }
 
@@ -609,9 +615,9 @@ void test_invalid_mutation_probability_throws()
   std::mt19937 random_generator(3);
   Chromosome chromosome(makeBinaryString("10101100"));
 
-  expect_throws<GANonFatalException>(
+  expect_throws<GAFatalException>(
     [&chromosome, &random_generator]() { chromosome.mutate(2.0, &random_generator); },
-    "Impossible mutation probability should throw a non-fatal exception");
+    "Impossible mutation probability should throw a fatal exception");
 }
 
 void test_non_binary_mutation_with_probability_one_stays_in_range()
@@ -763,7 +769,7 @@ void test_invalid_crossover_type_throws()
   Chromosome mother(makeBinaryString("1111"));
   Chromosome father(makeBinaryString("0000"));
 
-  expect_throws<GANonFatalException>(
+  expect_throws<GAFatalException>(
     [&mother, &father, &random_generator]() {
       mother.mate(father, 1.0, static_cast<Chromosome::CrossoverType>(99), &random_generator);
     },
@@ -845,7 +851,8 @@ void test_windowed_fitness_is_positive_for_maximize()
   for (int i = 0 ; i < 3 ; i++)
     {
       PopulationTestRig::chromosomes(pop)[i] = std::make_unique<Chromosome>(makeBinaryString(i == 0 ? "0" : "1"));
-      PopulationTestRig::fitnessValues(pop)[i] = -1.0;
+      PopulationTestRig::fitnessValues(pop)[i] = 0.0;
+      PopulationTestRig::evaluatedFitness(pop)[i] = false;
     }
   PopulationTestRig::setPopulationInitialized(pop, true);
   PopulationTestRig::evaluatePopulation(pop);
@@ -869,7 +876,8 @@ void test_windowed_fitness_is_positive_for_minimize()
   for (int i = 0 ; i < 3 ; i++)
     {
       PopulationTestRig::chromosomes(pop)[i] = std::make_unique<Chromosome>(makeBinaryString(i == 0 ? "0" : "1"));
-      PopulationTestRig::fitnessValues(pop)[i] = -1.0;
+      PopulationTestRig::fitnessValues(pop)[i] = 0.0;
+      PopulationTestRig::evaluatedFitness(pop)[i] = false;
     }
   PopulationTestRig::setPopulationInitialized(pop, true);
   PopulationTestRig::evaluatePopulation(pop);
@@ -916,10 +924,48 @@ void prepare_population(InspectablePopulation& pop, const std::string& first_bit
   PopulationTestRig::chromosomes(pop)[1] = std::make_unique<Chromosome>(makeBinaryString(second_bits));
   for (int i = 0 ; i < pop.settings().numberOfIndividuals ; i++)
     {
-      PopulationTestRig::fitnessValues(pop)[i] = -1.0;
+      PopulationTestRig::fitnessValues(pop)[i] = 0.0;
+      PopulationTestRig::evaluatedFitness(pop)[i] = false;
     }
   PopulationTestRig::setPopulationInitialized(pop, true);
   PopulationTestRig::evaluatePopulation(pop);
+}
+
+class NegativeFitnessProblem : public PopulationProblem
+{
+public:
+  double evaluateFitness(const BaseString& genes) override
+  {
+    return genes.valueAt(0) == 0 ? -1.0 : -2.0;
+  }
+
+  void printCandidate(const BaseString&, std::ostream&) const override
+  {
+  }
+};
+
+void test_negative_fitness_values_are_not_treated_as_unevaluated()
+{
+  NegativeFitnessProblem problem;
+  Population pop(make_population_options(Population::OperationMode::Minimize, 2, 4, 1, 0.0, 0.0,
+                                         Population::ReproductionMode::AllowDuplicates,
+                                         Population::ParentSelectionMode::RouletteWheel,
+                                         Population::DeletionMode::DeleteAll,
+                                         Population::FitnessMode::Evaluation,
+                                         Population::VariableLengthMode::Fixed, 2),
+                 problem);
+
+  PopulationTestRig::initializePopulation(pop);
+  PopulationTestRig::chromosomes(pop)[0] = std::make_unique<Chromosome>(makeBinaryString("0"));
+  PopulationTestRig::chromosomes(pop)[1] = std::make_unique<Chromosome>(makeBinaryString("1"));
+  PopulationTestRig::evaluatePopulation(pop);
+
+  expect_true(PopulationTestRig::evaluatedFitness(pop)[0], "Negative fitness entries should be marked evaluated");
+  expect_true(PopulationTestRig::evaluatedFitness(pop)[1], "All fitness entries should be marked evaluated");
+
+  const std::vector<double>& fitness = PopulationTestRig::fitnessValues(pop);
+  expect_true(fitness[0] == -2.0, "Minimize populations should preserve legitimate negative fitness values");
+  expect_true(fitness[1] == -1.0, "A fitness of -1.0 should remain a valid evaluated result");
 }
 
 void test_population_selection_and_replacement_branches()
@@ -1059,6 +1105,11 @@ void test_population_selection_guard_and_random_fitness_modes()
   int fractional_selected = PopulationTestRig::selectParent(fractional, roulette);
   expect_true(fractional_selected >= 0 && fractional_selected < fractional.settings().numberOfIndividuals,
               "Roulette selection should handle fractional weights without producing an invalid index");
+
+  std::vector<double> tiny_roulette(2, 1e-16);
+  int tiny_selected = PopulationTestRig::selectParent(fractional, tiny_roulette);
+  expect_true(tiny_selected >= 0 && tiny_selected < fractional.settings().numberOfIndividuals,
+              "Roulette selection should fall back safely for near-zero weights");
 
   InspectablePopulation windowed(make_population_options(Population::OperationMode::Maximize, 4, 4, 1, 0.0, 0.0,
 							 Population::ReproductionMode::AllowDuplicates,
@@ -1430,6 +1481,10 @@ void test_population_run_reporter_writes_json()
 	      "RunReporter JSON should include result data");
   expect_true(json.find("\"generation_reports\"") != std::string::npos,
 	      "RunReporter JSON should include generation reports");
+  expect_true(json.find("\"best_candidate_genes\"") != std::string::npos,
+	      "RunReporter JSON should include best-candidate gene snapshots");
+  expect_true(json.find("\"visualization\"") != std::string::npos,
+	      "RunReporter JSON should include visualization payloads");
 }
 
 void test_population_run_reporter_writes_csv()
@@ -1572,6 +1627,7 @@ int main()
   test_windowed_fitness_is_positive_for_maximize();
   test_windowed_fitness_is_positive_for_minimize();
   test_fitness_table_selection();
+  test_negative_fitness_values_are_not_treated_as_unevaluated();
   test_population_selection_and_replacement_branches();
   test_population_append_replacement_helper();
   test_population_insert_new_population_rejects_overflow();

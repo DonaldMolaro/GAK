@@ -40,6 +40,17 @@ The most useful runtime options are:
 
 These options let you experiment without editing the compiled defaults.
 
+The runner also supports machine-readable export:
+
+```sh
+./GA <mode> --report-json /tmp/run.json
+./GA <mode> --report-csv /tmp/run.csv
+```
+
+The JSON report can be loaded into the local viewer at
+[examples/viewer.html](/Users/donaldmolaro/src/GAK/examples/viewer.html) to
+scrub through per-generation progress visually.
+
 ## What The Parameter Block Means
 
 The runner prints a `GA parameters:` section before the run starts.
@@ -188,3 +199,6 @@ For that step, see
 [docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md)
 and
 [docs/PROBLEM_FIT.md](/Users/donaldmolaro/src/GAK/docs/PROBLEM_FIT.md).
+
+For repeatable multi-seed experiments, see
+[examples/experiments.md](/Users/donaldmolaro/src/GAK/examples/experiments.md).

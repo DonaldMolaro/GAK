@@ -183,6 +183,29 @@ void SudokuConstrained::printCandidate(const BaseString& genes, std::ostream& ou
    }
 }
 
+void SudokuConstrained::writeVisualizationJson(const BaseString& genes, std::ostream& out) const
+{
+   out << "{ \"type\": \"sudoku\", \"variant\": \"constraint_aware\", \"givens\": [";
+   for (int cell = 0 ; cell < kCellCount ; cell++)
+   {
+      if (cell > 0)
+      {
+         out << ',';
+      }
+      out << kPuzzle[cell];
+   }
+   out << "], \"board\": [";
+   for (int cell = 0 ; cell < kCellCount ; cell++)
+   {
+      if (cell > 0)
+      {
+         out << ',';
+      }
+      out << (genes.valueAt(cell) + 1);
+   }
+   out << "] }";
+}
+
 bool SudokuConstrained::hasReachedSolution(const Population&, const BaseString&, double fitness) const
 {
    return fitness >= 513.0;

@@ -25,12 +25,20 @@ If you are new to genetic algorithms, start with:
   guided first lab on binary decision vectors and penalties
 - [lab_symbolic.md](/Users/donaldmolaro/src/GAK/examples/lab_symbolic.md):
   guided lab on symbolic genes and exact-solution problems
+- [lab_numeric.md](/Users/donaldmolaro/src/GAK/examples/lab_numeric.md):
+  guided lab on numeric black-box optimization and experiment design
 - [lab_constraints.md](/Users/donaldmolaro/src/GAK/examples/lab_constraints.md):
   guided lab on graded constraint scoring
 - [lab_sudoku.md](/Users/donaldmolaro/src/GAK/examples/lab_sudoku.md):
   guided comparison between generic and constraint-aware operators
+- [lab_first_problem.md](/Users/donaldmolaro/src/GAK/examples/lab_first_problem.md):
+  guided design lab for building your first `PopulationProblem`
 - [visual_walkthroughs.md](/Users/donaldmolaro/src/GAK/examples/visual_walkthroughs.md):
   quick conceptual map of the example categories
+- [experiments.md](/Users/donaldmolaro/src/GAK/examples/experiments.md):
+  how to export runs and compare multiple seeds/settings
+- [viewer.html](/Users/donaldmolaro/src/GAK/examples/viewer.html):
+  local browser viewer for JSON generation reports
 
 ## Demo Modes
 
@@ -50,6 +58,8 @@ Supported modes:
 - `Q`: N-Queens
 - `K`: knapsack
 - `L`: Latin square
+- `G`: graph coloring
+- `M`: timetable scheduling
 - `U`: generic Sudoku
 - `C`: constraint-aware Sudoku
 
@@ -58,8 +68,10 @@ Supported modes:
 1. `K` for binary decision vectors
 2. `A` and `S` for symbolic chromosomes
 3. `D` and `F6` for numeric black-box optimization
-4. `Q` and `L` for constraint scoring
-5. `U` and `C` for representation and operator design
+4. `Q`, `L`, and `G` for constraint scoring on boards and graphs
+5. `M` for scheduling-style symbolic search
+6. `U` and `C` for representation and operator design
+7. your own first `PopulationProblem`
 
 ## Build And Test
 
@@ -79,6 +91,12 @@ Run the course/lab smoke checks:
 
 ```sh
 ./check_labs.sh
+```
+
+Run a quick multi-seed experiment sweep:
+
+```sh
+./sweep_runs.sh K /tmp/gak-knapsack 1 2 3
 ```
 
 For more tuning guidance, see

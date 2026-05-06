@@ -4,6 +4,7 @@
 
 #include "chromosome.hh"
 #include "except.hh"
+#include "base.hh"
 #include "population.hh"
 #include "population_report.hh"
 
@@ -66,6 +67,30 @@ void writeJsonArray(std::ostream& out, const std::vector<double>& values)
       out << std::fixed << std::setprecision(8) << values[i] << std::defaultfloat;
    }
    out << ']';
+}
+
+void writeJsonIntArray(std::ostream& out, const std::vector<int>& values)
+{
+   out << '[';
+   for (std::size_t i = 0 ; i < values.size() ; i++)
+   {
+      if (i > 0)
+      {
+         out << ',';
+      }
+      out << values[i];
+   }
+   out << ']';
+}
+
+BaseString buildSnapshotGenes(const Population& population, const std::vector<int>& geneValues)
+{
+   BaseString genes(static_cast<int>(geneValues.size()), population.settings().baseStates);
+   for (int i = 0 ; i < static_cast<int>(geneValues.size()) ; i++)
+   {
+      genes.setValue(i, geneValues[static_cast<std::size_t>(i)]);
+   }
+   return genes;
 }
 }
 
@@ -148,7 +173,9 @@ void PopulationReporter::write(std::ostream& out,
       const Population::GenerationReport finalProgress = {
          result.generationsCompleted,
          result.evaluations,
-         Population::PopulationSummary()
+         Population::PopulationSummary(),
+         std::vector<int>(),
+         0.0
       };
       printGenerationProgress(finalProgress, false);
    }
@@ -221,6 +248,14 @@ void PopulationReporter::writeJson(std::ostream& out,
       out << "      {\n";
       out << "        \"generation\": " << report.generation << ",\n";
       out << "        \"evaluations\": " << report.evaluations << ",\n";
+      out << "        \"best_candidate_fitness\": " << std::fixed << std::setprecision(8)
+          << report.bestCandidateFitness << ",\n" << std::defaultfloat;
+      out << "        \"best_candidate_genes\": ";
+      writeJsonIntArray(out, report.bestCandidateGenes);
+      out << ",\n";
+      out << "        \"visualization\": ";
+      population.writeVisualizationJson(buildSnapshotGenes(population, report.bestCandidateGenes), out);
+      out << ",\n";
       out << "        \"most_fit\": ";
       writeJsonArray(out, report.summary.mostFit);
       out << ",\n";

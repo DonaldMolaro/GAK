@@ -90,6 +90,31 @@ void TravelingSalesman::printCandidate(const BaseString& genes, std::ostream& ou
    out << " ::";
 }
 
+void TravelingSalesman::writeVisualizationJson(const BaseString& genes, std::ostream& out) const
+{
+   out << "{ \"type\": \"traveling_salesman\", \"cities\": [";
+   for (int i = 0 ; i < numCities ; i++)
+   {
+      if (i > 0)
+      {
+         out << ", ";
+      }
+      out << "{ \"name\": \"" << static_cast<char>('a' + i)
+          << "\", \"x\": " << cityCoordinates_[i].first
+          << ", \"y\": " << cityCoordinates_[i].second << " }";
+   }
+   out << "], \"route\": [";
+   for (int i = 0 ; i < genes.length() ; i++)
+   {
+      if (i > 0)
+      {
+         out << ", ";
+      }
+      out << genes.valueAt(i);
+   }
+   out << "] }";
+}
+
 bool TravelingSalesman::hasCityCoordinate(int allocated, const Coordinate& coordinate) const
 {
    for ( int i = 0 ; i < allocated ; i++ )

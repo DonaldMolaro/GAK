@@ -26,6 +26,7 @@ public:
    virtual void validatePopulation(const Population& population) const;
    virtual double evaluateFitness(const BaseString& genes) = 0;
    virtual void printCandidate(const BaseString& genes, std::ostream& out) const = 0;
+   virtual void writeVisualizationJson(const BaseString& genes, std::ostream& out) const;
    virtual bool hasReachedSolution(const Population& population,
                                    const BaseString& genes,
                                    double fitness) const;
@@ -91,6 +92,8 @@ public:
       int generation = 0;
       int evaluations = 0;
       PopulationSummary summary;
+      std::vector<int> bestCandidateGenes;
+      double bestCandidateFitness = 0.0;
    };
 
 private:
@@ -101,6 +104,7 @@ private:
    bool populationInitialized;
    std::vector<std::unique_ptr<Chromosome> > populationTable;
    std::vector<double> fitnessTable;
+   std::vector<bool> fitnessEvaluated;
    std::vector<double> windowedFitnessTable;
    std::vector<double> linearNormalizedfitnessTable;
    PopulationProblem& problem_;
@@ -137,6 +141,7 @@ public:
    ~Population();
    double evaluateFitness(const BaseString& genes);
    void printCandidate(const BaseString& genes, std::ostream& out) const;
+   void writeVisualizationJson(const BaseString& genes, std::ostream& out) const;
    const Settings& settings() const noexcept { return settings_; }
    unsigned int randomSeed() const noexcept { return activeRandomSeed_; }
    std::mt19937& randomEngine() noexcept { return randomGenerator; }

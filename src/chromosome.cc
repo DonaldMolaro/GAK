@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <limits>
 #include <random>
 #include <utility>
 
@@ -7,10 +8,26 @@
 
 namespace
 {
+constexpr unsigned int kFallbackRandomSeed = 0x47414bU;
+// The built-in chromosome helpers are meant for compact demo and teaching
+// problems; keep a conservative ceiling so pathological sizes fail fast.
+constexpr int kMaxChromosomeLength = 2048;
+
 std::mt19937& FallbackRandomGenerator()
 {
-  static std::mt19937 generator(std::random_device{}());
+  // Keep the no-argument chromosome helpers deterministic even when callers
+  // do not thread an explicit RNG through the API.
+  static std::mt19937 generator(kFallbackRandomSeed);
   return generator;
+}
+
+int checkedCombinedLength(int left, int right)
+{
+  if (left < 0 || right < 0 || left > std::numeric_limits<int>::max() - right)
+    {
+      throw GAFatalException(__FILE__,__LINE__,"Crossover produced an invalid chromosome length");
+    }
+  return left + right;
 }
 }
 
@@ -51,8 +68,11 @@ Chromosome::Chromosome(unsigned int requestedLength,
     baseStates(requestedBaseStates),
     chromosomeString_(chromosomeLength,baseStates)
 {
-  if (requestedLength > 2048)
-    throw GAFatalException(__FILE__,__LINE__,"Requested chromosome length over 2048. Probably a mistake.");
+  if (requestedLength > static_cast<unsigned int>(kMaxChromosomeLength))
+    {
+      throw GAFatalException(__FILE__,__LINE__,
+                             "Requested chromosome length exceeds the built-in 2048-gene safety limit.");
+    }
   std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
 
   if (baseStates == 2)
@@ -104,7 +124,7 @@ void Chromosome::mutate(double probability, std::mt19937* randomGenerator)
     }
   else
     {
-      throw GANonFatalException(__FILE__,__LINE__,"SingleBitMutate called with an impossible probability. Ignored.");
+      throw GAFatalException(__FILE__,__LINE__,"SingleBitMutate called with an impossible probability.");
     }
 }
 bool Chromosome::shouldCrossover(std::mt19937& randomGenerator, double crossoverRate)
@@ -136,8 +156,8 @@ Chromosome::singlePointCrossOver(const BaseString& mother, const BaseString& fat
   // The daughter is made up of the Primary section of the mother chromosome and the
   //     secondary section of the father chromosome.
   //
-  BaseString boy(FatherPrimaryLength + MotherSecondaryLength,baseStates);
-  BaseString girl(MotherPrimaryLength + FatherSecondaryLength,baseStates);
+  BaseString boy(checkedCombinedLength(FatherPrimaryLength, MotherSecondaryLength),baseStates);
+  BaseString girl(checkedCombinedLength(MotherPrimaryLength, FatherSecondaryLength),baseStates);
   //
   // Copy primary sections of chromosomes.
   //
@@ -243,7 +263,7 @@ Chromosome::mate(Chromosome& father,double crossoverRate,CrossoverType crossover
 	    case CrossoverType::Uniform:
 	      return uniformCrossOver(genes(),father.genes(),generator);
 	    default:
-	      throw GANonFatalException(__FILE__,__LINE__,"Unimplemented crossover type");
+	      throw GAFatalException(__FILE__,__LINE__,"Unimplemented crossover type");
 	    }
         }
       return std::make_pair(cloneBaseString(father.genes(),baseStates),

@@ -16,6 +16,8 @@
 
 namespace
 {
+constexpr double kFitnessSelectionEpsilon = 1e-12;
+
 bool IsVerboseEnabled()
 {
    return std::getenv("GAK_VERBOSE") != nullptr;
@@ -53,8 +55,27 @@ void Population::printCandidate(const BaseString& genes, std::ostream& out) cons
    problem_.printCandidate(genes, out);
 }
 
+void Population::writeVisualizationJson(const BaseString& genes, std::ostream& out) const
+{
+   problem_.writeVisualizationJson(genes, out);
+}
+
 void PopulationProblem::validatePopulation(const Population&) const
 {
+}
+
+void PopulationProblem::writeVisualizationJson(const BaseString& genes, std::ostream& out) const
+{
+   out << "{ \"gene_values\": [";
+   for (int i = 0 ; i < genes.length() ; i++)
+   {
+      if (i > 0)
+      {
+         out << ", ";
+      }
+      out << genes.valueAt(i);
+   }
+   out << "] }";
 }
 
 bool PopulationProblem::hasReachedSolution(const Population&, const BaseString&, double) const
@@ -239,6 +260,14 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
          report.generation = numGen;
          report.evaluations = numberBorn;
          report.summary = summary;
+         const int bestIndex = bestCandidateIndex();
+         const BaseString& bestGenes = populationTable[bestIndex].get()->genes();
+         report.bestCandidateGenes.reserve(bestGenes.length());
+         for (int gene = 0 ; gene < bestGenes.length() ; gene++)
+         {
+            report.bestCandidateGenes.push_back(bestGenes.valueAt(gene));
+         }
+         report.bestCandidateFitness = fitnessTable[bestIndex];
          result.generationReports.push_back(report);
          result.generationSummaries.push_back(summary);
       }
@@ -281,7 +310,8 @@ int Population::initializePopulation()
 {
    populationTable.clear();
    populationTable.reserve(settings_.numberOfIndividuals);
-   fitnessTable.assign(settings_.numberOfIndividuals, -1.0);
+   fitnessTable.assign(settings_.numberOfIndividuals, 0.0);
+   fitnessEvaluated.assign(settings_.numberOfIndividuals, false);
    windowedFitnessTable.assign(settings_.numberOfIndividuals, 0.0);
    linearNormalizedfitnessTable.assign(settings_.numberOfIndividuals, 0.0);
    
@@ -300,9 +330,10 @@ void Population::evaluatePopulation()
 {
    for ( int i = 0 ; i < settings_.numberOfIndividuals ; i++ )
    {
-      if (fitnessTable[i] < 0.0)
+      if (!fitnessEvaluated[i])
       {
 	 fitnessTable[i] = problem_.evaluateFitness(populationTable[i].get()->genes());
+         fitnessEvaluated[i] = true;
       }
    }
    sortPopulation();
@@ -359,19 +390,27 @@ int Population::selectParent(const std::vector<double>& rouletteTable)
          }
       }
 
-      throw GAFatalException(__FILE__,__LINE__,"Roulette selection produced an invalid index");
+      for (int i = settings_.numberOfIndividuals - 1 ; i >= 0 ; --i)
+      {
+         if (weights[i] > kFitnessSelectionEpsilon)
+         {
+            return i;
+         }
+      }
+
+      return randomIndex(settings_.numberOfIndividuals);
    };
 
    switch (settings_.operation)
      {
      case Population::OperationMode::Maximize:
-       if (totalFitness <= 0.0)
+       if (totalFitness <= kFitnessSelectionEpsilon)
        {
           return randomIndex(settings_.numberOfIndividuals);
        }
        return selectFromWeights(rouletteTable, totalFitness);
      case Population::OperationMode::Minimize:
-       if (invertedTotalFitness <= 0.0)
+       if (invertedTotalFitness <= kFitnessSelectionEpsilon)
        {
           return randomIndex(settings_.numberOfIndividuals);
        }
@@ -523,7 +562,8 @@ int Population::insertNewPopulation(std::vector<std::unique_ptr<Chromosome> > re
          continue;
       }
 
-      fitnessTable[index] = -1;
+      fitnessTable[index] = 0.0;
+      fitnessEvaluated[index] = false;
       populationTable[index] = std::move(replacementList[i]);
       replaced++;
    }
@@ -545,13 +585,16 @@ void Population::sortPopulation()
              [this](int left, int right) { return fitnessTable[left] < fitnessTable[right]; });
 
    std::vector<double> sortedFitness(settings_.numberOfIndividuals);
+   std::vector<bool> sortedFitnessEvaluated(settings_.numberOfIndividuals);
    std::vector<std::unique_ptr<Chromosome> > sortedPopulation(settings_.numberOfIndividuals);
    for ( int i = 0 ; i < settings_.numberOfIndividuals ; i++ )
    {
       sortedFitness[i] = fitnessTable[order[i]];
+      sortedFitnessEvaluated[i] = fitnessEvaluated[order[i]];
       sortedPopulation[i] = std::move(populationTable[order[i]]);
    }
 
    fitnessTable.swap(sortedFitness);
+   fitnessEvaluated.swap(sortedFitnessEvaluated);
    populationTable.swap(sortedPopulation);
 }

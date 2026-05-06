@@ -9,11 +9,13 @@
 #include "alpha.hh"
 #include "dome.hh"
 #include "f6.hh"
+#include "graphcoloring.hh"
 #include "knapsack.hh"
 #include "latinsquare.hh"
 #include "nqueens.hh"
 #include "sudoku.hh"
 #include "sudoku_constrained.hh"
+#include "timetable.hh"
 #include "ts.hh"
 #include "spell.hh"
 
@@ -288,6 +290,27 @@ void test_traveling_salesman_fixed_seed_is_reproducible()
               "TravelingSalesman should generate the same city coordinates for a fixed seed");
 }
 
+void test_traveling_salesman_visualization_json()
+{
+  Population::Settings options = make_options(Population::OperationMode::Minimize, 5,
+                                              Population::VariableLengthMode::Variable, 5);
+  TravelingSalesman tsp(options, 10);
+  BaseString route(5, 5);
+  for (int i = 0 ; i < 5 ; i++)
+  {
+    route.setValue(i, i);
+  }
+
+  std::ostringstream out;
+  tsp.writeVisualizationJson(route, out);
+  expect_contains(out.str(), "\"type\": \"traveling_salesman\"",
+                  "TravelingSalesman should emit a typed visualization payload");
+  expect_contains(out.str(), "\"cities\":",
+                  "TravelingSalesman visualization should include city coordinates");
+  expect_contains(out.str(), "\"route\":",
+                  "TravelingSalesman visualization should include the route order");
+}
+
 void test_nqueens_rewards_non_attacking_layouts()
 {
   NQueens queens;
@@ -411,6 +434,150 @@ void test_latin_square_run_path()
 
   expect_true(result.evaluations >= options.numberOfIndividuals,
               "LatinSquare execute should complete a run without throwing");
+}
+
+void test_graph_coloring_rewards_proper_colorings()
+{
+  GraphColoring graph;
+  Population::Settings settings = make_options(Population::OperationMode::Maximize, 8,
+                                               Population::VariableLengthMode::Fixed, 3);
+  Population population(settings, graph);
+
+  BaseString solved(8, 3);
+  const int solved_colors[8] = {0, 1, 0, 1, 0, 1, 2, 2};
+  BaseString bad(8, 3);
+  std::ostringstream out;
+  for (int i = 0 ; i < 8 ; i++)
+  {
+    solved.setValue(i, solved_colors[i]);
+    bad.setValue(i, 0);
+  }
+
+  const double solved_fitness = graph.evaluateFitness(solved);
+  expect_true(solved_fitness == 12,
+              "GraphColoring should score a proper 3-coloring at the maximum");
+  expect_true(solved_fitness > graph.evaluateFitness(bad),
+              "GraphColoring should rank a proper coloring above a conflicting one");
+  expect_true(graph.hasReachedSolution(population, solved, solved_fitness),
+              "GraphColoring should report an exact coloring when all edges are satisfied");
+  graph.printCandidate(solved, out);
+  expect_contains(out.str(), "Coloring:",
+                  "GraphColoring should print node assignments");
+  expect_contains(out.str(), "conflicts=0",
+                  "GraphColoring should report zero conflicts for a solved coloring");
+}
+
+void test_graph_coloring_validation_rejects_bad_settings()
+{
+  GraphColoring graph;
+
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population::Settings bad = make_options(Population::OperationMode::Maximize, 7,
+                                              Population::VariableLengthMode::Fixed, 3);
+      Population invalid_population(bad, graph);
+    },
+    "GraphColoring should reject chromosome lengths other than the node count");
+
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population::Settings bad = make_options(Population::OperationMode::Maximize, 8,
+                                              Population::VariableLengthMode::Fixed, 4);
+      Population invalid_population(bad, graph);
+    },
+    "GraphColoring should reject base-state counts other than three colors");
+}
+
+void test_graph_coloring_visualization_json()
+{
+  GraphColoring graph;
+  BaseString coloring(8, 3);
+  const int solved_colors[8] = {0, 1, 0, 1, 0, 1, 2, 2};
+  for (int i = 0 ; i < 8 ; i++)
+  {
+    coloring.setValue(i, solved_colors[i]);
+  }
+
+  std::ostringstream out;
+  graph.writeVisualizationJson(coloring, out);
+  expect_contains(out.str(), "\"type\": \"graph_coloring\"",
+                  "GraphColoring should emit a typed visualization payload");
+  expect_contains(out.str(), "\"nodes\":",
+                  "GraphColoring visualization should include node assignments");
+  expect_contains(out.str(), "\"edges\":",
+                  "GraphColoring visualization should include edge conflict state");
+}
+
+void test_timetable_rewards_conflict_free_preferred_assignments()
+{
+  Timetable timetable;
+  Population::Settings settings = make_options(Population::OperationMode::Maximize, 8,
+                                               Population::VariableLengthMode::Fixed, 4);
+  Population population(settings, timetable);
+
+  BaseString solved(8, 4);
+  const int solved_slots[8] = {0, 1, 2, 3, 0, 1, 3, 2};
+  BaseString bad(8, 4);
+  std::ostringstream out;
+  for (int i = 0 ; i < 8 ; i++)
+  {
+    solved.setValue(i, solved_slots[i]);
+    bad.setValue(i, 0);
+  }
+
+  const double solved_fitness = timetable.evaluateFitness(solved);
+  expect_true(solved_fitness == 108,
+              "Timetable should score a conflict-free preferred schedule at the maximum");
+  expect_true(solved_fitness > timetable.evaluateFitness(bad),
+              "Timetable should rank a good schedule above a conflicting one");
+  expect_true(timetable.hasReachedSolution(population, solved, solved_fitness),
+              "Timetable should report when the hard and soft scheduling goals are all met");
+  timetable.printCandidate(solved, out);
+  expect_contains(out.str(), "Timetable:",
+                  "Timetable should print course assignments");
+  expect_contains(out.str(), "preferred=8/8",
+                  "Timetable should report the number of preferences satisfied");
+}
+
+void test_timetable_validation_rejects_bad_settings()
+{
+  Timetable timetable;
+
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population::Settings bad = make_options(Population::OperationMode::Maximize, 7,
+                                              Population::VariableLengthMode::Fixed, 4);
+      Population invalid_population(bad, timetable);
+    },
+    "Timetable should reject chromosome lengths other than the course count");
+
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population::Settings bad = make_options(Population::OperationMode::Maximize, 8,
+                                              Population::VariableLengthMode::Fixed, 3);
+      Population invalid_population(bad, timetable);
+    },
+    "Timetable should reject base-state counts other than the slot count");
+}
+
+void test_timetable_visualization_json()
+{
+  Timetable timetable;
+  BaseString schedule(8, 4);
+  const int solved_slots[8] = {0, 1, 2, 3, 0, 1, 3, 2};
+  for (int i = 0 ; i < 8 ; i++)
+  {
+    schedule.setValue(i, solved_slots[i]);
+  }
+
+  std::ostringstream out;
+  timetable.writeVisualizationJson(schedule, out);
+  expect_contains(out.str(), "\"type\": \"timetable\"",
+                  "Timetable should emit a typed visualization payload");
+  expect_contains(out.str(), "\"courses\":",
+                  "Timetable visualization should include course assignments");
+  expect_contains(out.str(), "\"conflicts\":",
+                  "Timetable visualization should include conflict relationships");
 }
 
 void test_sudoku_rewards_valid_solution_and_givens()
@@ -615,6 +782,26 @@ void test_constrained_sudoku_fixed_seed_is_reproducible()
               "Constrained Sudoku should generate the same initial chromosome for a fixed seed");
 }
 
+void test_constrained_sudoku_visualization_json()
+{
+  Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
+                                              Population::VariableLengthMode::Fixed, 9);
+  SudokuConstrained sudoku(options);
+  Population population(options, sudoku);
+  std::unique_ptr<Chromosome> board = PopulationTestRig::createInitialChromosome(population);
+
+  std::ostringstream out;
+  sudoku.writeVisualizationJson(board->genes(), out);
+  expect_contains(out.str(), "\"type\": \"sudoku\"",
+                  "Constrained Sudoku should emit a typed visualization payload");
+  expect_contains(out.str(), "\"variant\": \"constraint_aware\"",
+                  "Constrained Sudoku visualization should identify the variant");
+  expect_contains(out.str(), "\"givens\":",
+                  "Constrained Sudoku visualization should include givens");
+  expect_contains(out.str(), "\"board\":",
+                  "Constrained Sudoku visualization should include the board values");
+}
+
 void test_constrained_sudoku_validation_rejects_bad_settings()
 {
   Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
@@ -649,17 +836,25 @@ int main()
   test_alpha_rejects_mismatched_population_settings();
   test_traveling_salesman_construction_and_validation();
   test_traveling_salesman_fixed_seed_is_reproducible();
+  test_traveling_salesman_visualization_json();
   test_nqueens_rewards_non_attacking_layouts();
   test_knapsack_prefers_feasible_high_value_selections();
   test_latin_square_rewards_unique_rows_and_columns();
   test_latin_square_validation_rejects_bad_settings();
   test_latin_square_run_path();
+  test_graph_coloring_rewards_proper_colorings();
+  test_graph_coloring_validation_rejects_bad_settings();
+  test_graph_coloring_visualization_json();
+  test_timetable_rewards_conflict_free_preferred_assignments();
+  test_timetable_validation_rejects_bad_settings();
+  test_timetable_visualization_json();
   test_sudoku_rewards_valid_solution_and_givens();
   test_sudoku_validation_rejects_bad_settings();
   test_sudoku_run_path();
   test_constrained_sudoku_preserves_row_structure_and_givens();
   test_constrained_sudoku_run_path();
   test_constrained_sudoku_fixed_seed_is_reproducible();
+  test_constrained_sudoku_visualization_json();
   test_constrained_sudoku_validation_rejects_bad_settings();
 
   if (g_failures != 0)

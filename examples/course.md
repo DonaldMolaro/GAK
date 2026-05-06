@@ -96,6 +96,10 @@ Self-check:
 
 ## Module 4: Numeric Black-Box Optimization
 
+Read:
+
+- [lab_numeric.md](/Users/donaldmolaro/src/GAK/examples/lab_numeric.md)
+
 Run:
 
 ```sh
@@ -191,6 +195,7 @@ Read:
 
 - [docs/PROBLEM_FIT.md](/Users/donaldmolaro/src/GAK/docs/PROBLEM_FIT.md)
 - [docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md)
+- [lab_first_problem.md](/Users/donaldmolaro/src/GAK/examples/lab_first_problem.md)
 
 Exercise:
 
@@ -223,5 +228,7 @@ Best templates:
 - [prerequisites.md](/Users/donaldmolaro/src/GAK/examples/prerequisites.md)
 - [lab_knapsack.md](/Users/donaldmolaro/src/GAK/examples/lab_knapsack.md)
 - [lab_symbolic.md](/Users/donaldmolaro/src/GAK/examples/lab_symbolic.md)
+- [lab_numeric.md](/Users/donaldmolaro/src/GAK/examples/lab_numeric.md)
 - [lab_constraints.md](/Users/donaldmolaro/src/GAK/examples/lab_constraints.md)
 - [lab_sudoku.md](/Users/donaldmolaro/src/GAK/examples/lab_sudoku.md)
+- [lab_first_problem.md](/Users/donaldmolaro/src/GAK/examples/lab_first_problem.md)

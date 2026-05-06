@@ -22,13 +22,13 @@ CXXFLAGS += -fprofile-instr-generate -fcoverage-mapping
 LDFLAGS += -fprofile-instr-generate
 endif
 
-SRCS = GA.cc spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc latinsquare.cc sudoku.cc sudoku_constrained.cc
+SRCS = GA.cc spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc latinsquare.cc sudoku.cc sudoku_constrained.cc graphcoloring.cc timetable.cc
 OBJS = $(SRCS:.cc=.o)
-EXAMPLE_SRCS = spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc latinsquare.cc sudoku.cc sudoku_constrained.cc test_main.cc
+EXAMPLE_SRCS = spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc latinsquare.cc sudoku.cc sudoku_constrained.cc graphcoloring.cc timetable.cc test_main.cc
 EXAMPLE_OBJS = $(EXAMPLE_SRCS:.cc=.o)
 DEPS = $(OBJS:.o=.d) $(EXAMPLE_OBJS:.o=.d)
 
-.PHONY: all clean test run-tests coverage course-check
+.PHONY: all clean test run-tests coverage course-check experiment-check
 
 all: $(OUTPUT)
 
@@ -53,6 +53,9 @@ run-tests: $(TEST_OUTPUT)
 
 course-check: $(OUTPUT)
 	./check_labs.sh
+
+experiment-check: $(OUTPUT)
+	./sweep_runs.sh K /tmp/gak-experiment-check 1 2 -- --population 12 --trials 24
 
 coverage: $(TEST_OUTPUT)
 	LLVM_PROFILE_FILE=$(PROFRAW) ./$(TEST_OUTPUT)

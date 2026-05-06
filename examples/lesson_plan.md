@@ -62,6 +62,10 @@ Checkpoint:
 
 - learner can explain how a chromosome can still drive a numeric objective
 
+Suggested follow-up:
+
+- [lab_numeric.md](/Users/donaldmolaro/src/GAK/examples/lab_numeric.md)
+
 ## Module 5: Constraint Scoring
 
 Run:
@@ -111,6 +115,7 @@ Checkpoint:
 Read:
 
 - [docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md)
+- [examples/lab_first_problem.md](/Users/donaldmolaro/src/GAK/examples/lab_first_problem.md)
 
 Checkpoint:
 

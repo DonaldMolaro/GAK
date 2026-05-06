@@ -52,9 +52,11 @@ BaseString::BaseString(int length, int numStates)
 
 int BaseString::testBit(int i) const
 {
-  return ( ( i >= 0)&&(i < bitLength )
-	   ? ( ( bits[i >> 3] & ( 0x80 >> (i & 0x07) )) ? 1 : 0)
-	   : ( throw GAFatalException(__FILE__,__LINE__,"Attempted to TEST out of range bit"),0 ) );
+  if (i < 0 || i >= bitLength)
+    {
+      throw GAFatalException(__FILE__,__LINE__,"Attempted to TEST out of range bit");
+    }
+  return (bits[i >> 3] & (0x80 >> (i & 0x07))) ? 1 : 0;
 }
 
 void BaseString::setBit(int i)

@@ -115,6 +115,10 @@ Available modes:
   Knapsack combinatorial optimization
 - `L`
   Latin square symbolic constraint satisfaction
+- `G`
+  Graph coloring with symbolic node assignments
+- `M`
+  Timetable scheduling with symbolic slot assignments
 - `U`
   Sudoku using generic symbolic operators plus givens/row/column/box scoring
 - `C`
@@ -158,6 +162,14 @@ problems. These are the most useful things to know before you run a mode.
   Latin square construction over symbolic cell values. A successful run should
   converge toward a grid with unique values across each row and column.
 
+- `G`
+  Graph coloring over symbolic node assignments. This is a compact example of
+  soft-to-hard constraint scoring on an adjacency structure.
+
+- `M`
+  Timetabling over symbolic slot assignments. This is a scheduling-style
+  example with hard conflict avoidance and soft preference rewards.
+
 - `U`
   Generic Sudoku. This uses the normal symbolic operators plus a scoring
   function for givens, rows, columns, and boxes. It demonstrates how far the
@@ -193,6 +205,9 @@ Sudoku is the clearest example in this repo.
 
 For a fuller discussion of where the library fits well and where it does not,
 see [docs/PROBLEM_FIT.md](/Users/donaldmolaro/src/GAK/docs/PROBLEM_FIT.md).
+
+For a higher-level technical overview of the system, see
+[docs/WHITE_PAPER.md](/Users/donaldmolaro/src/GAK/docs/WHITE_PAPER.md).
 
 ## Public Library Shape
 
@@ -277,6 +292,8 @@ Current examples that do this include:
 - `Spell`
 - `Alpha`
 - `NQueens`
+- `GraphColoring`
+- `Timetable`
 - `Sudoku`
 - `SudokuConstrained`
 

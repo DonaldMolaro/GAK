@@ -44,6 +44,8 @@ Examples:
 - board placements
 - symbolic pattern construction
 - small assignment problems
+- graph coloring
+- timetable slot assignment
 
 Why they fit:
 
@@ -55,6 +57,7 @@ Reference examples:
 
 - [examples/alpha.cc](/Users/donaldmolaro/src/GAK/examples/alpha.cc)
 - [examples/nqueens.cc](/Users/donaldmolaro/src/GAK/examples/nqueens.cc)
+- [examples/graphcoloring.cc](/Users/donaldmolaro/src/GAK/examples/graphcoloring.cc)
 
 ### Constraint satisfaction with scoreable partial progress
 
@@ -67,6 +70,7 @@ Examples:
 - Latin squares
 - Sudoku
 - timetable construction
+- graph coloring
 
 Why they fit:
 
@@ -77,6 +81,8 @@ Why they fit:
 Reference examples:
 
 - [examples/latinsquare.cc](/Users/donaldmolaro/src/GAK/examples/latinsquare.cc)
+- [examples/timetable.cc](/Users/donaldmolaro/src/GAK/examples/timetable.cc)
+- [examples/graphcoloring.cc](/Users/donaldmolaro/src/GAK/examples/graphcoloring.cc)
 - [examples/sudoku.cc](/Users/donaldmolaro/src/GAK/examples/sudoku.cc)
 - [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
 

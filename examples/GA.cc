@@ -10,12 +10,14 @@
 #include "alpha.hh"
 #include "dome.hh"
 #include "f6.hh"
+#include "graphcoloring.hh"
 #include "knapsack.hh"
 #include "latinsquare.hh"
 #include "nqueens.hh"
 #include "spell.hh"
 #include "sudoku.hh"
 #include "sudoku_constrained.hh"
+#include "timetable.hh"
 #include "ts.hh"
 #include "population_report.hh"
 
@@ -179,6 +181,33 @@ void printLatinSquareInput()
   printSectionHeading("Problem input:");
   printLabeledLine("board", "5x5 Latin square");
   printLabeledLine("symbols", "0 1 2 3 4");
+  std::cout << '\n';
+  finishInputSection();
+}
+
+void printGraphColoringInput()
+{
+  printSectionHeading("Problem input:");
+  printLabeledLine("problem", "3-color graph coloring");
+  printLabeledLine("nodes", "A B C D E F G H");
+  printLabeledLine("colors", "red green blue");
+  printLabeledLine("edges", "A-B B-C C-D D-E E-F F-A");
+  printLabeledLine("", "G-A G-C G-E H-B H-D H-F");
+  std::cout << '\n';
+  finishInputSection();
+}
+
+void printTimetableInput()
+{
+  printSectionHeading("Problem input:");
+  printLabeledLine("problem", "course timetabling");
+  printLabeledLine("slots", "0 1 2 3");
+  printLabeledLine("courses", "Calculus Physics Chemistry Biology");
+  printLabeledLine("", "History Literature Economics Programming");
+  printLabeledLine("hard conflicts", "Calc-Phys Calc-Bio Phys-Chem");
+  printLabeledLine("", "Phys-Prog Chem-Hist Chem-Econ");
+  printLabeledLine("", "Bio-Lit Bio-Prog Hist-Econ Lit-Prog");
+  printLabeledLine("soft goal", "match preferred slot for each course");
   std::cout << '\n';
   finishInputSection();
 }
@@ -416,6 +445,42 @@ Population::Settings make_constrained_sudoku_options()
   return options;
 }
 
+Population::Settings make_graph_coloring_options()
+{
+  Population::Settings options;
+  options.operation = Population::OperationMode::Maximize;
+  options.numberOfIndividuals = 120;
+  options.numberOfTrials = 7000;
+  options.chromosomeLength = 8;
+  options.bitMutationRate = 0.02;
+  options.crossOverRate = 0.75;
+  options.reproduction = Population::ReproductionMode::DisallowDuplicates;
+  options.parentSelection = Population::ParentSelectionMode::RouletteWheel;
+  options.deletion = Population::DeletionMode::DeleteHalf;
+  options.fitness = Population::FitnessMode::LinearNormalized;
+  options.variableLength = Population::VariableLengthMode::Fixed;
+  options.baseStates = 3;
+  return options;
+}
+
+Population::Settings make_timetable_options()
+{
+  Population::Settings options;
+  options.operation = Population::OperationMode::Maximize;
+  options.numberOfIndividuals = 150;
+  options.numberOfTrials = 9000;
+  options.chromosomeLength = 8;
+  options.bitMutationRate = 0.02;
+  options.crossOverRate = 0.75;
+  options.reproduction = Population::ReproductionMode::DisallowDuplicates;
+  options.parentSelection = Population::ParentSelectionMode::RouletteWheel;
+  options.deletion = Population::DeletionMode::DeleteHalf;
+  options.fitness = Population::FitnessMode::LinearNormalized;
+  options.variableLength = Population::VariableLengthMode::Fixed;
+  options.baseStates = 4;
+  return options;
+}
+
 void usage(std::ostream& out)
 {
   out << "Usage:\n";
@@ -429,6 +494,8 @@ void usage(std::ostream& out)
   out << "  Q   8 Queens\n";
   out << "  K   Knapsack\n";
   out << "  L   Latin Square\n";
+  out << "  G   Graph Coloring\n";
+  out << "  M   Timetable\n";
   out << "  U   Sudoku\n";
   out << "  C   Sudoku+\n\n";
   out << "Options:\n";
@@ -683,6 +750,22 @@ int main(int argc,char *argv[])
         printLatinSquareInput();
         LatinSquare latinSquare;
         Population population(applyOverrides(make_latin_square_options(), cli), latinSquare);
+        return runPopulation(population, cli);
+      }
+    case 'G':
+    case 'g':
+      {
+        printGraphColoringInput();
+        GraphColoring graphColoring;
+        Population population(applyOverrides(make_graph_coloring_options(), cli), graphColoring);
+        return runPopulation(population, cli);
+      }
+    case 'M':
+    case 'm':
+      {
+        printTimetableInput();
+        Timetable timetable;
+        Population population(applyOverrides(make_timetable_options(), cli), timetable);
         return runPopulation(population, cli);
       }
     case 'U':
