@@ -17,7 +17,8 @@ The framework is built around a composition-based model:
 
 This paper describes the motivation behind `GAK`, the design of its core
 engine, the representation and operator model it uses, the kinds of problems
-it addresses well, and the architectural lessons demonstrated by its example
+it addresses well, the reporting and visualization tools that support
+experimentation, and the architectural lessons demonstrated by its example
 suite, especially the contrast between generic and constraint-aware operators.
 
 ## 1. Motivation
@@ -128,6 +129,7 @@ output. The reporting layer can emit:
 - formatted terminal summaries
 - JSON run reports
 - per-generation CSV reports
+- per-generation visualization payloads embedded in JSON
 
 This makes the same engine suitable for:
 
@@ -135,6 +137,41 @@ This makes the same engine suitable for:
 - instructional labs
 - parameter sweeps
 - reproducible experiments
+
+The structured reporting path also supports visual analysis. Each generation
+report can carry the best candidate's fitness, decoded gene values, and an
+optional problem-specific visualization frame. Those frames can then be
+consumed by lightweight tools such as the local browser viewer in
+[examples/viewer.html](/Users/donaldmolaro/src/GAK/examples/viewer.html).
+
+### 3.4 Visual feedback and analysis
+
+One of the more practical additions to the modernized codebase is that runs
+are not limited to text output. Problems may provide visualization data through
+`writeVisualizationJson(...)`, allowing the engine to export a visual snapshot
+of the best candidate at each generation.
+
+This matters for two reasons.
+
+First, it improves debugging and tuning. Many GA pathologies are easier to see
+than to infer from a single scalar fitness value. A route that oscillates, a
+Sudoku board that keeps breaking a local constraint, or a timetable that
+reduces one conflict while creating another can all be diagnosed much faster
+when the best candidate is rendered directly.
+
+Second, it improves teaching value. The viewer makes the search process more
+concrete by showing how different problems evolve over time rather than only
+showing a final answer.
+
+The current visualization stack supports:
+
+- generic gene-level fallback rendering for all problems
+- route visualization for Traveling Salesman
+- board rendering for generic and constraint-aware Sudoku
+- graph views for graph coloring
+- grid and assignment views for timetable problems
+- board and selection views for other visual examples such as N-Queens,
+  Latin squares, and knapsack
 
 ## 4. Candidate Representation
 
@@ -311,7 +348,9 @@ matter at least as much as the outer loop.
 Third, `GAK` includes explicit support for structured experiment output and
 reproducibility. Standard teaching implementations often stop at terminal
 output and ad hoc random seeding. `GAK` treats seed control and machine-readable
-run reports as part of normal engineering practice.
+run reports as part of normal engineering practice. In the modern codebase,
+that structured reporting extends to per-generation visualization frames and a
+local browser viewer, which is uncommon in small textbook-style GA libraries.
 
 ### 7.4 Why this difference matters
 
@@ -453,7 +492,27 @@ The repository includes:
 This is important because GA code can appear to “work” even when subtle
 selection or evaluation bugs exist.
 
-### 10.3 Portability
+### 10.3 Experiment visibility
+
+In many GA systems, reproducibility is treated as sufficient instrumentation.
+`GAK` goes further by making runs inspectable through:
+
+- structured JSON summaries
+- per-generation CSV traces
+- per-generation visualization frames
+- a local browser viewer for exploring improvement over time
+
+This is especially useful when comparing:
+
+- generic versus constraint-aware operators
+- different seeds
+- different population sizes
+- different mutation and crossover settings
+
+The result is a workflow that supports not only repeatable runs, but also
+repeatable interpretation of those runs.
+
+### 10.4 Portability
 
 The framework is intentionally dependency-light and has been validated on:
 
@@ -475,12 +534,14 @@ The repository includes:
 - a self-study course
 - guided labs
 - experiment scripts
+- a local JSON report viewer with problem-specific visual renderers
 
 This makes the project useful in several modes:
 
 - as a compact GA library
 - as a teaching repo for engineers learning evolutionary search
 - as a sandbox for comparing encodings and operators
+- as a visual experiment environment for watching search dynamics
 
 The examples are intentionally diverse enough to show that “genetic algorithm”
 is not one technique but a family of design choices around:
@@ -490,6 +551,11 @@ is not one technique but a family of design choices around:
 - variation
 - selection
 - stopping criteria
+
+The visualization layer strengthens that lesson. A learner can now inspect not
+only whether fitness improved, but how a candidate changed as it improved.
+That makes differences between generic and constraint-aware design easier to
+see in concrete terms.
 
 ## 12. Current Limitations
 
@@ -504,6 +570,8 @@ limitations fall into three categories.
   more modern packaging or build-system story.
 - The experiment tooling is useful and reproducible, but it is still small
   compared with large research platforms.
+- The visualization system is intentionally lightweight and browser-based
+  rather than a full interactive analytics environment.
 
 ### 12.2 Practical limits
 
@@ -541,10 +609,13 @@ These items improve the project immediately without changing its identity.
   selection.
 - Improve experiment workflows:
   build higher-level comparison and summarization on top of the existing JSON,
-  CSV, and sweep tools.
+  CSV, sweep, and visualization tools.
 - Deepen the instructional track:
   keep extending the course and labs so the examples become a more complete
   onboarding path for engineers learning GA design.
+- Expand the visualization layer:
+  add richer comparison, playback, and side-by-side analysis features on top
+  of the existing viewer.
 
 ### 13.2 Mid-term priorities
 
@@ -572,6 +643,7 @@ Each roadmap area serves a different project goal:
 
 - More examples improve both library usefulness and teaching value.
 - Better experiment tooling improves research quality and reproducibility.
+- Better visualization improves both debugging quality and instructional value.
 - Better packaging improves external adoption.
 - Broader validation improves confidence in portability and maintenance.
 
@@ -581,6 +653,7 @@ Each roadmap area serves a different project goal:
 |---|---|---|---|
 | Near-term | More example families | Expands demonstrated problem fit | Higher educational and practical value |
 | Near-term | Better experiment tooling | Makes tuning and comparison easier | Better empirical workflows |
+| Near-term | Better visualization tooling | Makes runs easier to inspect and teach | Better debugging and instruction |
 | Near-term | Deeper course material | Improves onboarding and teachability | Faster adoption by new users |
 | Mid-term | Packaging and install story | Makes the library easier to consume externally | Better external usability |
 | Mid-term | Broader CI and validation | Increases confidence across environments | Better maintenance posture |
