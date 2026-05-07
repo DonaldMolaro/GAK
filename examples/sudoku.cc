@@ -167,6 +167,29 @@ void Sudoku::printCandidate(const BaseString& genes, std::ostream& out) const
    }
 }
 
+void Sudoku::writeVisualizationJson(const BaseString& genes, std::ostream& out) const
+{
+   out << "{ \"type\": \"sudoku\", \"variant\": \"generic\", \"givens\": [";
+   for (int cell = 0 ; cell < kCellCount ; cell++)
+   {
+      if (cell > 0)
+      {
+         out << ',';
+      }
+      out << kPuzzle[cell];
+   }
+   out << "], \"board\": [";
+   for (int cell = 0 ; cell < kCellCount ; cell++)
+   {
+      if (cell > 0)
+      {
+         out << ',';
+      }
+      out << (genes.valueAt(cell) + 1);
+   }
+   out << "] }";
+}
+
 bool Sudoku::hasReachedSolution(const Population&, const BaseString&, double fitness) const
 {
    return fitness >= 513.0;

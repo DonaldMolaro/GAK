@@ -434,6 +434,15 @@
       if (firstVisualization && firstVisualization.type === "traveling_salesman") {
         return "traveling salesman";
       }
+      if (firstVisualization && firstVisualization.type === "nqueens") {
+        return "n-queens";
+      }
+      if (firstVisualization && firstVisualization.type === "latin_square") {
+        return "latin square";
+      }
+      if (firstVisualization && firstVisualization.type === "knapsack") {
+        return "knapsack";
+      }
       if (firstVisualization && firstVisualization.type === "graph_coloring") {
         return "graph coloring";
       }
@@ -546,6 +555,15 @@
       switch (visualization.type) {
         case "traveling_salesman":
           renderTravelingSalesman(visualization);
+          break;
+        case "nqueens":
+          renderNQueens(visualization);
+          break;
+        case "latin_square":
+          renderLatinSquare(visualization);
+          break;
+        case "knapsack":
+          renderKnapsack(visualization);
           break;
         case "graph_coloring":
           renderGraphColoring(visualization);
@@ -676,6 +694,139 @@
         wrapper.appendChild(div);
       }
 
+      elements.vizSurface.appendChild(wrapper);
+    }
+
+    function renderNQueens(visualization) {
+      const rows = visualization.rows || [];
+      const boardSize = visualization.board_size || rows.length || 0;
+      const conflictColumns = new Set();
+      (visualization.conflicts || []).forEach(conflict => {
+        conflictColumns.add(conflict.left);
+        conflictColumns.add(conflict.right);
+      });
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "sudoku-board";
+      wrapper.style.gridTemplateColumns = `repeat(${boardSize}, 1fr)`;
+      wrapper.style.width = "min(100%, 30rem)";
+
+      for (let row = 0; row < boardSize; row += 1) {
+        for (let column = 0; column < boardSize; column += 1) {
+          const div = document.createElement("div");
+          div.className = "sudoku-cell";
+          div.style.background = (row + column) % 2 === 0 ? "#f8f4ec" : "#fff";
+          if (rows[column] === row) {
+            div.textContent = "Q";
+            div.style.fontWeight = "700";
+            div.style.color = conflictColumns.has(column) ? "var(--warn)" : "var(--accent)";
+            if (conflictColumns.has(column)) {
+              div.classList.add("conflict");
+            }
+          } else {
+            div.textContent = "";
+          }
+          wrapper.appendChild(div);
+        }
+      }
+
+      elements.vizSurface.appendChild(wrapper);
+    }
+
+    function renderLatinSquare(visualization) {
+      const size = visualization.size || 0;
+      const cells = visualization.cells || [];
+      const duplicates = findLatinSquareDuplicates(cells, size);
+      const wrapper = document.createElement("div");
+      wrapper.className = "sudoku-board";
+      wrapper.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+      wrapper.style.width = "min(100%, 30rem)";
+
+      cells.forEach((value, index) => {
+        const div = document.createElement("div");
+        div.className = "sudoku-cell";
+        div.textContent = String(value);
+        if (duplicates.has(index)) {
+          div.classList.add("conflict");
+        }
+        wrapper.appendChild(div);
+      });
+
+      elements.vizSurface.appendChild(wrapper);
+    }
+
+    function findLatinSquareDuplicates(cells, size) {
+      const conflicts = new Set();
+
+      function mark(indices) {
+        const seen = new Map();
+        indices.forEach(index => {
+          const value = cells[index];
+          if (!seen.has(value)) {
+            seen.set(value, [index]);
+          } else {
+            seen.get(value).push(index);
+          }
+        });
+        seen.forEach(indicesForValue => {
+          if (indicesForValue.length > 1) {
+            indicesForValue.forEach(index => conflicts.add(index));
+          }
+        });
+      }
+
+      for (let row = 0; row < size; row += 1) {
+        mark(Array.from({ length: size }, (_, column) => row * size + column));
+      }
+      for (let column = 0; column < size; column += 1) {
+        mark(Array.from({ length: size }, (_, row) => row * size + column));
+      }
+
+      return conflicts;
+    }
+
+    function renderKnapsack(visualization) {
+      const wrapper = document.createElement("div");
+      wrapper.style.width = "100%";
+      wrapper.style.display = "grid";
+      wrapper.style.gap = "1rem";
+
+      const bar = document.createElement("div");
+      bar.style.border = "1px solid var(--line)";
+      bar.style.borderRadius = "999px";
+      bar.style.overflow = "hidden";
+      bar.style.background = "#efe8de";
+      const fill = document.createElement("div");
+      const ratio = Math.min(1, (visualization.total_weight || 0) / Math.max(1, visualization.capacity || 1));
+      fill.style.width = `${ratio * 100}%`;
+      fill.style.height = "20px";
+      fill.style.background = visualization.feasible ? "var(--accent)" : "var(--warn)";
+      bar.appendChild(fill);
+
+      const summary = document.createElement("div");
+      summary.innerHTML = `
+        <strong>Weight:</strong> ${visualization.total_weight}/${visualization.capacity}
+        &nbsp;&nbsp; <strong>Value:</strong> ${visualization.total_value}
+        &nbsp;&nbsp; <strong>Status:</strong> ${visualization.feasible ? "feasible" : "over capacity"}
+      `;
+
+      const grid = document.createElement("div");
+      grid.className = "gene-grid";
+      (visualization.items || []).forEach(item => {
+        const card = document.createElement("div");
+        card.className = "gene-card";
+        card.style.background = item.selected ? "var(--accent-soft)" : "#fff";
+        card.innerHTML = `
+          <div class="gene-index">item ${item.index}</div>
+          <div class="gene-value">${item.selected ? "selected" : "skip"}</div>
+          <div class="muted" style="font-size:0.85rem">w=${item.weight} v=${item.value}</div>
+        `;
+        grid.appendChild(card);
+      });
+
+      wrapper.appendChild(summary);
+      wrapper.appendChild(bar);
+      wrapper.appendChild(grid);
       elements.vizSurface.appendChild(wrapper);
     }
 

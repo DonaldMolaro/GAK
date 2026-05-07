@@ -99,3 +99,18 @@ void LatinSquare::printCandidate(const BaseString& genes, std::ostream& out) con
       out << '\n';
    }
 }
+
+void LatinSquare::writeVisualizationJson(const BaseString& genes, std::ostream& out) const
+{
+   const int size = squareSize(genes);
+   out << "{ \"type\": \"latin_square\", \"size\": " << size << ", \"cells\": [";
+   for (int index = 0 ; index < genes.length() ; index++)
+   {
+      if (index > 0)
+      {
+         out << ", ";
+      }
+      out << genes.valueAt(index);
+   }
+   out << "] }";
+}

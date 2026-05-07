@@ -48,6 +48,45 @@ void NQueens::printCandidate(const BaseString& genes, std::ostream& out) const
    }
 }
 
+void NQueens::writeVisualizationJson(const BaseString& genes, std::ostream& out) const
+{
+   const int boardSize = genes.length();
+   out << "{ \"type\": \"nqueens\", \"board_size\": " << boardSize << ", \"rows\": [";
+   for (int column = 0 ; column < boardSize ; column++)
+   {
+      if (column > 0)
+      {
+         out << ", ";
+      }
+      out << genes.valueAt(column);
+   }
+   out << "], \"conflicts\": [";
+   bool firstConflict = true;
+   for (int column = 0 ; column < boardSize ; column++)
+   {
+      for (int otherColumn = column + 1 ; otherColumn < boardSize ; otherColumn++)
+      {
+         const int row = genes.valueAt(column);
+         const int otherRow = genes.valueAt(otherColumn);
+         const bool sameRow = row == otherRow;
+         const bool sameDiagonal = std::abs(row - otherRow) == (otherColumn - column);
+         if (sameRow || sameDiagonal)
+         {
+            if (!firstConflict)
+            {
+               out << ", ";
+            }
+            out << "{ \"left\": " << column
+                << ", \"right\": " << otherColumn
+                << ", \"same_row\": " << (sameRow ? "true" : "false")
+                << ", \"same_diagonal\": " << (sameDiagonal ? "true" : "false") << " }";
+            firstConflict = false;
+         }
+      }
+   }
+   out << "] }";
+}
+
 bool NQueens::hasReachedSolution(const Population&, const BaseString& genes, double fitness) const
 {
    const int boardSize = genes.length();

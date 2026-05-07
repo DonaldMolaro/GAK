@@ -49,3 +49,30 @@ void Knapsack::printCandidate(const BaseString& genes, std::ostream& out) const
    }
    out << " | weight=" << weight << '/' << kCapacity << " value=" << value;
 }
+
+void Knapsack::writeVisualizationJson(const BaseString& genes, std::ostream& out) const
+{
+   int weight = 0;
+   int value = 0;
+   out << "{ \"type\": \"knapsack\", \"capacity\": " << kCapacity << ", \"items\": [";
+   for (int item = 0 ; item < kItemCount ; item++)
+   {
+      if (item > 0)
+      {
+         out << ", ";
+      }
+      const bool selected = genes.valueAt(item) != 0;
+      if (selected)
+      {
+         weight += kWeights[item];
+         value += kValues[item];
+      }
+      out << "{ \"index\": " << item
+          << ", \"weight\": " << kWeights[item]
+          << ", \"value\": " << kValues[item]
+          << ", \"selected\": " << (selected ? "true" : "false") << " }";
+   }
+   out << "], \"total_weight\": " << weight
+       << ", \"total_value\": " << value
+       << ", \"feasible\": " << (weight <= kCapacity ? "true" : "false") << " }";
+}

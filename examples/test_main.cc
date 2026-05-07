@@ -341,6 +341,26 @@ void test_nqueens_rewards_non_attacking_layouts()
                   "NQueens should print a board view");
 }
 
+void test_nqueens_visualization_json()
+{
+  NQueens queens;
+  BaseString solution(8, 8);
+  const int solved_rows[8] = {0, 4, 7, 5, 2, 6, 1, 3};
+  for (int i = 0 ; i < 8 ; i++)
+  {
+    solution.setValue(i, solved_rows[i]);
+  }
+
+  std::ostringstream out;
+  queens.writeVisualizationJson(solution, out);
+  expect_contains(out.str(), "\"type\": \"nqueens\"",
+                  "NQueens should emit a typed visualization payload");
+  expect_contains(out.str(), "\"rows\":",
+                  "NQueens visualization should include row assignments");
+  expect_contains(out.str(), "\"conflicts\":",
+                  "NQueens visualization should include conflict relationships");
+}
+
 void test_knapsack_prefers_feasible_high_value_selections()
 {
   Knapsack knapsack;
@@ -363,6 +383,21 @@ void test_knapsack_prefers_feasible_high_value_selections()
                   "Knapsack should print total weight");
   expect_contains(out.str(), "value=",
                   "Knapsack should print total value");
+}
+
+void test_knapsack_visualization_json()
+{
+  Knapsack knapsack;
+  BaseString feasible = makeBinaryString("111101100000");
+  std::ostringstream out;
+
+  knapsack.writeVisualizationJson(feasible, out);
+  expect_contains(out.str(), "\"type\": \"knapsack\"",
+                  "Knapsack should emit a typed visualization payload");
+  expect_contains(out.str(), "\"items\":",
+                  "Knapsack visualization should include item state");
+  expect_contains(out.str(), "\"capacity\": 35",
+                  "Knapsack visualization should include capacity");
 }
 
 void test_latin_square_rewards_unique_rows_and_columns()
@@ -414,6 +449,31 @@ void test_latin_square_validation_rejects_bad_settings()
       Population invalid_population(bad, latin_square);
     },
     "LatinSquare should reject base-state counts that do not match the square width");
+}
+
+void test_latin_square_visualization_json()
+{
+  LatinSquare latin_square;
+  BaseString solution(16, 4);
+  const int solved_values[16] = {
+    0, 1, 2, 3,
+    1, 2, 3, 0,
+    2, 3, 0, 1,
+    3, 0, 1, 2
+  };
+  for (int i = 0 ; i < 16 ; i++)
+  {
+    solution.setValue(i, solved_values[i]);
+  }
+
+  std::ostringstream out;
+  latin_square.writeVisualizationJson(solution, out);
+  expect_contains(out.str(), "\"type\": \"latin_square\"",
+                  "LatinSquare should emit a typed visualization payload");
+  expect_contains(out.str(), "\"size\": 4",
+                  "LatinSquare visualization should include the board size");
+  expect_contains(out.str(), "\"cells\":",
+                  "LatinSquare visualization should include cell values");
 }
 
 void test_latin_square_run_path()
@@ -642,6 +702,27 @@ void test_sudoku_validation_rejects_bad_settings()
     "Sudoku should reject base-state counts other than 9");
 }
 
+void test_sudoku_visualization_json()
+{
+  Sudoku sudoku;
+  BaseString board(81, 9);
+  for (int i = 0 ; i < 81 ; i++)
+  {
+    board.setValue(i, i % 9);
+  }
+
+  std::ostringstream out;
+  sudoku.writeVisualizationJson(board, out);
+  expect_contains(out.str(), "\"type\": \"sudoku\"",
+                  "Sudoku should emit a typed visualization payload");
+  expect_contains(out.str(), "\"variant\": \"generic\"",
+                  "Sudoku visualization should identify the generic variant");
+  expect_contains(out.str(), "\"givens\":",
+                  "Sudoku visualization should include givens");
+  expect_contains(out.str(), "\"board\":",
+                  "Sudoku visualization should include board values");
+}
+
 void test_sudoku_run_path()
 {
   Population::Settings options = make_options(Population::OperationMode::Maximize, 81,
@@ -838,9 +919,12 @@ int main()
   test_traveling_salesman_fixed_seed_is_reproducible();
   test_traveling_salesman_visualization_json();
   test_nqueens_rewards_non_attacking_layouts();
+  test_nqueens_visualization_json();
   test_knapsack_prefers_feasible_high_value_selections();
+  test_knapsack_visualization_json();
   test_latin_square_rewards_unique_rows_and_columns();
   test_latin_square_validation_rejects_bad_settings();
+  test_latin_square_visualization_json();
   test_latin_square_run_path();
   test_graph_coloring_rewards_proper_colorings();
   test_graph_coloring_validation_rejects_bad_settings();
@@ -850,6 +934,7 @@ int main()
   test_timetable_visualization_json();
   test_sudoku_rewards_valid_solution_and_givens();
   test_sudoku_validation_rejects_bad_settings();
+  test_sudoku_visualization_json();
   test_sudoku_run_path();
   test_constrained_sudoku_preserves_row_structure_and_givens();
   test_constrained_sudoku_run_path();
