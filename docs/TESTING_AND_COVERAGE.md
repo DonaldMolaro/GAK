@@ -37,6 +37,7 @@ Then it runs:
 
 - the library unit-test binary
 - the example test harness
+- the command-line checks in [examples/check_cli.sh](../examples/check_cli.sh)
 
 Run only the library tests:
 
@@ -49,6 +50,12 @@ Run only the example tests:
 
 ```sh
 make example-tests
+```
+
+Run only the command-line checks (builds `GA` first):
+
+```sh
+make -C examples cli-check
 ```
 
 Rebuild just the library:
@@ -93,7 +100,40 @@ These tests are the right place to verify:
 - a problem-specific encoding
 - a custom operator override
 
+### Command-line checks
+
+[examples/check_cli.sh](../examples/check_cli.sh) runs the real `GA` binary
+and checks exit codes and messages: usage and `--help`, strict rejection of
+malformed option values, configuration errors reported as `GA: <reason>`,
+every mode running, each override actually being applied, mode `R`'s data
+loading and reports, and fixed-seed reproducibility. It is the right place to
+verify a new runner option or a change to what the runner prints. A check
+reads:
+
+```sh
+expect STATUS "text the output must contain" "description" -- $GA args...
+```
+
 ## Coverage Workflow
+
+### With GCC only (gcov)
+
+```sh
+make coverage-gcc
+```
+
+This needs nothing beyond GCC. It rebuilds everything unoptimized with
+`--coverage`, runs the full `make test` flow, including the command-line
+checks, so the `GA` runner is measured too, and prints per-file line coverage
+for the production `.cc` files. For line-by-line detail, run `gcov` in `src/`
+or `examples/` afterwards; each `<file>.gcov` marks never-executed lines with
+`#####`. `make clean` removes the coverage data files.
+
+Most of the remaining uncovered lines are defensive `throw`s for states the
+public API cannot produce, such as out-of-range gene symbols, which `setValue`
+already rejects.
+
+### With LLVM (llvm-cov)
 
 Generate coverage with:
 

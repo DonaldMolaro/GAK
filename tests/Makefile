@@ -53,6 +53,6 @@ coverage: $(OUTPUT)
 	$(LLVM_COV) show ./$(OUTPUT) -instr-profile=$(PROFDATA) > $(TEXT_REPORT)
 
 clean:
-	rm -f *~ *.o *.d $(OUTPUT) $(PROFRAW) $(PROFDATA) $(TEXT_REPORT)
+	rm -f *~ *.o *.d $(OUTPUT) $(PROFRAW) $(PROFDATA) $(TEXT_REPORT) *.gcda *.gcno *.gcov
 
 -include $(DEPS)

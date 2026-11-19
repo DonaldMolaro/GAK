@@ -32,7 +32,7 @@ EXAMPLE_SRCS = spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc lati
 EXAMPLE_OBJS = $(EXAMPLE_SRCS:.cc=.o)
 DEPS = $(OBJS:.o=.d) $(EXAMPLE_OBJS:.o=.d)
 
-.PHONY: all clean test run-tests coverage course-check experiment-check
+.PHONY: all clean test run-tests coverage course-check cli-check experiment-check
 
 all: $(OUTPUT)
 
@@ -58,6 +58,9 @@ run-tests: $(TEST_OUTPUT)
 course-check: $(OUTPUT)
 	./check_labs.sh
 
+cli-check: $(OUTPUT)
+	./check_cli.sh
+
 experiment-check: $(OUTPUT)
 	./sweep_runs.sh K /tmp/gak-experiment-check 1 2 -- --population 12 --trials 24
 
@@ -68,6 +71,6 @@ coverage: $(TEST_OUTPUT)
 	$(LLVM_COV) show ./$(TEST_OUTPUT) -instr-profile=$(PROFDATA) > $(TEXT_REPORT)
 
 clean:
-	rm -f *~ *.o core *.d $(OUTPUT) $(TEST_OUTPUT) $(PROFRAW) $(PROFDATA) $(TEXT_REPORT)
+	rm -f *~ *.o core *.d $(OUTPUT) $(TEST_OUTPUT) $(PROFRAW) $(PROFDATA) $(TEXT_REPORT) *.gcda *.gcno *.gcov
 
 -include $(DEPS)

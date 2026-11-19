@@ -47,6 +47,7 @@ const int kSudokuPuzzle[] = {
 struct CliOptions
 {
   std::string mode;
+  bool helpRequested = false;
   bool showSettings = false;
   bool seedProvided = false;
   unsigned int seed = 0;
@@ -666,6 +667,7 @@ bool parseCliOptions(int argc, char* argv[], CliOptions& options)
   options.mode = argv[1];
   if (options.mode == "--help")
   {
+    options.helpRequested = true;
     return false;
   }
 
@@ -674,6 +676,7 @@ bool parseCliOptions(int argc, char* argv[], CliOptions& options)
     const std::string arg = argv[i];
     if (arg == "--help")
     {
+      options.helpRequested = true;
       return false;
     }
     if (arg == "--show-settings")
@@ -907,8 +910,9 @@ int runGa(int argc, char *argv[])
   CliOptions cli;
   if (!parseCliOptions(argc, argv, cli))
   {
-    usage(std::cerr);
-    return EXIT_FAILURE;
+    // Asking for help is not an error: usage goes to stdout with status 0.
+    usage(cli.helpRequested ? std::cout : std::cerr);
+    return cli.helpRequested ? EXIT_SUCCESS : EXIT_FAILURE;
   }
 
   switch (cli.mode[0])
