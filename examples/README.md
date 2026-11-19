@@ -62,6 +62,7 @@ Supported modes:
 - `M`: timetable scheduling
 - `U`: generic Sudoku
 - `C`: constraint-aware Sudoku
+- `R`: symbolic regression on a CSV (`./GA R --data data/pendulum.csv`; see [../docs/SYMBOLIC_REGRESSION.md](../docs/SYMBOLIC_REGRESSION.md))
 
 ## Suggested Learning Order
 

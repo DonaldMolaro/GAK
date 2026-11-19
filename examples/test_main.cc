@@ -1,3 +1,4 @@
+#include <cmath>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -19,6 +20,9 @@
 #include "timetable.hh"
 #include "ts.hh"
 #include "spell.hh"
+#include "dataset.hh"
+#include "expression.hh"
+#include "regression.hh"
 
 class PopulationTestRig
 {
@@ -1059,6 +1063,270 @@ void test_knapsack_validation_and_output()
 
 }
 
+namespace {
+
+// Gene index of an instruction in a one-input InstructionSet.
+int geneFor(const InstructionSet& set, Operation operation, double constant = 0.0)
+{
+  for (int gene = 0 ; gene < set.size() ; gene++)
+    {
+      const Instruction& instruction = set.at(gene);
+      if (instruction.operation == operation &&
+          (operation != Operation::Constant || instruction.constant == constant))
+        {
+          return gene;
+        }
+    }
+  return -1;
+}
+
+BaseString program(const InstructionSet& set, const std::vector<int>& genes)
+{
+  BaseString result(static_cast<int>(genes.size()), set.size());
+  for (int i = 0 ; i < static_cast<int>(genes.size()) ; i++)
+    {
+      result.setValue(i, genes[i]);
+    }
+  return result;
+}
+
+Dataset makeDataset(double (*f)(double), int rows, double low, double high)
+{
+  Dataset data;
+  data.source = "synthetic";
+  data.inputNames.push_back("x");
+  data.targetName = "y";
+  for (int i = 0 ; i < rows ; i++)
+    {
+      const double x = low + (high - low) * i / (rows - 1);
+      data.inputs.push_back(std::vector<double>(1, x));
+      data.targets.push_back(f(x));
+    }
+  return data;
+}
+
+double quadraticTarget(double x) { return 3.0 * x * x + 2.0; }
+
+void test_csv_dataset_loading()
+{
+  std::istringstream in("time_s, counts ,temp\n\n1, 10, 20\n2,20,21\n3,30,22\n");
+  Dataset data = loadCsvDataset(in, "inline.csv");
+  expect_true(data.rowCount() == 3 && data.inputCount() == 2,
+              "CSV loader should read every row and treat all but the last column as inputs");
+  expect_true(data.targetName == "temp" && data.inputNames[0] == "time_s" && data.inputNames[1] == "counts",
+              "CSV loader should trim column names and default the target to the last column");
+  expect_true(data.targets[2] == 22.0 && data.inputs[1][1] == 20.0,
+              "CSV loader should parse numeric values into rows");
+
+  std::istringstream named("a,b,c\n1,2,3\n4,5,6\n7,8,9\n");
+  Dataset byName = loadCsvDataset(named, "named.csv", "a");
+  expect_true(byName.targetName == "a" && byName.targets[1] == 4.0 &&
+              byName.inputNames[0] == "b" && byName.inputs[1][0] == 5.0,
+              "CSV loader should use the named target column and keep the rest as inputs");
+}
+
+void test_csv_dataset_errors()
+{
+  auto failsWith = [](const std::string& text, const std::string& needle, const std::string& target) {
+    std::istringstream in(text);
+    try
+      {
+        loadCsvDataset(in, "bad.csv", target);
+      }
+    catch (const GAFatalException& error)
+      {
+        return std::string(error.what()).find(needle) != std::string::npos;
+      }
+    return false;
+  };
+  expect_true(failsWith("x,y\n1,2\n3,abc\n5,6\n", "bad.csv:3", ""),
+              "CSV loader should report the line of a non-numeric value");
+  expect_true(failsWith("x,y\n1,2\n3\n5,6\n", "expected 2 values", ""),
+              "CSV loader should reject ragged rows");
+  expect_true(failsWith("x,y\n1,2\n3,4\n5,6\n", "'z' is not in the header", "z"),
+              "CSV loader should reject an unknown target column");
+  expect_true(failsWith("x,y\n1,2\n", "at least 3 data rows", ""),
+              "CSV loader should reject files with too few rows");
+  expect_true(failsWith("x\n1\n2\n3\n", "at least one input column", ""),
+              "CSV loader should require an input and a target column");
+}
+
+void test_expression_compiles_postfix_programs()
+{
+  InstructionSet set(1);
+  const int x = geneFor(set, Operation::Variable);
+  const int two = geneFor(set, Operation::Constant, 2.0);
+  const int three = geneFor(set, Operation::Constant, 3.0);
+  const int add = geneFor(set, Operation::Add);
+  const int mul = geneFor(set, Operation::Multiply);
+  const int sinGene = geneFor(set, Operation::Sin);
+
+  // "add" first underflows and is skipped; the program is x*x + 2.
+  Expression expression = Expression::compile(program(set, {add, x, x, mul, two, add}), set);
+  expect_true(expression.size() == 5, "Expression should keep only nodes that feed the result");
+  expect_true(expression.toString({"x"}) == "x*x + 2", "Expression should print postfix code in infix");
+  std::vector<double> values;
+  expect_true(expression.evaluate({{3.0}, {-1.0}}, values) && values[0] == 11.0 && values[1] == 3.0,
+              "Expression should evaluate every row");
+
+  // Values not feeding the top of the stack are dropped: "3 x sin" leaves sin(x).
+  Expression dangling = Expression::compile(program(set, {three, x, sinGene}), set);
+  expect_true(dangling.size() == 2 && dangling.toString({"x"}) == "sin(x)",
+              "Expression should ignore values left below the result");
+
+  // Variable-free subtrees fold to a number.
+  Expression folded = Expression::compile(program(set, {x, two, three, mul, add}), set);
+  expect_true(folded.toString({"x"}) == "x + 6", "Expression should fold constant subtrees");
+
+  Expression empty = Expression::compile(program(set, {add, mul}), set);
+  expect_true(empty.empty() && !empty.evaluate({{1.0}}, values),
+              "A program that never pushes a value should be empty and undefined");
+}
+
+void test_expression_rejects_undefined_values()
+{
+  InstructionSet set(1);
+  const int x = geneFor(set, Operation::Variable);
+  const int divide = geneFor(set, Operation::Divide);
+  const int logGene = geneFor(set, Operation::Log);
+  const int one = geneFor(set, Operation::Constant, 1.0);
+  std::vector<double> values;
+
+  Expression reciprocal = Expression::compile(program(set, {one, x, divide}), set);
+  expect_true(reciprocal.evaluate({{2.0}}, values) && values[0] == 0.5,
+              "Division should work away from zero");
+  expect_true(!reciprocal.evaluate({{2.0}, {0.0}}, values),
+              "Division by zero on any row should make the formula undefined");
+  Expression logarithm = Expression::compile(program(set, {x, logGene}), set);
+  expect_true(!logarithm.evaluate({{-1.0}}, values),
+              "log of a non-positive value should make the formula undefined");
+}
+
+void test_regression_scaling_and_fit()
+{
+  SymbolicRegression::Config config;
+  config.holdoutFraction = 0.25;
+  SymbolicRegression regression(makeDataset(quadraticTarget, 40, -3.0, 3.0), config);
+  expect_true(regression.trainRowCount() == 30 && regression.testRowCount() == 10,
+              "Regression should hold out the configured share of rows");
+
+  InstructionSet set(1);
+  const int x = geneFor(set, Operation::Variable);
+  const int square = geneFor(set, Operation::Square);
+  // The bare shape x^2: linear scaling should supply 3 and 2 exactly.
+  SymbolicRegression::Fit fit = regression.describe(program(set, {x, square}));
+  expect_true(fit.valid && std::fabs(fit.slope - 3.0) < 1e-9 && std::fabs(fit.intercept - 2.0) < 1e-9,
+              "Linear scaling should recover the slope and intercept of the right shape");
+  expect_true(fit.trainR2 > 0.999999 && fit.testR2 > 0.999999,
+              "The right shape should fit noiseless data perfectly");
+  expect_true(std::fabs(fit.fitness - config.parsimony * 2) < 1e-9,
+              "A perfect fit should cost only its parsimony penalty");
+  expect_true(regression.scaledFormula(fit) == "2 + 3*(x^2)",
+              "Scaled formula should show the fitted intercept and slope");
+
+  // A wrong shape scores worse, and an undefined formula gets the penalty.
+  SymbolicRegression::Fit line = regression.describe(program(set, {x}));
+  expect_true(line.valid && line.fitness > fit.fitness, "A wrong shape should score worse");
+  const int one = geneFor(set, Operation::Constant, 1.0);
+  const int divide = geneFor(set, Operation::Divide);
+  const int subtract = geneFor(set, Operation::Subtract);
+  SymbolicRegression::Fit undefined = regression.describe(program(set, {one, x, x, subtract, divide}));
+  expect_true(!undefined.valid && undefined.fitness == SymbolicRegression::kInvalidFitness,
+              "A formula undefined on the data should get the invalid-fitness penalty");
+}
+
+void test_regression_operators_respect_length_limits()
+{
+  SymbolicRegression::Config config;
+  config.maximumLength = 30;
+  SymbolicRegression regression(makeDataset(quadraticTarget, 20, -1.0, 1.0), config);
+  Population::Settings settings = make_options(Population::OperationMode::Minimize, 24,
+                                               Population::VariableLengthMode::Variable,
+                                               regression.alphabetSize());
+  settings.crossOverRate = 1.0;
+  Population population(settings, regression);
+  for (int trial = 0 ; trial < 300 ; trial++)
+    {
+      std::unique_ptr<Chromosome> mother = PopulationTestRig::createInitialChromosome(population);
+      std::unique_ptr<Chromosome> father = PopulationTestRig::createInitialChromosome(population);
+      expect_true(mother->length() >= config.minimumInitialLength &&
+                  mother->length() <= config.maximumInitialLength,
+                  "Initial programs should have a length within the configured range");
+      std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+        PopulationTestRig::mateChromosomes(population, *mother, *father);
+      expect_true(children.first->length() <= config.maximumLength &&
+                  children.second->length() <= config.maximumLength,
+                  "Offspring should be truncated to the maximum program length");
+    }
+
+  expect_throws<GAFatalException>(
+    [&regression]() {
+      Population::Settings fixed = make_options(Population::OperationMode::Minimize, 24,
+                                                Population::VariableLengthMode::Fixed,
+                                                regression.alphabetSize());
+      Population invalid(fixed, regression);
+    },
+    "Regression should require variable-length chromosomes");
+}
+
+double decayTarget(double x) { return 5.0 * std::exp(-0.3 * x); }
+
+void test_regression_tunes_constants()
+{
+  InstructionSet set(1);
+  const int x = geneFor(set, Operation::Variable);
+  const int half = geneFor(set, Operation::Constant, 0.5);
+  const int mul = geneFor(set, Operation::Multiply);
+  const int negate = geneFor(set, Operation::Negate);
+  const int expGene = geneFor(set, Operation::Exp);
+  // The structure exp(-(x*0.5)) is right but its rate constant is not.
+  const BaseString genes = program(set, {x, half, mul, negate, expGene});
+
+  SymbolicRegression::Config untuned;
+  untuned.constantTuningBudget = 0;
+  SymbolicRegression plain(makeDataset(decayTarget, 40, 0.0, 10.0), untuned);
+  SymbolicRegression::Config tunedConfig;
+  tunedConfig.constantTuningBudget = 60;
+  SymbolicRegression tuned(makeDataset(decayTarget, 40, 0.0, 10.0), tunedConfig);
+
+  const SymbolicRegression::Fit before = plain.describe(genes);
+  const SymbolicRegression::Fit after = tuned.describe(genes);
+  expect_true(before.valid && before.trainR2 < 0.99,
+              "Without tuning, the wrong rate constant should fit noticeably worse");
+  expect_true(after.valid && after.trainR2 > 0.99999 && after.fitness < before.fitness,
+              "Constant tuning should find the rate constant and lower the fitness");
+  expect_true(after.formula.find("0.3") != std::string::npos,
+              "The tuned formula should print the recovered constant 0.3");
+  const SymbolicRegression::Fit again = tuned.describe(genes);
+  expect_true(again.fitness == after.fitness && again.formula == after.formula,
+              "Constant tuning should be deterministic");
+}
+
+void test_regression_run_recovers_formula()
+{
+  SymbolicRegression regression(makeDataset(quadraticTarget, 40, -3.0, 3.0), SymbolicRegression::Config());
+  Population::Settings settings;
+  settings.operation = Population::OperationMode::Minimize;
+  settings.numberOfIndividuals = 200;
+  settings.numberOfTrials = 20000;
+  settings.chromosomeLength = 24;
+  settings.bitMutationRate = 0.04;
+  settings.crossOverRate = 0.8;
+  settings.reproduction = Population::ReproductionMode::DisallowDuplicates;
+  settings.deletion = Population::DeletionMode::DeleteHalf;
+  settings.fitness = Population::FitnessMode::LinearNormalized;
+  settings.variableLength = Population::VariableLengthMode::Variable;
+  settings.baseStates = regression.alphabetSize();
+  settings.useFixedRandomSeed = true;
+  settings.randomSeed = 1;
+  Population population(settings, regression);
+  Population::RunResult result = population.execute();
+  expect_true(result.finalSummary.mostFit[0] < 0.02,
+              "A seeded run should rediscover 3x^2 + 2 on noiseless data");
+}
+
+}
+
 int main()
 {
   test_dome_fitness();
@@ -1098,6 +1366,14 @@ int main()
   test_dome_reports_exact_optimum();
   test_latin_square_reports_solution();
   test_knapsack_validation_and_output();
+  test_csv_dataset_loading();
+  test_csv_dataset_errors();
+  test_expression_compiles_postfix_programs();
+  test_expression_rejects_undefined_values();
+  test_regression_scaling_and_fit();
+  test_regression_operators_respect_length_limits();
+  test_regression_run_recovers_formula();
+  test_regression_tunes_constants();
 
   if (g_failures != 0)
     {

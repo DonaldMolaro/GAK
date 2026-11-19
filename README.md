@@ -123,6 +123,8 @@ Available modes:
   Sudoku using generic symbolic operators plus givens/row/column/box scoring
 - `C`
   Constraint-aware Sudoku with row-valid initialization, locked givens, row-wise crossover, and row-swap mutation
+- `R`
+  Symbolic regression: discover a formula that fits a CSV of measured points (`./GA R --data data/pendulum.csv`)
 
 ### Example mode reference
 
@@ -188,6 +190,14 @@ problems. These are the most useful things to know before you run a mode.
   Constraint-aware Sudoku. This is the strongest example of the modernized
   extension hooks. Rows start valid, givens stay locked, mutation only swaps
   mutable values within a row, and crossover operates on whole rows.
+
+- `R`
+  Symbolic regression. Formulas are postfix programs over a symbolic gene
+  alphabet (variables, constants, operators), scored with least-squares
+  linear scaling and a length penalty, with a held-out test split to show
+  generalization. Needs `--data` with a CSV; test datasets with known answers
+  are in `examples/data/`. See
+  [docs/SYMBOLIC_REGRESSION.md](docs/SYMBOLIC_REGRESSION.md).
 
 Most modes print generation progress and then a best candidate summary at the
 end. Constraint problems usually become easiest to judge by reading the final

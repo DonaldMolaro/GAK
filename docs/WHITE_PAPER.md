@@ -249,6 +249,8 @@ The framework supports:
 
 - roulette-wheel parent selection
 - random parent selection
+- tournament selection (`Settings::tournamentSize` entrants, fittest wins),
+  whose pressure depends only on rank and never on the scale of fitness
 
 Fitness weighting can be based on:
 

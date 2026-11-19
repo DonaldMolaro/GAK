@@ -16,15 +16,19 @@ PROFDATA = coverage.profdata
 TEXT_REPORT = coverage.txt
 
 override CXXFLAGS += $(WARNING_FLAGS)
+# Never fuse a*b + c into one rounding step: GCC and Clang fuse differently,
+# which changes fitness values in the last bit and makes fixed-seed runs
+# diverge between compilers.
+override CXXFLAGS += -ffp-contract=off
 
 ifeq ($(COVERAGE),1)
 override CXXFLAGS += -fprofile-instr-generate -fcoverage-mapping
 override LDFLAGS += -fprofile-instr-generate
 endif
 
-SRCS = GA.cc spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc latinsquare.cc sudoku.cc sudoku_constrained.cc graphcoloring.cc timetable.cc
+SRCS = GA.cc spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc latinsquare.cc sudoku.cc sudoku_constrained.cc graphcoloring.cc timetable.cc dataset.cc expression.cc regression.cc
 OBJS = $(SRCS:.cc=.o)
-EXAMPLE_SRCS = spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc latinsquare.cc sudoku.cc sudoku_constrained.cc graphcoloring.cc timetable.cc test_main.cc
+EXAMPLE_SRCS = spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc latinsquare.cc sudoku.cc sudoku_constrained.cc graphcoloring.cc timetable.cc dataset.cc expression.cc regression.cc test_main.cc
 EXAMPLE_OBJS = $(EXAMPLE_SRCS:.cc=.o)
 DEPS = $(OBJS:.o=.d) $(EXAMPLE_OBJS:.o=.d)
 

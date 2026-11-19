@@ -193,6 +193,24 @@ int Population::selectRandomParent()
    return randomIndex(settings_.numberOfIndividuals);
 }
 
+int Population::selectTournamentParent()
+{
+   // The table is sorted ascending by fitness, so the fittest entrant is the
+   // one with the highest index when maximizing and the lowest when
+   // minimizing: comparing indices is enough.
+   const bool maximize = settings_.operation == Population::OperationMode::Maximize;
+   int winner = randomIndex(settings_.numberOfIndividuals);
+   for (int entrant = 1 ; entrant < settings_.tournamentSize ; entrant++)
+   {
+      const int challenger = randomIndex(settings_.numberOfIndividuals);
+      if (maximize ? challenger > winner : challenger < winner)
+      {
+         winner = challenger;
+      }
+   }
+   return winner;
+}
+
 int Population::randomIndex(int upperBoundExclusive)
 {
    if (upperBoundExclusive <= 0)
@@ -244,6 +262,11 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
    if (settings_.numberOfIndividuals <= 0)
    {
       throw GAFatalException(__FILE__,__LINE__,"Population requires at least one individual");
+   }
+   if (settings_.parentSelection == Population::ParentSelectionMode::Tournament &&
+       settings_.tournamentSize < 1)
+   {
+      throw GAFatalException(__FILE__,__LINE__,"Tournament size must be at least 1");
    }
    if (!(settings_.crossOverRate >= 0.0 && settings_.crossOverRate <= 1.0))
    {
@@ -517,10 +540,17 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
    {
    case Population::ParentSelectionMode::RouletteWheel:
    case Population::ParentSelectionMode::Random:
+   case Population::ParentSelectionMode::Tournament:
    {
       const bool roulette = settings_.parentSelection == Population::ParentSelectionMode::RouletteWheel;
+      const bool tournament = settings_.parentSelection == Population::ParentSelectionMode::Tournament;
       // Weights cannot change while breeding, so build the wheel once.
       const SelectionWheel wheel = roulette ? buildSelectionWheel(selectFitnessWeights()) : SelectionWheel();
+      auto pickParent = [&]() {
+         if (roulette) return spinSelectionWheel(wheel);
+         if (tournament) return selectTournamentParent();
+         return selectRandomParent();
+      };
       // Bound the number of matings so duplicate rejection cannot loop
       // forever when fewer distinct children exist than slots to fill.
       for (long matings = 0 ;
@@ -528,8 +558,8 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
            matings < static_cast<long>(numberToReplace) * kMaxMatingsPerReplacement ;
            ++matings)
       {
-	 const int fatherIndex = roulette ? spinSelectionWheel(wheel) : selectRandomParent();
-	 const int motherIndex = roulette ? spinSelectionWheel(wheel) : selectRandomParent();
+	 const int fatherIndex = pickParent();
+	 const int motherIndex = pickParent();
          std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
             mateChromosomes(*populationTable[motherIndex], *populationTable[fatherIndex]);
          mutateChromosome(*children.first);

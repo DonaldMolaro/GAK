@@ -44,7 +44,12 @@ const char* reproductionLabel(Population::ReproductionMode mode)
 
 const char* selectionLabel(Population::ParentSelectionMode mode)
 {
-   return mode == Population::ParentSelectionMode::Random ? "random" : "roulette";
+   switch (mode)
+   {
+   case Population::ParentSelectionMode::Random: return "random";
+   case Population::ParentSelectionMode::Tournament: return "tournament";
+   default: return "roulette";
+   }
 }
 
 const char* deletionLabel(Population::DeletionMode mode)
@@ -236,6 +241,7 @@ void PopulationReporter::writeJson(std::ostream& out,
    out << "    \"cross_over_rate\": " << settings.crossOverRate << ",\n" << std::defaultfloat;
    out << "    \"reproduction\": \"" << reproductionLabel(settings.reproduction) << "\",\n";
    out << "    \"parent_selection\": \"" << selectionLabel(settings.parentSelection) << "\",\n";
+   out << "    \"tournament_size\": " << settings.tournamentSize << ",\n";
    out << "    \"deletion\": \"" << deletionLabel(settings.deletion) << "\",\n";
    out << "    \"fitness\": \"" << fitnessLabel(settings.fitness) << "\",\n";
    out << "    \"variable_length\": \"" << variableLengthLabel(settings.variableLength) << "\"\n";

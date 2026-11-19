@@ -35,8 +35,15 @@ The most useful runtime options are:
 ./GA <mode> --trials 20000
 ./GA <mode> --mutation 0.02
 ./GA <mode> --crossover 0.75
+./GA <mode> --selection random
+./GA <mode> --tournament 3
 ./GA T --grid 250
 ```
+
+`--selection` picks the parent-selection policy (`roulette`, `random` or
+`tournament`); `--tournament N` switches to tournament selection with N
+entrants per draw. Mode `R` has its own options; see
+[SYMBOLIC_REGRESSION.md](SYMBOLIC_REGRESSION.md).
 
 These options let you experiment without editing the compiled defaults.
 

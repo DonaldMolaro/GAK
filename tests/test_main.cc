@@ -55,6 +55,11 @@ public:
     return population.selectFitnessWeights();
   }
 
+  static int selectTournamentParent(Population& population)
+  {
+    return population.selectTournamentParent();
+  }
+
   static int selectParent(Population& population, const std::vector<double>& roulette_table)
   {
     return population.selectParent(roulette_table);
@@ -1923,6 +1928,59 @@ void test_portable_random_golden_values()
               "gak::shuffle should produce the documented permutation");
 }
 
+void test_tournament_selection()
+{
+  for (Population::OperationMode mode : {Population::OperationMode::Maximize, Population::OperationMode::Minimize})
+    {
+      Population::Settings settings = make_population_options(mode, 10, 10, 1, 0.0, 0.0,
+                                                              Population::ReproductionMode::AllowDuplicates,
+                                                              Population::ParentSelectionMode::Tournament,
+                                                              Population::DeletionMode::DeleteAll,
+                                                              Population::FitnessMode::Evaluation,
+                                                              Population::VariableLengthMode::Fixed, 2);
+      settings.tournamentSize = 4;
+      InspectablePopulation pop(settings);
+      PopulationTestRig::initializePopulation(pop);
+      const int bestIndex = mode == Population::OperationMode::Maximize ? 9 : 0;
+      int bestHalf = 0;
+      int bestPicks = 0;
+      for (int draw = 0 ; draw < 4000 ; draw++)
+        {
+          const int index = PopulationTestRig::selectTournamentParent(pop);
+          const bool inBestHalf = mode == Population::OperationMode::Maximize ? index >= 5 : index < 5;
+          bestHalf += inBestHalf ? 1 : 0;
+          bestPicks += index == bestIndex ? 1 : 0;
+        }
+      // With k = 4 the best half wins 1 - 0.5^4 = 93.75% of tournaments and
+      // the single best member 1 - 0.9^4 = 34.4%.
+      expect_true(bestHalf > 3600 && bestHalf < 3900,
+                  "Tournament selection should favour the fitter half at the expected rate");
+      expect_true(bestPicks > 1200 && bestPicks < 1550,
+                  "Tournament selection should pick the best member at the expected rate");
+    }
+
+  Population::Settings bad = make_population_options(Population::OperationMode::Maximize, 4, 8, 1, 0.0, 0.0,
+                                                     Population::ReproductionMode::AllowDuplicates,
+                                                     Population::ParentSelectionMode::Tournament,
+                                                     Population::DeletionMode::DeleteAll,
+                                                     Population::FitnessMode::Evaluation,
+                                                     Population::VariableLengthMode::Fixed, 2);
+  bad.tournamentSize = 0;
+  InspectablePopulation invalid(bad);
+  expect_throws<GAFatalException>([&invalid]() { (void)invalid.execute(); },
+                                  "A tournament size below 1 should be rejected");
+
+  Population::Settings run = bad;
+  run.tournamentSize = 2;
+  InspectablePopulation runnable(run);
+  Population::RunResult result = runnable.execute(true);
+  std::ostringstream json;
+  PopulationReporter::writeJson(json, runnable, result);
+  expect_true(json.str().find("\"parent_selection\": \"tournament\"") != std::string::npos &&
+              json.str().find("\"tournament_size\": 2") != std::string::npos,
+              "JSON reports should record tournament selection and its size");
+}
+
 void test_selection_wheel_matches_weights()
 {
   InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 3, 3, 1, 0.0, 0.0,
@@ -2007,6 +2065,7 @@ int main()
   test_reporters_restore_stream_state();
   test_verbose_report_prints_generation_snapshot();
   test_portable_random_golden_values();
+  test_tournament_selection();
 
   if (g_failures != 0)
     {
