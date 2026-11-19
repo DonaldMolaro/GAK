@@ -32,7 +32,7 @@ EXAMPLE_SRCS = spell.cc alpha.cc dome.cc ts.cc f6.cc nqueens.cc knapsack.cc lati
 EXAMPLE_OBJS = $(EXAMPLE_SRCS:.cc=.o)
 DEPS = $(OBJS:.o=.d) $(EXAMPLE_OBJS:.o=.d)
 
-.PHONY: all clean test run-tests coverage course-check experiment-check
+.PHONY: all clean FORCE test run-tests coverage course-check experiment-check
 
 all: $(OUTPUT)
 
@@ -44,8 +44,14 @@ $(OUTPUT): $(OBJS) ../src/libga.a
 $(TEST_OUTPUT): $(EXAMPLE_OBJS) ../src/libga.a
 	$(CXX) $(LDFLAGS) -o $@ $(EXAMPLE_OBJS) $(LDLIBS)
 
-../src/libga.a:
+# Always ask the library's own (incremental) Makefile to bring libga.a up
+# to date. Without FORCE this rule ran only when libga.a was missing, so
+# building here after the library sources changed linked against a stale
+# library whose structure layouts no longer matched the headers.
+../src/libga.a: FORCE
 	$(MAKE) -C ../src COVERAGE=$(COVERAGE)
+
+FORCE:
 
 %.o: %.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
