@@ -16,6 +16,10 @@ PROFDATA = coverage.profdata
 TEXT_REPORT = coverage.txt
 
 override CXXFLAGS += $(WARNING_FLAGS)
+# Never fuse a*b + c into one rounding step: GCC and Clang fuse differently,
+# which changes fitness values in the last bit and makes fixed-seed runs
+# diverge between compilers.
+override CXXFLAGS += -ffp-contract=off
 
 ifeq ($(COVERAGE),1)
 override CXXFLAGS += -fprofile-instr-generate -fcoverage-mapping

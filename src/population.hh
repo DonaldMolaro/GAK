@@ -42,7 +42,9 @@ public:
    struct GenerationReport;
    enum class OperationMode { Minimize, Maximize };
    enum class ReproductionMode { AllowDuplicates, DisallowDuplicates };
-   enum class ParentSelectionMode { RouletteWheel, Random };
+   // Tournament: draw `tournamentSize` members uniformly and keep the fittest.
+   // Pressure depends only on rank, never on the scale of fitness values.
+   enum class ParentSelectionMode { RouletteWheel, Random, Tournament };
    enum class DeletionMode { DeleteAll, DeleteAllButBest, DeleteHalf, DeleteQuarter, DeleteLast };
    enum class FitnessMode { Evaluation, Windowed, LinearNormalized };
    enum class VariableLengthMode { Fixed, Variable };
@@ -60,6 +62,7 @@ public:
       double crossOverRate = 0.65;
       ReproductionMode reproduction = ReproductionMode::AllowDuplicates;
       ParentSelectionMode parentSelection = ParentSelectionMode::RouletteWheel;
+      int tournamentSize = 3; // used by ParentSelectionMode::Tournament
       DeletionMode deletion = DeletionMode::DeleteAll;
       FitnessMode fitness = FitnessMode::Evaluation;
       VariableLengthMode variableLength = VariableLengthMode::Fixed;
@@ -174,6 +177,7 @@ private:
    PopulationSummary buildPopulationSummary() const;
    RunResult executeInternal(bool captureGenerationSummaries);
    int selectRandomParent();
+   int selectTournamentParent();
    int bestCandidateIndex() const;
    bool hasReachedSolution() const;
 };

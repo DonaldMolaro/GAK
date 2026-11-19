@@ -2,6 +2,8 @@
 #include <cerrno>
 #include <cstdlib>
 #include <limits>
+#include <memory>
+#include <random>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -23,6 +25,8 @@
 #include "timetable.hh"
 #include "ts.hh"
 #include "population_report.hh"
+#include "dataset.hh"
+#include "regression.hh"
 
 namespace
 {
@@ -58,6 +62,18 @@ struct CliOptions
   int grid = 0;
   std::string reportJsonPath;
   std::string reportCsvPath;
+  std::string dataPath;
+  std::string targetColumn;
+  bool holdoutProvided = false;
+  double holdout = 0.0;
+  bool tuningProvided = false;
+  int tuning = 0;
+  bool restartsProvided = false;
+  int restarts = 0;
+  bool selectionProvided = false;
+  Population::ParentSelectionMode selection = Population::ParentSelectionMode::RouletteWheel;
+  bool tournamentProvided = false;
+  int tournament = 0;
 };
 
 void printSectionHeading(const std::string& title)
@@ -228,7 +244,12 @@ const char* reproductionLabel(Population::ReproductionMode mode)
 
 const char* selectionLabel(Population::ParentSelectionMode mode)
 {
-  return mode == Population::ParentSelectionMode::Random ? "random" : "roulette";
+  switch (mode)
+  {
+  case Population::ParentSelectionMode::Random: return "random";
+  case Population::ParentSelectionMode::Tournament: return "tournament";
+  default: return "roulette";
+  }
 }
 
 const char* deletionLabel(Population::DeletionMode mode)
@@ -272,6 +293,10 @@ void printGaParameters(const Population::Settings& settings)
   printLabeledLine("crossover", settings.crossOverRate);
   printLabeledLine("reproduction", reproductionLabel(settings.reproduction));
   printLabeledLine("selection", selectionLabel(settings.parentSelection));
+  if (settings.parentSelection == Population::ParentSelectionMode::Tournament)
+  {
+    printLabeledLine("tournament size", settings.tournamentSize);
+  }
   printLabeledLine("deletion", deletionLabel(settings.deletion));
   printLabeledLine("fitness", fitnessLabel(settings.fitness));
   printLabeledLine("length mode", variableLengthLabel(settings.variableLength));
@@ -449,6 +474,48 @@ Population::Settings make_constrained_sudoku_options()
   return options;
 }
 
+const int kDefaultRegressionRestarts = 4;
+
+Population::Settings make_regression_options(int alphabetSize)
+{
+  Population::Settings options;
+  options.operation = Population::OperationMode::Minimize;
+  options.numberOfIndividuals = 400;
+  options.numberOfTrials = 15000; // per restart (4 restarts by default)
+  options.chromosomeLength = SymbolicRegression::Config().maximumInitialLength;
+  options.bitMutationRate = 0.04;
+  options.crossOverRate = 0.8;
+  options.reproduction = Population::ReproductionMode::DisallowDuplicates;
+  options.parentSelection = Population::ParentSelectionMode::RouletteWheel;
+  options.deletion = Population::DeletionMode::DeleteHalf;
+  options.fitness = Population::FitnessMode::LinearNormalized;
+  options.variableLength = Population::VariableLengthMode::Variable;
+  options.baseStates = alphabetSize;
+  return options;
+}
+
+void printRegressionInput(const SymbolicRegression& regression)
+{
+  const Dataset& data = regression.dataset();
+  std::string inputs;
+  for (int i = 0 ; i < data.inputCount() ; i++)
+  {
+    inputs += (i > 0 ? " " : "") + data.inputNames[i];
+  }
+  printSectionHeading("Problem input:");
+  printLabeledLine("problem", "symbolic regression");
+  printLabeledLine("data", data.source);
+  printLabeledLine("rows", data.rowCount());
+  printLabeledLine("inputs", inputs);
+  printLabeledLine("target", data.targetName);
+  printLabeledLine("train rows", regression.trainRowCount());
+  printLabeledLine("test rows", regression.testRowCount());
+  printLabeledLine("operators", "+ - * / sin cos exp log sqrt ^2 neg");
+  printLabeledLine("constants", "0.1 0.5 1 2 3 5 10");
+  std::cout << '\n';
+  finishInputSection();
+}
+
 Population::Settings make_graph_coloring_options()
 {
   Population::Settings options;
@@ -501,14 +568,22 @@ void usage(std::ostream& out)
   out << "  G   Graph Coloring\n";
   out << "  M   Timetable\n";
   out << "  U   Sudoku\n";
-  out << "  C   Sudoku+\n\n";
+  out << "  C   Sudoku+\n";
+  out << "  R   Symbolic regression on a CSV (requires --data)\n\n";
   out << "Options:\n";
   out << "  --seed N          Use a fixed random seed\n";
   out << "  --population N    Override population size\n";
   out << "  --trials N        Override trial/evaluation budget\n";
   out << "  --mutation R      Override mutation rate\n";
   out << "  --crossover R     Override crossover rate\n";
+  out << "  --selection S     Parent selection: roulette, random or tournament\n";
+  out << "  --tournament N    Tournament size (implies --selection tournament)\n";
   out << "  --grid N          Override TSP grid size\n";
+  out << "  --data P          CSV of measured points for mode R (header row, numeric values)\n";
+  out << "  --target NAME     Output column for mode R (default: the last column)\n";
+  out << "  --holdout R       Share of rows held out for testing in mode R (default 0.25)\n";
+  out << "  --restarts N      Independent runs in mode R; the best training fit is reported (default 4)\n";
+  out << "  --tuning N        Constant-tuning evaluations per formula in mode R (default 40, 0 = off)\n";
   out << "  --report-json P   Write a structured JSON run report to path P\n";
   out << "  --report-csv P    Write per-generation CSV progress to path P\n";
   out << "  --show-settings   Print the resolved settings report before the final summary\n";
@@ -642,6 +717,42 @@ bool parseCliOptions(int argc, char* argv[], CliOptions& options)
       options.gridProvided = parsePositiveInt(value, options.grid);
       if (!options.gridProvided) return reportInvalidValue(arg, value, "a positive integer");
     }
+    else if (arg == "--tuning")
+    {
+      options.tuningProvided = parseInt(value, options.tuning) && options.tuning >= 0;
+      if (!options.tuningProvided) return reportInvalidValue(arg, value, "a non-negative integer");
+    }
+    else if (arg == "--restarts")
+    {
+      options.restartsProvided = parsePositiveInt(value, options.restarts);
+      if (!options.restartsProvided) return reportInvalidValue(arg, value, "a positive integer");
+    }
+    else if (arg == "--selection")
+    {
+      options.selectionProvided = true;
+      if (value == "roulette") options.selection = Population::ParentSelectionMode::RouletteWheel;
+      else if (value == "random") options.selection = Population::ParentSelectionMode::Random;
+      else if (value == "tournament") options.selection = Population::ParentSelectionMode::Tournament;
+      else return reportInvalidValue(arg, value, "roulette, random or tournament");
+    }
+    else if (arg == "--tournament")
+    {
+      options.tournamentProvided = parsePositiveInt(value, options.tournament);
+      if (!options.tournamentProvided) return reportInvalidValue(arg, value, "a positive integer");
+    }
+    else if (arg == "--data")
+    {
+      options.dataPath = value;
+    }
+    else if (arg == "--target")
+    {
+      options.targetColumn = value;
+    }
+    else if (arg == "--holdout")
+    {
+      options.holdoutProvided = parseProbability(value, options.holdout) && options.holdout < 1.0;
+      if (!options.holdoutProvided) return reportInvalidValue(arg, value, "a number from 0 up to (not including) 1");
+    }
     else if (arg == "--report-json")
     {
       options.reportJsonPath = value;
@@ -682,17 +793,28 @@ Population::Settings applyOverrides(Population::Settings options, const CliOptio
   {
     options.crossOverRate = cli.crossover;
   }
+  if (cli.selectionProvided)
+  {
+    options.parentSelection = cli.selection;
+  }
+  if (cli.tournamentProvided)
+  {
+    options.parentSelection = Population::ParentSelectionMode::Tournament;
+    options.tournamentSize = cli.tournament;
+  }
   return options;
 }
 
-int runPopulation(Population& population, const CliOptions& cli)
+bool shouldCaptureGenerations(const CliOptions& cli)
 {
-  const bool verbose = std::getenv("GAK_VERBOSE") != nullptr;
-  const bool captureGenerationSummaries = verbose ||
-                                          !cli.reportJsonPath.empty() ||
-                                          !cli.reportCsvPath.empty();
-  printGaParameters(population.settings());
-  Population::RunResult result = population.execute(captureGenerationSummaries);
+  return std::getenv("GAK_VERBOSE") != nullptr ||
+         !cli.reportJsonPath.empty() ||
+         !cli.reportCsvPath.empty();
+}
+
+int reportRun(Population& population, const Population::RunResult& result, const CliOptions& cli)
+{
+  const bool captureGenerationSummaries = shouldCaptureGenerations(cli);
   PopulationReporter::write(std::cout,
                             population,
                             result,
@@ -721,6 +843,62 @@ int runPopulation(Population& population, const CliOptions& cli)
   }
 
   return EXIT_SUCCESS;
+}
+
+int runPopulation(Population& population, const CliOptions& cli)
+{
+  printGaParameters(population.settings());
+  Population::RunResult result = population.execute(shouldCaptureGenerations(cli));
+  return reportRun(population, result, cli);
+}
+
+// Seed for restart `index`: restart 0 keeps the base seed, so one restart
+// reproduces a plain run exactly; later restarts get well-separated seeds.
+unsigned int restartSeed(unsigned int baseSeed, int index)
+{
+  return baseSeed ^ (static_cast<unsigned int>(index) * 0x9E3779B9u);
+}
+
+// Run independent populations and report the one whose best formula has the
+// lowest TRAINING fitness. Held-out rows never influence the choice, so the
+// reported test score is still an honest estimate.
+int runRegression(SymbolicRegression& regression, const Population::Settings& baseSettings,
+                  const CliOptions& cli, int restarts)
+{
+  printGaParameters(baseSettings);
+  printLabeledLine("restarts", restarts);
+  std::cout << '\n';
+
+  std::unique_ptr<Population> best;
+  Population::RunResult bestResult;
+  double bestFitness = 0.0;
+  const unsigned int baseSeed = baseSettings.useFixedRandomSeed ? baseSettings.randomSeed
+                                                                : std::random_device{}();
+  for (int index = 0 ; index < restarts ; index++)
+  {
+    Population::Settings settings = baseSettings;
+    settings.useFixedRandomSeed = true;
+    settings.randomSeed = restartSeed(baseSeed, index);
+    std::unique_ptr<Population> population(new Population(settings, regression));
+    Population::RunResult result = population->execute(shouldCaptureGenerations(cli));
+    const double fitness = result.finalSummary.mostFit.front();
+    if (restarts > 1)
+    {
+      std::cout << "Restart " << (index + 1) << " (seed " << settings.randomSeed << "): fitness "
+                << fitness << '\n';
+    }
+    if (!best || fitness < bestFitness)
+    {
+      best = std::move(population);
+      bestResult = result;
+      bestFitness = fitness;
+    }
+  }
+  if (restarts > 1)
+  {
+    std::cout << "Best restart seed: " << best->randomSeed() << "\n\n";
+  }
+  return reportRun(*best, bestResult, cli);
 }
 }
 
@@ -833,6 +1011,29 @@ int runGa(int argc, char *argv[])
         SudokuConstrained sudoku(settings);
         Population population(settings, sudoku);
         return runPopulation(population, cli);
+      }
+    case 'R':
+    case 'r':
+      {
+        if (cli.dataPath.empty())
+        {
+          std::cerr << "Mode R needs --data PATH (a CSV with a header row)\n";
+          return EXIT_FAILURE;
+        }
+        SymbolicRegression::Config config;
+        if (cli.holdoutProvided)
+        {
+          config.holdoutFraction = cli.holdout;
+        }
+        if (cli.tuningProvided)
+        {
+          config.constantTuningBudget = cli.tuning;
+        }
+        SymbolicRegression regression(loadCsvDataset(cli.dataPath, cli.targetColumn), config);
+        printRegressionInput(regression);
+        return runRegression(regression,
+                             applyOverrides(make_regression_options(regression.alphabetSize()), cli),
+                             cli, cli.restartsProvided ? cli.restarts : kDefaultRegressionRestarts);
       }
     default:
       usage(std::cerr);

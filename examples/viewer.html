@@ -449,12 +449,15 @@
       if (firstVisualization && firstVisualization.type === "timetable") {
         return "timetable";
       }
+      if (firstVisualization && firstVisualization.type === "regression") {
+        return "symbolic regression";
+      }
       if (firstVisualization && firstVisualization.type === "sudoku") {
         return firstVisualization.variant === "constraint_aware"
           ? "constraint-aware sudoku"
           : "sudoku";
       }
-      if (settings.chromosome_length === 8 && settings.base_states === 3) {
+      if (settings.chromosome_length === 16 && settings.base_states === 3) {
         return "graph coloring";
       }
       if (settings.chromosome_length === 8 && settings.base_states === 4) {
@@ -574,6 +577,9 @@
         case "sudoku":
           renderSudoku(visualization);
           break;
+        case "regression":
+          renderRegression(visualization);
+          break;
         default:
           renderGenericGenes(Array.isArray(visualization.gene_values) ? visualization.gene_values : genes);
           break;
@@ -662,6 +668,112 @@
         ctx.font = "16px Georgia, serif";
         ctx.fillText(point.label, point.x + 10, point.y - 10);
       });
+    }
+
+    // Symbolic regression: with one input, the measured points and the fitted
+    // curve; with several inputs, predicted vs measured with the y = x line.
+    function renderRegression(visualization) {
+      const wrapper = document.createElement("div");
+      const caption = document.createElement("div");
+      caption.style.fontFamily = "Georgia, serif";
+      caption.style.margin = "0 0 8px";
+      const trainR2 = Number(visualization.train_r2 || 0).toFixed(4);
+      const testR2 = Number(visualization.test_r2 || 0).toFixed(4);
+      caption.textContent = `${visualization.target} ≈ ${visualization.formula}   ` +
+        `(nodes ${visualization.nodes}, train R² ${trainR2}, test R² ${testR2})`;
+      wrapper.appendChild(caption);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = 900;
+      canvas.height = 520;
+      wrapper.appendChild(canvas);
+      elements.vizSurface.appendChild(wrapper);
+
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const points = visualization.points || [];
+      if (points.length === 0) {
+        return;
+      }
+      const singleInput = (visualization.inputs || []).length === 1;
+      const xOf = point => singleInput ? point.inputs[0] : point.y;
+      const yOf = point => singleInput ? point.y : point.predicted;
+      const plotted = points.filter(point => Number.isFinite(xOf(point)) && Number.isFinite(yOf(point)));
+      const curve = singleInput ? (visualization.curve || []) : [];
+
+      const xs = plotted.map(xOf).concat(curve.map(c => c.x));
+      const ys = plotted.map(yOf).concat(curve.map(c => c.y));
+      if (!singleInput) {
+        xs.push(...plotted.map(p => p.predicted));
+        ys.push(...plotted.map(p => p.y));
+      }
+      if (xs.length === 0) {
+        return;
+      }
+      const padding = 56;
+      let minX = Math.min(...xs), maxX = Math.max(...xs);
+      let minY = Math.min(...ys), maxY = Math.max(...ys);
+      if (maxX === minX) { maxX += 1; minX -= 1; }
+      if (maxY === minY) { maxY += 1; minY -= 1; }
+      const toX = x => padding + (x - minX) * (canvas.width - padding * 2) / (maxX - minX);
+      const toY = y => canvas.height - padding - (y - minY) * (canvas.height - padding * 2) / (maxY - minY);
+
+      ctx.strokeStyle = "#c7c0b5";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(padding, padding, canvas.width - padding * 2, canvas.height - padding * 2);
+      ctx.fillStyle = "#1d1b18";
+      ctx.font = "14px Georgia, serif";
+      ctx.textAlign = "center";
+      ctx.fillText(singleInput ? visualization.inputs[0] : `measured ${visualization.target}`,
+                   canvas.width / 2, canvas.height - 18);
+      ctx.fillText(minX.toPrecision(3), padding, canvas.height - padding + 18);
+      ctx.fillText(maxX.toPrecision(3), canvas.width - padding, canvas.height - padding + 18);
+      ctx.textAlign = "right";
+      ctx.fillText(maxY.toPrecision(3), padding - 6, padding + 4);
+      ctx.fillText(minY.toPrecision(3), padding - 6, canvas.height - padding + 4);
+      ctx.save();
+      ctx.translate(18, canvas.height / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.textAlign = "center";
+      ctx.fillText(singleInput ? visualization.target : `predicted ${visualization.target}`, 0, 0);
+      ctx.restore();
+
+      ctx.strokeStyle = "#1b6f5f";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      if (singleInput) {
+        curve.forEach((sample, index) => {
+          if (index === 0) ctx.moveTo(toX(sample.x), toY(sample.y));
+          else ctx.lineTo(toX(sample.x), toY(sample.y));
+        });
+      } else {
+        const low = Math.max(minX, minY), high = Math.min(maxX, maxY);
+        ctx.moveTo(toX(low), toY(low));
+        ctx.lineTo(toX(high), toY(high));
+      }
+      ctx.stroke();
+
+      plotted.forEach(point => {
+        ctx.beginPath();
+        ctx.arc(toX(xOf(point)), toY(yOf(point)), 4.5, 0, Math.PI * 2);
+        if (point.set === "test") {
+          ctx.strokeStyle = "#cc5a3d";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = "#1d1b18";
+          ctx.fill();
+        }
+      });
+
+      ctx.textAlign = "left";
+      ctx.font = "13px Georgia, serif";
+      ctx.fillStyle = "#1d1b18";
+      ctx.fillText("● train", canvas.width - padding - 120, padding - 12);
+      ctx.fillStyle = "#cc5a3d";
+      ctx.fillText("○ test", canvas.width - padding - 60, padding - 12);
     }
 
     function renderSudoku(visualization) {
