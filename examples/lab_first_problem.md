@@ -18,14 +18,14 @@ By the end of this lab, you should be able to:
 
 Read:
 
-- [docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md)
-- [docs/PROBLEM_FIT.md](/Users/donaldmolaro/src/GAK/docs/PROBLEM_FIT.md)
+- [docs/WRITING_EXAMPLES.md](../docs/WRITING_EXAMPLES.md)
+- [docs/PROBLEM_FIT.md](../docs/PROBLEM_FIT.md)
 
 Reference examples:
 
-- [examples/knapsack.cc](/Users/donaldmolaro/src/GAK/examples/knapsack.cc)
-- [examples/nqueens.cc](/Users/donaldmolaro/src/GAK/examples/nqueens.cc)
-- [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
+- [examples/knapsack.cc](knapsack.cc)
+- [examples/nqueens.cc](nqueens.cc)
+- [examples/sudoku_constrained.cc](sudoku_constrained.cc)
 
 ## Step 1: Pick A Small Problem
 

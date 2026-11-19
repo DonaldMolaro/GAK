@@ -21,13 +21,13 @@ By the end of the course, you should be able to:
 
 Read:
 
-- [README.md](/Users/donaldmolaro/src/GAK/README.md)
-- [glossary.md](/Users/donaldmolaro/src/GAK/examples/glossary.md)
+- [README.md](../README.md)
+- [glossary.md](glossary.md)
 
 Run:
 
 ```sh
-cd /Users/donaldmolaro/src/GAK/examples
+cd examples   # from the repository root
 ./GA K --seed 1
 ```
 
@@ -49,7 +49,7 @@ Self-check:
 
 Read:
 
-- [lab_knapsack.md](/Users/donaldmolaro/src/GAK/examples/lab_knapsack.md)
+- [lab_knapsack.md](lab_knapsack.md)
 
 Run:
 
@@ -74,7 +74,7 @@ Self-check:
 
 Read:
 
-- [docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md)
+- [docs/WRITING_EXAMPLES.md](../docs/WRITING_EXAMPLES.md)
 
 Run:
 
@@ -98,7 +98,7 @@ Self-check:
 
 Read:
 
-- [lab_numeric.md](/Users/donaldmolaro/src/GAK/examples/lab_numeric.md)
+- [lab_numeric.md](lab_numeric.md)
 
 Run:
 
@@ -143,8 +143,8 @@ Self-check:
 
 Read:
 
-- [docs/SUDOKU_DESIGN.md](/Users/donaldmolaro/src/GAK/docs/SUDOKU_DESIGN.md)
-- [docs/CROSSOVER_MODES.md](/Users/donaldmolaro/src/GAK/docs/CROSSOVER_MODES.md)
+- [docs/SUDOKU_DESIGN.md](../docs/SUDOKU_DESIGN.md)
+- [docs/CROSSOVER_MODES.md](../docs/CROSSOVER_MODES.md)
 
 Run:
 
@@ -168,9 +168,9 @@ Self-check:
 
 Read:
 
-- [src/population.hh](/Users/donaldmolaro/src/GAK/src/population.hh)
-- [src/chromosome.hh](/Users/donaldmolaro/src/GAK/src/chromosome.hh)
-- [src/base.hh](/Users/donaldmolaro/src/GAK/src/base.hh)
+- [src/population.hh](../src/population.hh)
+- [src/chromosome.hh](../src/chromosome.hh)
+- [src/base.hh](../src/base.hh)
 
 Focus on:
 
@@ -193,9 +193,9 @@ Self-check:
 
 Read:
 
-- [docs/PROBLEM_FIT.md](/Users/donaldmolaro/src/GAK/docs/PROBLEM_FIT.md)
-- [docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md)
-- [lab_first_problem.md](/Users/donaldmolaro/src/GAK/examples/lab_first_problem.md)
+- [docs/PROBLEM_FIT.md](../docs/PROBLEM_FIT.md)
+- [docs/WRITING_EXAMPLES.md](../docs/WRITING_EXAMPLES.md)
+- [lab_first_problem.md](lab_first_problem.md)
 
 Exercise:
 
@@ -224,11 +224,11 @@ Best templates:
 
 ## Next References
 
-- [lesson_plan.md](/Users/donaldmolaro/src/GAK/examples/lesson_plan.md)
-- [prerequisites.md](/Users/donaldmolaro/src/GAK/examples/prerequisites.md)
-- [lab_knapsack.md](/Users/donaldmolaro/src/GAK/examples/lab_knapsack.md)
-- [lab_symbolic.md](/Users/donaldmolaro/src/GAK/examples/lab_symbolic.md)
-- [lab_numeric.md](/Users/donaldmolaro/src/GAK/examples/lab_numeric.md)
-- [lab_constraints.md](/Users/donaldmolaro/src/GAK/examples/lab_constraints.md)
-- [lab_sudoku.md](/Users/donaldmolaro/src/GAK/examples/lab_sudoku.md)
-- [lab_first_problem.md](/Users/donaldmolaro/src/GAK/examples/lab_first_problem.md)
+- [lesson_plan.md](lesson_plan.md)
+- [prerequisites.md](prerequisites.md)
+- [lab_knapsack.md](lab_knapsack.md)
+- [lab_symbolic.md](lab_symbolic.md)
+- [lab_numeric.md](lab_numeric.md)
+- [lab_constraints.md](lab_constraints.md)
+- [lab_sudoku.md](lab_sudoku.md)
+- [lab_first_problem.md](lab_first_problem.md)

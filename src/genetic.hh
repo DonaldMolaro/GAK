@@ -5,3 +5,4 @@
 #include "chromosome.hh"
 #include "population.hh"
 #include "population_report.hh"
+#include "random.hh"

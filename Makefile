@@ -30,6 +30,8 @@ test:
 	$(MAKE) -C examples example_tests
 	cd tests && ./gak_tests
 	cd examples && ./example_tests
+	# Rebuild the demo runner the clean step removed, so ./GA works afterwards.
+	$(MAKE) -C examples
 
 
 coverage-lib:

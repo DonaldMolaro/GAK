@@ -3,23 +3,23 @@ CXX ?= c++
 CXXFLAGS ?= -O2 -g -std=c++14
 WARNING_FLAGS = -Wall -Wextra -Wpedantic
 CPPFLAGS ?=
-CPPFLAGS += -I../src
-CPPFLAGS += -DGAK_TESTING
+override CPPFLAGS += -I../src
+override CPPFLAGS += -DGAK_TESTING
 DEPFLAGS = -MMD -MP
 LDFLAGS ?=
-LDFLAGS += -L../src
-LDLIBS += -lga -lm
+override LDFLAGS += -L../src
+override LDLIBS += -lga -lm
 LLVM_PROFDATA ?= $(shell if command -v xcrun >/dev/null 2>&1; then xcrun --find llvm-profdata; else command -v llvm-profdata; fi)
 LLVM_COV ?= $(shell if command -v xcrun >/dev/null 2>&1; then xcrun --find llvm-cov; else command -v llvm-cov; fi)
 PROFRAW = coverage.profraw
 PROFDATA = coverage.profdata
 TEXT_REPORT = coverage.txt
 
-CXXFLAGS += $(WARNING_FLAGS)
+override CXXFLAGS += $(WARNING_FLAGS)
 
 ifeq ($(COVERAGE),1)
-CXXFLAGS += -fprofile-instr-generate -fcoverage-mapping
-LDFLAGS += -fprofile-instr-generate
+override CXXFLAGS += -fprofile-instr-generate -fcoverage-mapping
+override LDFLAGS += -fprofile-instr-generate
 endif
 
 SRCS = test_main.cc

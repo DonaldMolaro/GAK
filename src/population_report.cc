@@ -10,6 +10,27 @@
 
 namespace
 {
+// Restores the caller's stream formatting when a report finishes.
+class StreamStateGuard
+{
+public:
+   explicit StreamStateGuard(std::ostream& stream)
+      : stream_(stream), flags_(stream.flags()), precision_(stream.precision())
+   {
+   }
+   ~StreamStateGuard()
+   {
+      stream_.flags(flags_);
+      stream_.precision(precision_);
+   }
+   StreamStateGuard(const StreamStateGuard&) = delete;
+   StreamStateGuard& operator=(const StreamStateGuard&) = delete;
+private:
+   std::ostream& stream_;
+   std::ios::fmtflags flags_;
+   std::streamsize precision_;
+};
+
 const char* operationLabel(Population::OperationMode mode)
 {
    return mode == Population::OperationMode::Minimize ? "minimize" : "maximize";
@@ -99,6 +120,7 @@ void PopulationReporter::write(std::ostream& out,
                                const Population::RunResult& result,
                                const PopulationRunReportOptions& options)
 {
+   StreamStateGuard guard(out);
    if (options.includeSettings)
    {
       const Population::Settings& settings = population.settings();
@@ -119,37 +141,39 @@ void PopulationReporter::write(std::ostream& out,
           << (result.usedConfiguredSeed ? " (configured)" : " (generated)") << '\n';
    }
 
-   auto printPopulationSummary = [&](const Population::PopulationSummary& summary) {
-      const int summaryCount = static_cast<int>(summary.mostFit.size());
-      if (summaryCount <= 0)
+   // Index of the i-th best (or i-th worst) member in the ascending table.
+   auto rankedIndex = [&](int i, bool best) {
+      const bool highIsBest = population.settings().operation == Population::OperationMode::Maximize;
+      const int highIndex = (population.settings().numberOfIndividuals - 1) - i;
+      return (best == highIsBest) ? highIndex : i;
+   };
+
+   auto printFitnessList = [&](const char* label, const std::vector<double>& values) {
+      out << label << ' ' << values.size() << " Fitness Values:";
+      for (double value : values)
+      {
+         out << ' ' << std::fixed << std::setprecision(8) << value << std::defaultfloat;
+      }
+      out << '\n';
+   };
+
+   // A generation report only snapshots the best member's genes, so print
+   // that member plus the fitness values; the live population table holds
+   // the final generation and must not be paired with historical values.
+   auto printGenerationSummary = [&](const Population::GenerationReport& report) {
+      if (report.summary.mostFit.empty())
       {
          return;
       }
-
-      if (population.settings().operation == Population::OperationMode::Maximize)
-         out << "Best " << summaryCount << " Members are:\n";
-      else
-         out << "Worst " << summaryCount << " Members are:\n";
-
-      for ( int i = 0 ; i < summaryCount ; i++ )
+      if (!report.bestCandidateGenes.empty())
       {
-         const int index = (population.settings().numberOfIndividuals - 1) - i;
-         population.printCandidate(population.populationTable[index].get()->genes(), out);
-         out << "(F = " << std::fixed << std::setprecision(8) << summary.mostFit[i]
+         out << "Best Member:\n";
+         population.printCandidate(buildSnapshotGenes(population, report.bestCandidateGenes), out);
+         out << "(F = " << std::fixed << std::setprecision(8) << report.bestCandidateFitness
              << ")\n" << std::defaultfloat;
       }
-
-      if (population.settings().operation == Population::OperationMode::Maximize)
-         out << "Worst " << summaryCount << " Members are:\n";
-      else
-         out << "Best " << summaryCount << " Members are:\n";
-
-      for ( int i = 0 ; i < summaryCount ; i++ )
-      {
-         population.printCandidate(population.populationTable[i].get()->genes(), out);
-         out << "(F = " << std::fixed << std::setprecision(8) << summary.leastFit[i]
-             << ")\n" << std::defaultfloat;
-      }
+      printFitnessList("Best", report.summary.mostFit);
+      printFitnessList("Worst", report.summary.leastFit);
    };
 
    auto printGenerationProgress = [&](const Population::GenerationReport& report, bool printSummary) {
@@ -157,7 +181,7 @@ void PopulationReporter::write(std::ostream& out,
           << " Number of Evaluations " << report.evaluations << " \n";
       if (printSummary)
       {
-         printPopulationSummary(report.summary);
+         printGenerationSummary(report);
       }
    };
 
@@ -181,27 +205,16 @@ void PopulationReporter::write(std::ostream& out,
    }
 
    const int summaryCount = static_cast<int>(result.finalSummary.mostFit.size());
-   switch(population.settings().operation)
+   if (population.settings().operation != Population::OperationMode::Maximize &&
+       population.settings().operation != Population::OperationMode::Minimize)
    {
-      case Population::OperationMode::Maximize:
-      for ( int i = 0 ; i < summaryCount ; i++ )
-      {
-         const int index = (population.settings().numberOfIndividuals - 1) - i;
-         population.printCandidate(population.populationTable[index].get()->genes(), out);
-         out << std::fixed << std::setprecision(6) << result.finalSummary.mostFit[i]
-             << '\n' << std::defaultfloat;
-      }
-      break;
-      case Population::OperationMode::Minimize:
-      for ( int i = 0 ; i < summaryCount ; i++ )
-      {
-         population.printCandidate(population.populationTable[i].get()->genes(), out);
-         out << std::fixed << std::setprecision(6) << result.finalSummary.leastFit[i]
-             << '\n' << std::defaultfloat;
-      }
-      break;
-      default:
       throw GAFatalException(__FILE__,__LINE__,"Unsupported operation technique");
+   }
+   for ( int i = 0 ; i < summaryCount ; i++ )
+   {
+      population.printCandidate(population.populationTable[rankedIndex(i, true)].get()->genes(), out);
+      out << std::fixed << std::setprecision(6) << result.finalSummary.mostFit[i]
+          << '\n' << std::defaultfloat;
    }
 }
 
@@ -209,6 +222,7 @@ void PopulationReporter::writeJson(std::ostream& out,
                                    const Population& population,
                                    const Population::RunResult& result)
 {
+   StreamStateGuard guard(out);
    const Population::Settings& settings = population.settings();
    out << "{\n";
    out << "  \"settings\": {\n";
@@ -231,6 +245,7 @@ void PopulationReporter::writeJson(std::ostream& out,
    out << "    \"used_configured_seed\": " << (result.usedConfiguredSeed ? "true" : "false") << ",\n";
    out << "    \"stopped_early\": " << (result.stoppedEarly ? "true" : "false") << ",\n";
    out << "    \"solution_found\": " << (result.solutionFound ? "true" : "false") << ",\n";
+   out << "    \"stalled\": " << (result.stalled ? "true" : "false") << ",\n";
    out << "    \"generations_completed\": " << result.generationsCompleted << ",\n";
    out << "    \"evaluations\": " << result.evaluations << ",\n";
    out << "    \"final_summary\": {\n";
@@ -278,6 +293,7 @@ void PopulationReporter::writeGenerationCsv(std::ostream& out,
                                             const Population&,
                                             const Population::RunResult& result)
 {
+   StreamStateGuard guard(out);
    out << "generation,evaluations,best_fitness,worst_fitness\n";
    for (std::size_t i = 0 ; i < result.generationReports.size() ; i++)
    {

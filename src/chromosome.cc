@@ -5,6 +5,7 @@
 
 #include "chromosome.hh"
 #include "except.hh"
+#include "random.hh"
 
 namespace
 {
@@ -16,8 +17,9 @@ constexpr int kMaxChromosomeLength = 2048;
 std::mt19937& FallbackRandomGenerator()
 {
   // Keep the no-argument chromosome helpers deterministic even when callers
-  // do not thread an explicit RNG through the API.
-  static std::mt19937 generator(kFallbackRandomSeed);
+  // do not thread an explicit RNG through the API. One generator per thread
+  // so concurrent callers never race on shared state.
+  thread_local std::mt19937 generator(kFallbackRandomSeed);
   return generator;
 }
 
@@ -29,24 +31,26 @@ int checkedCombinedLength(int left, int right)
     }
   return left + right;
 }
+
+int cappedLength(int length)
+{
+  return std::min(length, kMaxChromosomeLength);
+}
 }
 
 int Chromosome::randomBit(std::mt19937& randomGenerator)
 {
-  std::uniform_int_distribution<int> distribution(0, 1);
-  return distribution(randomGenerator);
+  return gak::uniformIndex(randomGenerator, 2);
 }
 
 int Chromosome::randomIndex(std::mt19937& randomGenerator, int upperBoundExclusive)
 {
-  std::uniform_int_distribution<int> distribution(0, upperBoundExclusive - 1);
-  return distribution(randomGenerator);
+  return gak::uniformIndex(randomGenerator, upperBoundExclusive);
 }
 
 bool Chromosome::randomChance(std::mt19937& randomGenerator, double probability)
 {
-  std::bernoulli_distribution distribution(probability);
-  return distribution(randomGenerator);
+  return gak::chance(randomGenerator, probability);
 }
 
 Chromosome::BaseStringValue Chromosome::cloneBaseString(const BaseString& source, int baseStates)
@@ -98,6 +102,16 @@ Chromosome::Chromosome(BaseString b, bool requestedVariableLength, unsigned int 
     baseStates(requestedBaseStates),
     chromosomeString_(std::move(b))
 {
+  if (chromosomeLength > kMaxChromosomeLength)
+    {
+      throw GAFatalException(__FILE__,__LINE__,
+                             "Chromosome length exceeds the built-in 2048-gene safety limit.");
+    }
+  if (static_cast<int>(requestedBaseStates) != chromosomeString_.states())
+    {
+      throw GAFatalException(__FILE__,__LINE__,
+                             "Chromosome state count does not match its BaseString.");
+    }
 }
 
 void Chromosome::mutate(double probability, std::mt19937* randomGenerator)
@@ -109,16 +123,20 @@ void Chromosome::mutate(double probability, std::mt19937* randomGenerator)
 	{
 	  if (randomChance(generator, probability))
 	    {
+	      // A mutation always changes the gene, so `probability` is the
+	      // real per-gene change rate: binary genes flip, symbolic genes
+	      // move to one of the other (baseStates - 1) values uniformly.
+	      const int current = chromosomeString_.valueAt(i);
 	      if (baseStates == 2)
 		{
-		  if (randomBit(generator)) chromosomeString_.setValue(i);
-		  else chromosomeString_.clearValue(i);
+		  chromosomeString_.setValue(i, 1 - current);
 		}
 	      else
 		{
-		  chromosomeString_.setValue(i,randomIndex(generator,baseStates));
+		  int replacement = randomIndex(generator,baseStates - 1);
+		  if (replacement >= current) ++replacement;
+		  chromosomeString_.setValue(i,replacement);
 		}
-
 	    }
 	}
     }
@@ -156,8 +174,10 @@ Chromosome::singlePointCrossOver(const BaseString& mother, const BaseString& fat
   // The daughter is made up of the Primary section of the mother chromosome and the
   //     secondary section of the father chromosome.
   //
-  BaseString boy(checkedCombinedLength(FatherPrimaryLength, MotherSecondaryLength),baseStates);
-  BaseString girl(checkedCombinedLength(MotherPrimaryLength, FatherSecondaryLength),baseStates);
+  // Variable-length children keep the leading genes up to the safety limit,
+  // so repeated crossover cannot grow chromosomes without bound.
+  BaseString boy(cappedLength(checkedCombinedLength(FatherPrimaryLength, MotherSecondaryLength)),baseStates);
+  BaseString girl(cappedLength(checkedCombinedLength(MotherPrimaryLength, FatherSecondaryLength)),baseStates);
   //
   // Copy primary sections of chromosomes.
   //
@@ -245,6 +265,10 @@ std::pair<Chromosome::ChromosomePtr, Chromosome::ChromosomePtr>
 Chromosome::mate(Chromosome& father,double crossoverRate,CrossoverType crossoverType,std::mt19937* randomGenerator)
 {
   std::mt19937& generator = randomGenerator == nullptr ? FallbackRandomGenerator() : *randomGenerator;
+  if (!(crossoverRate >= 0.0 && crossoverRate <= 1.0))
+    {
+      throw GAFatalException(__FILE__,__LINE__,"Crossover rate must be between 0 and 1.");
+    }
   if (!variableLength && (length() != father.length()))
     {
       throw GAFatalException(__FILE__,__LINE__,"Mismatch in chromosome strings");

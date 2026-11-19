@@ -8,36 +8,36 @@ through the examples in this repo.
 
 If you are new to genetic algorithms, start with:
 
-- [course.md](/Users/donaldmolaro/src/GAK/examples/course.md):
+- [course.md](course.md):
   **Genetic Algorithms for the Classical Engineer**. A guided self-study course
   built around the actual `GAK` examples, from first principles through
   constrained operators.
 
 ## Teaching Material
 
-- [lesson_plan.md](/Users/donaldmolaro/src/GAK/examples/lesson_plan.md):
+- [lesson_plan.md](lesson_plan.md):
   module-by-module teaching sequence with commands and checkpoints
-- [prerequisites.md](/Users/donaldmolaro/src/GAK/examples/prerequisites.md):
+- [prerequisites.md](prerequisites.md):
   what a learner should understand before each stage
-- [glossary.md](/Users/donaldmolaro/src/GAK/examples/glossary.md):
+- [glossary.md](glossary.md):
   key GA terms mapped to plain-language intuition
-- [lab_knapsack.md](/Users/donaldmolaro/src/GAK/examples/lab_knapsack.md):
+- [lab_knapsack.md](lab_knapsack.md):
   guided first lab on binary decision vectors and penalties
-- [lab_symbolic.md](/Users/donaldmolaro/src/GAK/examples/lab_symbolic.md):
+- [lab_symbolic.md](lab_symbolic.md):
   guided lab on symbolic genes and exact-solution problems
-- [lab_numeric.md](/Users/donaldmolaro/src/GAK/examples/lab_numeric.md):
+- [lab_numeric.md](lab_numeric.md):
   guided lab on numeric black-box optimization and experiment design
-- [lab_constraints.md](/Users/donaldmolaro/src/GAK/examples/lab_constraints.md):
+- [lab_constraints.md](lab_constraints.md):
   guided lab on graded constraint scoring
-- [lab_sudoku.md](/Users/donaldmolaro/src/GAK/examples/lab_sudoku.md):
+- [lab_sudoku.md](lab_sudoku.md):
   guided comparison between generic and constraint-aware operators
-- [lab_first_problem.md](/Users/donaldmolaro/src/GAK/examples/lab_first_problem.md):
+- [lab_first_problem.md](lab_first_problem.md):
   guided design lab for building your first `PopulationProblem`
-- [visual_walkthroughs.md](/Users/donaldmolaro/src/GAK/examples/visual_walkthroughs.md):
+- [visual_walkthroughs.md](visual_walkthroughs.md):
   quick conceptual map of the example categories
-- [experiments.md](/Users/donaldmolaro/src/GAK/examples/experiments.md):
+- [experiments.md](experiments.md):
   how to export runs and compare multiple seeds/settings
-- [viewer.html](/Users/donaldmolaro/src/GAK/examples/viewer.html):
+- [viewer.html](viewer.html):
   local browser viewer for JSON generation reports
 
 ## Demo Modes
@@ -100,4 +100,4 @@ Run a quick multi-seed experiment sweep:
 ```
 
 For more tuning guidance, see
-[docs/RUNNING_DEMOS.md](/Users/donaldmolaro/src/GAK/docs/RUNNING_DEMOS.md).
+[docs/RUNNING_DEMOS.md](../docs/RUNNING_DEMOS.md).

@@ -7,6 +7,7 @@
 #include "chromosome.hh"
 #include "except.hh"
 #include "population.hh"
+#include "random.hh"
 #include "sudoku_constrained.hh"
 
 const int SudokuConstrained::kPuzzle[SudokuConstrained::kCellCount] = {
@@ -243,7 +244,7 @@ void SudokuConstrained::initializeRow(BaseString& board, int row, std::mt19937& 
    }
 
    std::vector<int> digits = missingDigitsByRow_[row];
-   std::shuffle(digits.begin(), digits.end(), randomGenerator);
+   gak::shuffle(digits.begin(), digits.end(), randomGenerator);
    for ( int i = 0 ; i < static_cast<int>(mutableColumnsByRow_[row].size()) ; i++ )
    {
       board.setValue(rowStart + mutableColumnsByRow_[row][i], digits[i]);
@@ -281,10 +282,7 @@ std::unique_ptr<Chromosome> SudokuConstrained::initializeCandidate(Population& p
 std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
 SudokuConstrained::mateCandidates(Population& population, Chromosome& mother, Chromosome& father)
 {
-   std::uniform_real_distribution<double> probability(0.0, 1.0);
-   std::uniform_int_distribution<int> parent_choice(0, 1);
-
-   if (probability(population.randomEngine()) >= population.settings().crossOverRate)
+   if (!gak::chance(population.randomEngine(), population.settings().crossOverRate))
    {
       return std::make_pair(
          std::make_unique<Chromosome>(cloneBoard(mother.genes()),
@@ -300,7 +298,7 @@ SudokuConstrained::mateCandidates(Population& population, Chromosome& mother, Ch
 
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
-      const bool useMotherForFirst = parent_choice(population.randomEngine()) == 0;
+      const bool useMotherForFirst = gak::uniformIndex(population.randomEngine(), 2) == 0;
       fillRowFromParent(first, useMotherForFirst ? mother.genes() : father.genes(), row);
       fillRowFromParent(second, useMotherForFirst ? father.genes() : mother.genes(), row);
    }
@@ -317,8 +315,6 @@ SudokuConstrained::mateCandidates(Population& population, Chromosome& mother, Ch
 void SudokuConstrained::mutateCandidate(Population& population, Chromosome& chromosome)
 {
    const double rowMutationRate = std::min(1.0, population.settings().bitMutationRate * kBoardSize);
-   std::uniform_real_distribution<double> probability(0.0, 1.0);
-
    BaseString& board = chromosome.genes();
    for ( int row = 0 ; row < kBoardSize ; row++ )
    {
@@ -328,18 +324,16 @@ void SudokuConstrained::mutateCandidate(Population& population, Chromosome& chro
          continue;
       }
 
-      if (probability(population.randomEngine()) >= rowMutationRate)
+      if (!gak::chance(population.randomEngine(), rowMutationRate))
       {
          continue;
       }
 
-      std::uniform_int_distribution<int> columnIndex(0, static_cast<int>(mutableColumns.size()) - 1);
-      int first = columnIndex(population.randomEngine());
-      int second = columnIndex(population.randomEngine());
-      while (second == first)
-      {
-         second = columnIndex(population.randomEngine());
-      }
+      const int columnCount = static_cast<int>(mutableColumns.size());
+      const int first = gak::uniformIndex(population.randomEngine(), columnCount);
+      // Pick a different column directly instead of redrawing until distinct.
+      int second = gak::uniformIndex(population.randomEngine(), columnCount - 1);
+      if (second >= first) ++second;
 
       const int rowStart = row * kBoardSize;
       const int firstCell = rowStart + mutableColumns[first];

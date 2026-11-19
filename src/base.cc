@@ -128,6 +128,10 @@ int BaseString::decodeBits(int startBit, int endBit) const
 
 void BaseString::setValue(int index, int value)
 {
+  if (value < 0 || value >= stateCount)
+    {
+      throw GAFatalException(__FILE__,__LINE__,"Attempted to SET a value outside the state range");
+    }
   if (( index >= 0)&&(index < stringLength))
     {
       int startBit = startPos[index];

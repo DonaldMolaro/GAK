@@ -2,10 +2,10 @@
 
 This project has two supported test layers:
 
-- library-focused tests in [tests/test_main.cc](/Users/donaldmolaro/src/GAK/tests/test_main.cc)
-- example-focused tests in [examples/test_main.cc](/Users/donaldmolaro/src/GAK/examples/test_main.cc)
+- library-focused tests in [tests/test_main.cc](../tests/test_main.cc)
+- example-focused tests in [examples/test_main.cc](../examples/test_main.cc)
 
-The top-level [Makefile](/Users/donaldmolaro/src/GAK/Makefile) provides the
+The top-level [Makefile](../Makefile) provides the
 main entry points.
 
 ## Known Build Environments
@@ -85,7 +85,7 @@ These tests verify things like:
 - example-specific invariants
 - short successful runs
 - constraint-aware operator preservation in examples like
-  [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
+  [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc)
 
 These tests are the right place to verify:
 
@@ -107,16 +107,16 @@ runs into one combined report focused on production `.cc` files.
 
 Generated coverage artifacts:
 
-- [coverage/combined.profdata](/Users/donaldmolaro/src/GAK/coverage/combined.profdata)
-- [coverage/coverage.txt](/Users/donaldmolaro/src/GAK/coverage/coverage.txt)
-- [tests/coverage.profraw](/Users/donaldmolaro/src/GAK/tests/coverage.profraw)
-- [tests/coverage.profdata](/Users/donaldmolaro/src/GAK/tests/coverage.profdata)
-- [tests/coverage.txt](/Users/donaldmolaro/src/GAK/tests/coverage.txt)
-- [examples/coverage.profraw](/Users/donaldmolaro/src/GAK/examples/coverage.profraw)
-- [examples/coverage.profdata](/Users/donaldmolaro/src/GAK/examples/coverage.profdata)
-- [examples/coverage.txt](/Users/donaldmolaro/src/GAK/examples/coverage.txt)
+- [coverage/combined.profdata](../coverage/combined.profdata)
+- [coverage/coverage.txt](../coverage/coverage.txt)
+- [tests/coverage.profraw](../tests/coverage.profraw)
+- [tests/coverage.profdata](../tests/coverage.profdata)
+- [tests/coverage.txt](../tests/coverage.txt)
+- [examples/coverage.profraw](../examples/coverage.profraw)
+- [examples/coverage.profdata](../examples/coverage.profdata)
+- [examples/coverage.txt](../examples/coverage.txt)
 
-The combined annotated report in [coverage/coverage.txt](/Users/donaldmolaro/src/GAK/coverage/coverage.txt)
+The combined annotated report in [coverage/coverage.txt](../coverage/coverage.txt)
 is the easiest place to inspect uncovered branches after a change. The
 top-level combined report intentionally excludes test harness files and header
 files so the percentage reflects exercised production code.
@@ -139,5 +139,5 @@ core engine.
   end states.
 - For constrained problems, test what operators preserve after initialization,
   crossover, and mutation.
-- When adding a new example, update [examples/test_main.cc](/Users/donaldmolaro/src/GAK/examples/test_main.cc)
+- When adding a new example, update [examples/test_main.cc](../examples/test_main.cc)
   alongside the example itself.

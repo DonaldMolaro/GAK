@@ -1,9 +1,9 @@
 # Built-In Crossover Modes
 
 The built-in chromosome crossover strategies live in
-[src/chromosome.cc](/Users/donaldmolaro/src/GAK/src/chromosome.cc) and are
+[src/chromosome.cc](../src/chromosome.cc) and are
 selected through `Chromosome::CrossoverType` in
-[src/chromosome.hh](/Users/donaldmolaro/src/GAK/src/chromosome.hh).
+[src/chromosome.hh](../src/chromosome.hh).
 
 Available built-in modes:
 
@@ -93,7 +93,7 @@ such as:
 - some symbolic search problems
 
 They are a poor fit for highly constrained problems such as Sudoku, which is
-why [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
+why [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc)
 implements row-wise crossover through
 `PopulationProblem::mateCandidates(...)` instead of relying on the generic
 chromosome crossover path.

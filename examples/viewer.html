@@ -844,10 +844,14 @@
       const palette = ["#cc5a3d", "#2f7f65", "#3d63b8", "#b08d2b"];
       const nodes = visualization.nodes || [];
       const edges = visualization.edges || [];
-      const positions = [
-        { x: 180, y: 110 }, { x: 360, y: 80 }, { x: 560, y: 110 }, { x: 680, y: 240 },
-        { x: 560, y: 390 }, { x: 360, y: 430 }, { x: 180, y: 360 }, { x: 100, y: 220 }
-      ];
+      // Lay nodes out on a circle so any node count fits the canvas.
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = Math.min(canvas.width, canvas.height) / 2 - 50;
+      const positions = nodes.map((_, index) => {
+        const angle = -Math.PI / 2 + (2 * Math.PI * index) / Math.max(nodes.length, 1);
+        return { x: centerX + radius * Math.cos(angle), y: centerY + radius * Math.sin(angle) };
+      });
 
       ctx.lineWidth = 4;
       edges.forEach(edge => {
@@ -870,21 +874,21 @@
         }
         ctx.fillStyle = palette[node.color_index % palette.length];
         ctx.beginPath();
-        ctx.arc(point.x, point.y, 32, 0, Math.PI * 2);
+        ctx.arc(point.x, point.y, 24, 0, Math.PI * 2);
         ctx.fill();
         ctx.strokeStyle = "#1d1b18";
         ctx.lineWidth = 2;
         ctx.stroke();
 
         ctx.fillStyle = "#fff";
-        ctx.font = "bold 22px Georgia, serif";
+        ctx.font = "bold 18px Georgia, serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(node.name, point.x, point.y);
 
         ctx.fillStyle = "#1d1b18";
-        ctx.font = "15px Georgia, serif";
-        ctx.fillText(node.color_name, point.x, point.y + 50);
+        ctx.font = "13px Georgia, serif";
+        ctx.fillText(node.color_name, point.x, point.y + 38);
       });
     }
 

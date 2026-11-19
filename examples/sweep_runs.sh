@@ -32,7 +32,6 @@ shift 2
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
 GA_BIN="$SCRIPT_DIR/GA"
 
-EXTRA_ARGS=""
 SEEDS=""
 FOUND_SEPARATOR=0
 
@@ -46,8 +45,10 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-if [ "$FOUND_SEPARATOR" -eq 1 ]; then
-  EXTRA_ARGS="$*"
+# Whatever follows "--" stays in "$@" untouched, so GA options that contain
+# spaces (for example report paths) are passed through as single arguments.
+if [ "$FOUND_SEPARATOR" -eq 0 ]; then
+  set --
 fi
 
 if [ -z "${SEEDS# }" ]; then
@@ -87,8 +88,7 @@ for seed in $SEEDS; do
 
   echo "[sweep] mode=$MODE seed=$seed"
 
-  # shellcheck disable=SC2086
-  "$GA_BIN" "$MODE" --seed "$seed" --report-json "$json_path" --report-csv "$csv_path" $EXTRA_ARGS > "$text_path"
+  "$GA_BIN" "$MODE" --seed "$seed" --report-json "$json_path" --report-csv "$csv_path" "$@" > "$text_path"
 
   generations_completed="$(json_number generations_completed "$json_path")"
   evaluations="$(json_number evaluations "$json_path")"

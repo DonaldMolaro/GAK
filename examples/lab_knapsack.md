@@ -9,7 +9,7 @@ Learn how a simple binary chromosome maps onto a concrete optimization problem.
 ## Run
 
 ```sh
-cd /Users/donaldmolaro/src/GAK/examples
+cd examples   # from the repository root
 ./GA K --seed 1
 ```
 

@@ -3,6 +3,8 @@
 // Traveling salesman example built on the GA population engine.
 
 #include "population.hh"
+#include "chromosome.hh"
+#include <memory>
 #include <random>
 #include <utility>
 #include <vector>
@@ -17,6 +19,12 @@ public:
   
    void validatePopulation(const Population& population) const override;
    double evaluateFitness(const BaseString& genes) override;
+   // Permutation-preserving operators: every candidate is a tour that visits
+   // each city exactly once.
+   std::unique_ptr<Chromosome> initializeCandidate(Population& population) override;
+   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
+      mateCandidates(Population& population, Chromosome& mother, Chromosome& father) override;
+   void mutateCandidate(Population& population, Chromosome& chromosome) override;
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
    void writeVisualizationJson(const BaseString& genes, std::ostream& out) const override;
    int cityCount() const noexcept { return numCities; }
@@ -24,6 +32,7 @@ public:
    const std::vector<Coordinate>& cityCoordinates() const noexcept { return cityCoordinates_; }
    void writeCityList(std::ostream& out) const;
 private:
+   BaseString orderCrossover(const BaseString& first, const BaseString& second, int start, int end) const;
    bool hasCityCoordinate(int allocated, const Coordinate& coordinate) const;
    Coordinate randomCoordinate();
    void initializeCityCoordinates();

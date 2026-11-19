@@ -1,6 +1,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <vector>
 
 #include "base.hh"
 #include "chromosome.hh"
@@ -499,22 +500,22 @@ void test_latin_square_run_path()
 void test_graph_coloring_rewards_proper_colorings()
 {
   GraphColoring graph;
-  Population::Settings settings = make_options(Population::OperationMode::Maximize, 8,
+  Population::Settings settings = make_options(Population::OperationMode::Maximize, 16,
                                                Population::VariableLengthMode::Fixed, 3);
   Population population(settings, graph);
 
-  BaseString solved(8, 3);
-  const int solved_colors[8] = {0, 1, 0, 1, 0, 1, 2, 2};
-  BaseString bad(8, 3);
+  BaseString solved(16, 3);
+  const int solved_colors[16] = {0, 1, 2, 0, 1, 2, 1, 1, 0, 2, 2, 0, 1, 0, 2, 1};
+  BaseString bad(16, 3);
   std::ostringstream out;
-  for (int i = 0 ; i < 8 ; i++)
+  for (int i = 0 ; i < 16 ; i++)
   {
     solved.setValue(i, solved_colors[i]);
     bad.setValue(i, 0);
   }
 
   const double solved_fitness = graph.evaluateFitness(solved);
-  expect_true(solved_fitness == 12,
+  expect_true(solved_fitness == GraphColoring::kEdgeCount,
               "GraphColoring should score a proper 3-coloring at the maximum");
   expect_true(solved_fitness > graph.evaluateFitness(bad),
               "GraphColoring should rank a proper coloring above a conflicting one");
@@ -533,7 +534,7 @@ void test_graph_coloring_validation_rejects_bad_settings()
 
   expect_throws<GAFatalException>(
     [&]() {
-      Population::Settings bad = make_options(Population::OperationMode::Maximize, 7,
+      Population::Settings bad = make_options(Population::OperationMode::Maximize, 15,
                                               Population::VariableLengthMode::Fixed, 3);
       Population invalid_population(bad, graph);
     },
@@ -541,7 +542,7 @@ void test_graph_coloring_validation_rejects_bad_settings()
 
   expect_throws<GAFatalException>(
     [&]() {
-      Population::Settings bad = make_options(Population::OperationMode::Maximize, 8,
+      Population::Settings bad = make_options(Population::OperationMode::Maximize, 16,
                                               Population::VariableLengthMode::Fixed, 4);
       Population invalid_population(bad, graph);
     },
@@ -551,9 +552,9 @@ void test_graph_coloring_validation_rejects_bad_settings()
 void test_graph_coloring_visualization_json()
 {
   GraphColoring graph;
-  BaseString coloring(8, 3);
-  const int solved_colors[8] = {0, 1, 0, 1, 0, 1, 2, 2};
-  for (int i = 0 ; i < 8 ; i++)
+  BaseString coloring(16, 3);
+  const int solved_colors[16] = {0, 1, 2, 0, 1, 2, 1, 1, 0, 2, 2, 0, 1, 0, 2, 1};
+  for (int i = 0 ; i < 16 ; i++)
   {
     coloring.setValue(i, solved_colors[i]);
   }
@@ -908,6 +909,156 @@ void test_constrained_sudoku_validation_rejects_bad_settings()
 
 }  // namespace
 
+namespace {
+
+bool isPermutation(const BaseString& genes)
+{
+  std::vector<int> seen(genes.length(), 0);
+  for (int i = 0 ; i < genes.length() ; i++)
+    {
+      const int value = genes.valueAt(i);
+      if (value < 0 || value >= genes.length() || seen[value]) return false;
+      seen[value] = 1;
+    }
+  return true;
+}
+
+void test_traveling_salesman_operators_keep_tours_valid()
+{
+  Population::Settings options = make_options(Population::OperationMode::Minimize, 12,
+                                              Population::VariableLengthMode::Fixed, 12);
+  options.crossOverRate = 1.0;
+  options.bitMutationRate = 0.3;
+  TravelingSalesman tsp(options, 20);
+  Population population(options, tsp);
+
+  for (int trial = 0 ; trial < 200 ; trial++)
+    {
+      std::unique_ptr<Chromosome> mother = PopulationTestRig::createInitialChromosome(population);
+      std::unique_ptr<Chromosome> father = PopulationTestRig::createInitialChromosome(population);
+      expect_true(isPermutation(mother->genes()) && isPermutation(father->genes()),
+                  "TravelingSalesman should initialize candidates as permutations");
+      std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+        PopulationTestRig::mateChromosomes(population, *mother, *father);
+      PopulationTestRig::mutateChromosome(population, *children.first);
+      PopulationTestRig::mutateChromosome(population, *children.second);
+      expect_true(isPermutation(children.first->genes()) && isPermutation(children.second->genes()),
+                  "TravelingSalesman crossover and mutation should keep every tour a permutation");
+    }
+
+  // A tour with a repeated city must score worse than the valid tour it
+  // was derived from, whatever the city layout.
+  BaseString valid(12, 12);
+  BaseString repeated(12, 12);
+  for (int i = 0 ; i < 12 ; i++)
+    {
+      valid.setValue(i, i);
+      repeated.setValue(i, i);
+    }
+  repeated.setValue(5, 0);
+  expect_true(tsp.evaluateFitness(repeated) > tsp.evaluateFitness(valid),
+              "TravelingSalesman should always penalize a missing city more than any edge saves");
+}
+
+void test_traveling_salesman_rejects_mismatched_alphabet()
+{
+  expect_throws<GAFatalException>(
+    []() {
+      Population::Settings options = make_options(Population::OperationMode::Minimize, 10,
+                                                  Population::VariableLengthMode::Fixed, 26);
+      TravelingSalesman tsp(options, 20);
+    },
+    "TravelingSalesman should reject gene alphabets larger than the city table");
+}
+
+void test_f6_uses_standard_domain()
+{
+  F6 f6;
+  // The all-ones code is the top of the domain on both axes.
+  BaseString top = makeBinaryString(std::string(44, '1'));
+  std::ostringstream out;
+  f6.printCandidate(top, out);
+  expect_contains(out.str(), "X ( 100 ) Y ( 100 )",
+                  "F6 should map the largest code onto the top of [-100, 100]");
+
+  // The code nearest the centre is the near-optimal point.
+  BaseString centre = makeBinaryString("0111111111111111111111" "0111111111111111111111");
+  expect_true(f6.evaluateFitness(centre) < 1.01,
+              "F6 should score the centre of the domain near the optimum of 1");
+
+  expect_throws<GAFatalException>(
+    [&f6]() {
+      Population::Settings bad = make_options(Population::OperationMode::Minimize, 43,
+                                              Population::VariableLengthMode::Fixed, 2);
+      Population invalid(bad, f6);
+    },
+    "F6 should reject chromosomes too short for two 22-bit axes");
+}
+
+void test_dome_reports_exact_optimum()
+{
+  Dome dome;
+  Population::Settings options = make_options(Population::OperationMode::Minimize, 32,
+                                              Population::VariableLengthMode::Fixed, 2);
+  Population population(options, dome);
+  BaseString origin = makeBinaryString(std::string(32, '0'));
+  BaseString near = makeBinaryString(std::string(15, '0') + "1" + std::string(16, '0'));
+  expect_true(dome.hasReachedSolution(population, origin, dome.evaluateFitness(origin)),
+              "Dome should report the origin as the exact optimum");
+  expect_true(dome.evaluateFitness(near) > 100.0 &&
+              !dome.hasReachedSolution(population, near, dome.evaluateFitness(near)),
+              "Dome should distinguish points near the origin from the optimum");
+
+  expect_throws<GAFatalException>(
+    [&dome]() {
+      Population::Settings bad = make_options(Population::OperationMode::Minimize, 31,
+                                              Population::VariableLengthMode::Fixed, 2);
+      Population invalid(bad, dome);
+    },
+    "Dome should reject chromosomes shorter than 32 bits");
+}
+
+void test_latin_square_reports_solution()
+{
+  LatinSquare latin_square;
+  Population::Settings options = make_options(Population::OperationMode::Maximize, 16,
+                                              Population::VariableLengthMode::Fixed, 4);
+  Population population(options, latin_square);
+  BaseString solution(16, 4);
+  BaseString almost(16, 4);
+  const int solved_values[16] = {0, 1, 2, 3, 1, 2, 3, 0, 2, 3, 0, 1, 3, 0, 1, 2};
+  for (int i = 0 ; i < 16 ; i++)
+    {
+      solution.setValue(i, solved_values[i]);
+      almost.setValue(i, solved_values[i]);
+    }
+  almost.setValue(0, 1);
+  expect_true(latin_square.hasReachedSolution(population, solution, latin_square.evaluateFitness(solution)),
+              "LatinSquare should report a perfect square as solved");
+  expect_true(!latin_square.hasReachedSolution(population, almost, latin_square.evaluateFitness(almost)),
+              "LatinSquare should not report an imperfect square as solved");
+}
+
+void test_knapsack_validation_and_output()
+{
+  Knapsack knapsack;
+  expect_throws<GAFatalException>(
+    [&knapsack]() {
+      Population::Settings bad = make_options(Population::OperationMode::Maximize, 13,
+                                              Population::VariableLengthMode::Fixed, 2);
+      Population invalid(bad, knapsack);
+    },
+    "Knapsack should reject chromosomes with more genes than items");
+
+  BaseString genes = makeBinaryString("110000000000");
+  std::ostringstream out;
+  knapsack.printCandidate(genes, out);
+  expect_true(out.str().size() >= 3 && out.str().compare(out.str().size() - 3, 3, " ::") == 0,
+              "Knapsack output should end with a separator before the fitness value");
+}
+
+}
+
 int main()
 {
   test_dome_fitness();
@@ -941,6 +1092,12 @@ int main()
   test_constrained_sudoku_fixed_seed_is_reproducible();
   test_constrained_sudoku_visualization_json();
   test_constrained_sudoku_validation_rejects_bad_settings();
+  test_traveling_salesman_operators_keep_tours_valid();
+  test_traveling_salesman_rejects_mismatched_alphabet();
+  test_f6_uses_standard_domain();
+  test_dome_reports_exact_optimum();
+  test_latin_square_reports_solution();
+  test_knapsack_validation_and_output();
 
   if (g_failures != 0)
     {

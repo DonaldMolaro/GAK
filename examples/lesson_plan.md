@@ -12,8 +12,8 @@ Goal:
 
 Read:
 
-- [README.md](/Users/donaldmolaro/src/GAK/README.md)
-- [examples/README.md](/Users/donaldmolaro/src/GAK/examples/README.md)
+- [README.md](../README.md)
+- [examples/README.md](README.md)
 
 Checkpoint:
 
@@ -24,7 +24,7 @@ Checkpoint:
 Run:
 
 ```sh
-cd /Users/donaldmolaro/src/GAK/examples
+cd examples   # from the repository root
 ./GA K --seed 1
 ```
 
@@ -47,7 +47,7 @@ Checkpoint:
 
 Suggested follow-up:
 
-- [lab_symbolic.md](/Users/donaldmolaro/src/GAK/examples/lab_symbolic.md)
+- [lab_symbolic.md](lab_symbolic.md)
 
 ## Module 4: Numeric Benchmarks
 
@@ -64,7 +64,7 @@ Checkpoint:
 
 Suggested follow-up:
 
-- [lab_numeric.md](/Users/donaldmolaro/src/GAK/examples/lab_numeric.md)
+- [lab_numeric.md](lab_numeric.md)
 
 ## Module 5: Constraint Scoring
 
@@ -81,7 +81,7 @@ Checkpoint:
 
 Suggested follow-up:
 
-- [lab_constraints.md](/Users/donaldmolaro/src/GAK/examples/lab_constraints.md)
+- [lab_constraints.md](lab_constraints.md)
 
 ## Module 6: Representation Matters
 
@@ -114,8 +114,8 @@ Checkpoint:
 
 Read:
 
-- [docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md)
-- [examples/lab_first_problem.md](/Users/donaldmolaro/src/GAK/examples/lab_first_problem.md)
+- [docs/WRITING_EXAMPLES.md](../docs/WRITING_EXAMPLES.md)
+- [examples/lab_first_problem.md](lab_first_problem.md)
 
 Checkpoint:
 

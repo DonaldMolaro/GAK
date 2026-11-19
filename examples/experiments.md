@@ -8,7 +8,7 @@ a small sweep tool for comparing multiple seeds.
 You can export one run as JSON and per-generation CSV:
 
 ```sh
-cd /Users/donaldmolaro/src/GAK/examples
+cd examples   # from the repository root
 ./GA K --seed 1 \
   --report-json /tmp/gak-knapsack.json \
   --report-csv /tmp/gak-knapsack.csv
@@ -26,7 +26,7 @@ What you get:
 For reports that include visualization payloads, you can also open:
 
 ```sh
-open /Users/donaldmolaro/src/GAK/examples/viewer.html
+open examples/viewer.html
 ```
 
 Then load the generated JSON file into the viewer. The first custom visual
@@ -42,7 +42,7 @@ Other problems currently fall back to a generic gene viewer.
 Use the sweep helper:
 
 ```sh
-cd /Users/donaldmolaro/src/GAK/examples
+cd examples   # from the repository root
 ./sweep_runs.sh K /tmp/gak-knapsack 1 2 3
 ```
 
@@ -68,7 +68,8 @@ The summary contains one row per seed with:
 - `evaluations`
 - `solution_found`
 - `stopped_early`
-- `best_fitness`
+- `best_fitness` (the best value for the run's direction, so the smallest when
+  minimizing)
 - `worst_fitness`
 
 ## Suggested Experiment Patterns
