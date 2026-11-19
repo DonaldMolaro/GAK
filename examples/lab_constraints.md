@@ -10,7 +10,7 @@ Understand how to score partial progress on constrained problems.
 ## Run
 
 ```sh
-cd /Users/donaldmolaro/src/GAK/examples
+cd examples   # from the repository root
 ./GA Q --seed 1
 ./GA L --seed 1
 ```

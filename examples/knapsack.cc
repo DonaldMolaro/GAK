@@ -2,11 +2,23 @@
 #include <ostream>
 
 #include "base.hh"
+#include "except.hh"
 #include "population.hh"
 #include "knapsack.hh"
 
 const int Knapsack::kWeights[Knapsack::kItemCount] = {2, 3, 5, 7, 1, 4, 1, 6, 9, 8, 3, 5};
 const int Knapsack::kValues[Knapsack::kItemCount] = {6, 5, 8, 9, 6, 7, 3, 7, 12, 10, 4, 8};
+
+void Knapsack::validatePopulation(const Population& population) const
+{
+   const Population::Settings& settings = population.settings();
+   if (settings.chromosomeLength != kItemCount || settings.baseStates != 2 ||
+       settings.variableLength != Population::VariableLengthMode::Fixed)
+   {
+      throw GAFatalException(__FILE__,__LINE__,
+                             "Knapsack requires a fixed-length binary chromosome with one gene per item (12)");
+   }
+}
 
 double Knapsack::evaluateFitness(const BaseString& genes)
 {
@@ -47,7 +59,7 @@ void Knapsack::printCandidate(const BaseString& genes, std::ostream& out) const
          value += kValues[item];
       }
    }
-   out << " | weight=" << weight << '/' << kCapacity << " value=" << value;
+   out << " | weight=" << weight << '/' << kCapacity << " value=" << value << " ::";
 }
 
 void Knapsack::writeVisualizationJson(const BaseString& genes, std::ostream& out) const

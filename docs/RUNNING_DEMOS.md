@@ -1,6 +1,6 @@
 # Running And Tuning The Demos
 
-The example runner in [examples/GA.cc](/Users/donaldmolaro/src/GAK/examples/GA.cc)
+The example runner in [examples/GA.cc](../examples/GA.cc)
 is both a demo program and a practical way to explore how different GA
 settings behave on different problem types.
 
@@ -48,7 +48,7 @@ The runner also supports machine-readable export:
 ```
 
 The JSON report can be loaded into the local viewer at
-[examples/viewer.html](/Users/donaldmolaro/src/GAK/examples/viewer.html) to
+[examples/viewer.html](../examples/viewer.html) to
 scrub through per-generation progress visually.
 
 ## What The Parameter Block Means
@@ -128,6 +128,16 @@ Always use:
 
 This is especially helpful when comparing parameter changes.
 
+A fixed seed reproduces a run exactly on every platform: the library draws
+all randomness through the portable helpers in `src/random.hh` instead of the
+`<random>` distributions, whose algorithms differ between libstdc++ (Linux)
+and libc++ (macOS). Problems with custom operators should use the same
+helpers (`gak::uniformIndex`, `gak::chance`, `gak::shuffle`, ...) with
+`Population::randomEngine()` to keep that guarantee. The guarantee covers GAK's
+own arithmetic; a fitness function that calls math-library routines such as
+`std::sin` (F6 does) can still differ in the last bit on an operating system
+whose math library rounds differently.
+
 ## Reading Demo Output
 
 For many runs, the raw fitness number is less useful than the final printed
@@ -196,9 +206,9 @@ That is when you should revisit:
 - whether the problem needs custom operators
 
 For that step, see
-[docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md)
+[docs/WRITING_EXAMPLES.md](WRITING_EXAMPLES.md)
 and
-[docs/PROBLEM_FIT.md](/Users/donaldmolaro/src/GAK/docs/PROBLEM_FIT.md).
+[docs/PROBLEM_FIT.md](PROBLEM_FIT.md).
 
 For repeatable multi-seed experiments, see
-[examples/experiments.md](/Users/donaldmolaro/src/GAK/examples/experiments.md).
+[examples/experiments.md](../examples/experiments.md).

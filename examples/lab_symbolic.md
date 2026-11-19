@@ -13,7 +13,7 @@ Understand the difference between:
 ## Run
 
 ```sh
-cd /Users/donaldmolaro/src/GAK/examples
+cd examples   # from the repository root
 ./GA A --seed 1
 ./GA S --seed 1
 ```

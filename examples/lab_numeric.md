@@ -19,13 +19,13 @@ By the end of this lab, you should be able to:
 
 Read:
 
-- [course.md](/Users/donaldmolaro/src/GAK/examples/course.md), Module 4
-- [docs/RUNNING_DEMOS.md](/Users/donaldmolaro/src/GAK/docs/RUNNING_DEMOS.md)
+- [course.md](course.md), Module 4
+- [docs/RUNNING_DEMOS.md](../docs/RUNNING_DEMOS.md)
 
 Build the examples if needed:
 
 ```sh
-cd /Users/donaldmolaro/src/GAK/examples
+cd examples   # from the repository root
 make
 ```
 
@@ -54,8 +54,8 @@ Questions:
 
 Read:
 
-- [examples/dome.cc](/Users/donaldmolaro/src/GAK/examples/dome.cc)
-- [examples/f6.cc](/Users/donaldmolaro/src/GAK/examples/f6.cc)
+- [examples/dome.cc](dome.cc)
+- [examples/f6.cc](f6.cc) (22 bits per axis mapped onto [-100, 100])
 
 Focus on:
 

@@ -77,10 +77,10 @@ make coverage
 ```
 
 The combined production-code coverage report is written to
-[coverage/coverage.txt](/Users/donaldmolaro/src/GAK/coverage/coverage.txt).
+[coverage/coverage.txt](coverage/coverage.txt).
 
 For a more detailed developer workflow, see
-[docs/TESTING_AND_COVERAGE.md](/Users/donaldmolaro/src/GAK/docs/TESTING_AND_COVERAGE.md).
+[docs/TESTING_AND_COVERAGE.md](docs/TESTING_AND_COVERAGE.md).
 
 ## Example runner
 
@@ -133,6 +133,9 @@ problems. These are the most useful things to know before you run a mode.
   Continuous-function minimization examples encoded as binary chromosomes.
   These are good first runs if you want to see the classic GA flow on a small,
   generic search space. Expect fitness values to improve toward smaller numbers.
+  Dome's optimum is exactly 100 at (0, 0) and the run stops when it is found.
+  F6 is the standard Schaffer F6 on [-100, 100]²: 22 bits per axis, scaled so
+  fitness runs from 1 (the global optimum at the origin) up to about 1000.
 
 - `A`
   Alphabet ordering over symbolic fixed-length chromosomes. This is a classic
@@ -146,8 +149,10 @@ problems. These are the most useful things to know before you run a mode.
 
 - `T`
   Traveling salesman over symbolic chromosomes. This is a sequencing-style
-  example and a useful reminder that generic operators can work for routing-like
-  problems, but may not preserve as much structure as a specialized encoding.
+  example that uses permutation-preserving operators (random-permutation
+  initialization, order crossover, and swap mutation), so every candidate is a
+  valid tour. It is the clearest contrast with `A`, which solves an ordering
+  problem with the generic operators and a pairwise-order score instead.
 
 - `Q`
   Eight queens constraint satisfaction. This is a compact example of mapping a
@@ -160,11 +165,14 @@ problems. These are the most useful things to know before you run a mode.
 
 - `L`
   Latin square construction over symbolic cell values. A successful run should
-  converge toward a grid with unique values across each row and column.
+  converge toward a grid with unique values across each row and column, and
+  stops as soon as a perfect square is found.
 
 - `G`
   Graph coloring over symbolic node assignments. This is a compact example of
-  soft-to-hard constraint scoring on an adjacency structure.
+  soft-to-hard constraint scoring on an adjacency structure. The 16-node graph
+  is uniquely 3-colorable (6 proper colorings out of about 43 million), so the
+  GA has to evolve a solution rather than find one in its first population.
 
 - `M`
   Timetabling over symbolic slot assignments. This is a scheduling-style
@@ -204,10 +212,10 @@ Some problems are especially strong fits only when they use custom operators.
 Sudoku is the clearest example in this repo.
 
 For a fuller discussion of where the library fits well and where it does not,
-see [docs/PROBLEM_FIT.md](/Users/donaldmolaro/src/GAK/docs/PROBLEM_FIT.md).
+see [docs/PROBLEM_FIT.md](docs/PROBLEM_FIT.md).
 
 For a higher-level technical overview of the system, see
-[docs/WHITE_PAPER.md](/Users/donaldmolaro/src/GAK/docs/WHITE_PAPER.md).
+[docs/WHITE_PAPER.md](docs/WHITE_PAPER.md).
 
 ## Public Library Shape
 
@@ -219,13 +227,13 @@ The core design is now composition-based:
 
 Important pieces:
 
-- [src/population.hh](/Users/donaldmolaro/src/GAK/src/population.hh)
+- [src/population.hh](src/population.hh)
   Main GA engine, `PopulationProblem`, and public configuration types
-- [src/chromosome.hh](/Users/donaldmolaro/src/GAK/src/chromosome.hh)
+- [src/chromosome.hh](src/chromosome.hh)
   Generic chromosome representation and built-in crossover/mutation
-- [src/base.hh](/Users/donaldmolaro/src/GAK/src/base.hh)
+- [src/base.hh](src/base.hh)
   Packed symbolic/base-string storage
-- [src/genetic.hh](/Users/donaldmolaro/src/GAK/src/genetic.hh)
+- [src/genetic.hh](src/genetic.hh)
   Umbrella include for the public library surface
 
 ### Configuration API
@@ -274,13 +282,13 @@ loop.
 
 This is especially important for problems like Sudoku, where the generic operators waste most of their effort breaking invariants that could instead be preserved by construction.
 
-The best example of this in the repo is [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc).
+The best example of this in the repo is [examples/sudoku_constrained.cc](examples/sudoku_constrained.cc).
 
 For a direct comparison between the generic and constraint-aware Sudoku designs,
-see [docs/SUDOKU_DESIGN.md](/Users/donaldmolaro/src/GAK/docs/SUDOKU_DESIGN.md).
+see [docs/SUDOKU_DESIGN.md](docs/SUDOKU_DESIGN.md).
 
 For the generic crossover strategies built into `Chromosome`, see
-[docs/CROSSOVER_MODES.md](/Users/donaldmolaro/src/GAK/docs/CROSSOVER_MODES.md).
+[docs/CROSSOVER_MODES.md](docs/CROSSOVER_MODES.md).
 
 ## Exact-Solution Early Stop
 
@@ -304,20 +312,20 @@ When a solution is found, the engine stops early and reports it in
 
 If you want to understand the project by reading a few files instead of everything:
 
-1. [src/population.hh](/Users/donaldmolaro/src/GAK/src/population.hh)
-2. [src/population.cc](/Users/donaldmolaro/src/GAK/src/population.cc)
-3. [examples/GA.cc](/Users/donaldmolaro/src/GAK/examples/GA.cc)
-4. [examples/nqueens.cc](/Users/donaldmolaro/src/GAK/examples/nqueens.cc)
-5. [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
+1. [src/population.hh](src/population.hh)
+2. [src/population.cc](src/population.cc)
+3. [examples/GA.cc](examples/GA.cc)
+4. [examples/nqueens.cc](examples/nqueens.cc)
+5. [examples/sudoku_constrained.cc](examples/sudoku_constrained.cc)
 
 If you want to add a new example, start with
-[docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md).
+[docs/WRITING_EXAMPLES.md](docs/WRITING_EXAMPLES.md).
 
 If you want practical guidance on running and tuning the demos, see
-[docs/RUNNING_DEMOS.md](/Users/donaldmolaro/src/GAK/docs/RUNNING_DEMOS.md).
+[docs/RUNNING_DEMOS.md](docs/RUNNING_DEMOS.md).
 
 If you want a guided learning path through the examples, start with
-[examples/README.md](/Users/donaldmolaro/src/GAK/examples/README.md).
+[examples/README.md](examples/README.md).
 
 ## Current status
 
@@ -335,15 +343,15 @@ Removed:
 
 ## Documentation Map
 
-- [docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md)
+- [docs/WRITING_EXAMPLES.md](docs/WRITING_EXAMPLES.md)
   How to build a new problem and wire it into the repo
-- [docs/PROBLEM_FIT.md](/Users/donaldmolaro/src/GAK/docs/PROBLEM_FIT.md)
+- [docs/PROBLEM_FIT.md](docs/PROBLEM_FIT.md)
   What kinds of problems fit GAK well
-- [docs/RUNNING_DEMOS.md](/Users/donaldmolaro/src/GAK/docs/RUNNING_DEMOS.md)
+- [docs/RUNNING_DEMOS.md](docs/RUNNING_DEMOS.md)
   How to run and tune the example modes
-- [docs/SUDOKU_DESIGN.md](/Users/donaldmolaro/src/GAK/docs/SUDOKU_DESIGN.md)
+- [docs/SUDOKU_DESIGN.md](docs/SUDOKU_DESIGN.md)
   Why generic and constraint-aware Sudoku behave differently
-- [docs/CROSSOVER_MODES.md](/Users/donaldmolaro/src/GAK/docs/CROSSOVER_MODES.md)
+- [docs/CROSSOVER_MODES.md](docs/CROSSOVER_MODES.md)
   Built-in generic crossover behavior
-- [docs/TESTING_AND_COVERAGE.md](/Users/donaldmolaro/src/GAK/docs/TESTING_AND_COVERAGE.md)
+- [docs/TESTING_AND_COVERAGE.md](docs/TESTING_AND_COVERAGE.md)
   Test and coverage workflow

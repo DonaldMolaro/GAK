@@ -32,7 +32,7 @@ Why they fit:
 
 Reference example:
 
-- [examples/knapsack.cc](/Users/donaldmolaro/src/GAK/examples/knapsack.cc)
+- [examples/knapsack.cc](../examples/knapsack.cc)
 
 ### Symbolic fixed-length search
 
@@ -55,9 +55,9 @@ Why they fit:
 
 Reference examples:
 
-- [examples/alpha.cc](/Users/donaldmolaro/src/GAK/examples/alpha.cc)
-- [examples/nqueens.cc](/Users/donaldmolaro/src/GAK/examples/nqueens.cc)
-- [examples/graphcoloring.cc](/Users/donaldmolaro/src/GAK/examples/graphcoloring.cc)
+- [examples/alpha.cc](../examples/alpha.cc)
+- [examples/nqueens.cc](../examples/nqueens.cc)
+- [examples/graphcoloring.cc](../examples/graphcoloring.cc)
 
 ### Constraint satisfaction with scoreable partial progress
 
@@ -80,11 +80,11 @@ Why they fit:
 
 Reference examples:
 
-- [examples/latinsquare.cc](/Users/donaldmolaro/src/GAK/examples/latinsquare.cc)
-- [examples/timetable.cc](/Users/donaldmolaro/src/GAK/examples/timetable.cc)
-- [examples/graphcoloring.cc](/Users/donaldmolaro/src/GAK/examples/graphcoloring.cc)
-- [examples/sudoku.cc](/Users/donaldmolaro/src/GAK/examples/sudoku.cc)
-- [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
+- [examples/latinsquare.cc](../examples/latinsquare.cc)
+- [examples/timetable.cc](../examples/timetable.cc)
+- [examples/graphcoloring.cc](../examples/graphcoloring.cc)
+- [examples/sudoku.cc](../examples/sudoku.cc)
+- [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc)
 
 ### Black-box numeric optimization
 
@@ -105,8 +105,8 @@ Why they fit:
 
 Reference examples:
 
-- [examples/dome.cc](/Users/donaldmolaro/src/GAK/examples/dome.cc)
-- [examples/f6.cc](/Users/donaldmolaro/src/GAK/examples/f6.cc)
+- [examples/dome.cc](../examples/dome.cc)
+- [examples/f6.cc](../examples/f6.cc)
 
 ## Fits That Usually Need Custom Operators
 
@@ -142,7 +142,7 @@ Why custom operators help:
 
 Reference example:
 
-- [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
+- [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc)
 
 ### Problems With Exact Known Wins
 
@@ -202,11 +202,11 @@ model rather than specialized continuous operators.
 ## Recommended Starting Points
 
 - If the problem is binary and combinatorial, start from
-  [examples/knapsack.cc](/Users/donaldmolaro/src/GAK/examples/knapsack.cc)
+  [examples/knapsack.cc](../examples/knapsack.cc)
 - If it is symbolic with soft constraints, start from
-  [examples/nqueens.cc](/Users/donaldmolaro/src/GAK/examples/nqueens.cc)
+  [examples/nqueens.cc](../examples/nqueens.cc)
 - If it has hard structure that must be preserved, start from
-  [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
+  [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc)
 - If it is a numeric benchmark or black-box objective, start from
-  [examples/dome.cc](/Users/donaldmolaro/src/GAK/examples/dome.cc) or
-  [examples/f6.cc](/Users/donaldmolaro/src/GAK/examples/f6.cc)
+  [examples/dome.cc](../examples/dome.cc) or
+  [examples/f6.cc](../examples/f6.cc)

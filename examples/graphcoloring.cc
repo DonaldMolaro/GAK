@@ -5,14 +5,19 @@
 #include "graphcoloring.hh"
 #include "population.hh"
 
+// A 16-node "2-tree": starting from triangle A-B-C, every later node is
+// joined to both ends of an existing edge. Such graphs are uniquely
+// 3-colorable, so only 6 of the 3^16 (~43 million) assignments are proper
+// and a random initial population essentially never contains a solution.
 const GraphColoring::Edge GraphColoring::kEdges[GraphColoring::kEdgeCount] = {
-   {0, 1}, {1, 2}, {2, 3}, {3, 4}, {4, 5}, {5, 0},
-   {6, 0}, {6, 2}, {6, 4},
-   {7, 1}, {7, 3}, {7, 5}
+   {0, 1}, {1, 2}, {0, 2}, {1, 3}, {2, 3}, {2, 4}, {3, 4}, {3, 5}, {4, 5}, {3, 6},
+   {5, 6}, {3, 7}, {5, 7}, {4, 8}, {5, 8}, {4, 9}, {8, 9}, {3, 10}, {4, 10}, {2, 11},
+   {4, 11}, {8, 12}, {9, 12}, {4, 13}, {9, 13}, {4, 14}, {11, 14}, {2, 15}, {11, 15}
 };
 
 const char* GraphColoring::kNodeNames[GraphColoring::kNodeCount] = {
-   "A", "B", "C", "D", "E", "F", "G", "H"
+   "A", "B", "C", "D", "E", "F", "G", "H",
+   "I", "J", "K", "L", "M", "N", "O", "P"
 };
 
 const char* GraphColoring::kColorNames[GraphColoring::kColorCount] = {

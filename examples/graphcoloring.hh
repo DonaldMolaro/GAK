@@ -13,9 +13,9 @@ public:
                            double fitness) const override;
    void validatePopulation(const Population& population) const override;
 
-   static const int kNodeCount = 8;
+   static const int kNodeCount = 16;
    static const int kColorCount = 3;
-   static const int kEdgeCount = 12;
+   static const int kEdgeCount = 29;
 
 private:
    struct Edge

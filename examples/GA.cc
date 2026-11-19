@@ -1,4 +1,7 @@
+#include <cctype>
+#include <cerrno>
 #include <cstdlib>
+#include <limits>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -189,10 +192,11 @@ void printGraphColoringInput()
 {
   printSectionHeading("Problem input:");
   printLabeledLine("problem", "3-color graph coloring");
-  printLabeledLine("nodes", "A B C D E F G H");
+  printLabeledLine("nodes", "A B C D E F G H I J K L M N O P");
   printLabeledLine("colors", "red green blue");
-  printLabeledLine("edges", "A-B B-C C-D D-E E-F F-A");
-  printLabeledLine("", "G-A G-C G-E H-B H-D H-F");
+  printLabeledLine("edges", "A-B B-C A-C B-D C-D C-E D-E D-F E-F D-G");
+  printLabeledLine("", "F-G D-H F-H E-I F-I E-J I-J D-K E-K C-L");
+  printLabeledLine("", "E-L I-M J-M E-N J-N E-O L-O C-P L-P");
   std::cout << '\n';
   finishInputSection();
 }
@@ -450,8 +454,8 @@ Population::Settings make_graph_coloring_options()
   Population::Settings options;
   options.operation = Population::OperationMode::Maximize;
   options.numberOfIndividuals = 120;
-  options.numberOfTrials = 7000;
-  options.chromosomeLength = 8;
+  options.numberOfTrials = 20000;
+  options.chromosomeLength = GraphColoring::kNodeCount;
   options.bitMutationRate = 0.02;
   options.crossOverRate = 0.75;
   options.reproduction = Population::ReproductionMode::DisallowDuplicates;
@@ -511,25 +515,70 @@ void usage(std::ostream& out)
   out << "  --help            Show this help\n";
 }
 
+// Strict parsers: the whole string must be a number in range. Empty
+// strings, trailing junk ("12abc"), overflow and negative unsigned values
+// ("-1" would otherwise wrap to 4294967295) are all rejected.
 bool parseInt(const std::string& text, int& value)
 {
-  std::istringstream stream(text);
-  stream >> value;
-  return stream.good() || stream.eof();
+  if (text.empty() || std::isspace(static_cast<unsigned char>(text[0])))
+  {
+    return false;
+  }
+  errno = 0;
+  char* end = nullptr;
+  const long parsed = std::strtol(text.c_str(), &end, 10);
+  if (errno != 0 || *end != '\0' ||
+      parsed < std::numeric_limits<int>::min() || parsed > std::numeric_limits<int>::max())
+  {
+    return false;
+  }
+  value = static_cast<int>(parsed);
+  return true;
+}
+
+bool parsePositiveInt(const std::string& text, int& value)
+{
+  return parseInt(text, value) && value > 0;
 }
 
 bool parseUnsigned(const std::string& text, unsigned int& value)
 {
-  std::istringstream stream(text);
-  stream >> value;
-  return stream.good() || stream.eof();
+  if (text.empty() || !std::isdigit(static_cast<unsigned char>(text[0])))
+  {
+    return false;
+  }
+  errno = 0;
+  char* end = nullptr;
+  const unsigned long long parsed = std::strtoull(text.c_str(), &end, 10);
+  if (errno != 0 || *end != '\0' || parsed > std::numeric_limits<unsigned int>::max())
+  {
+    return false;
+  }
+  value = static_cast<unsigned int>(parsed);
+  return true;
 }
 
-bool parseDouble(const std::string& text, double& value)
+bool parseProbability(const std::string& text, double& value)
 {
-  std::istringstream stream(text);
-  stream >> value;
-  return stream.good() || stream.eof();
+  if (text.empty() || std::isspace(static_cast<unsigned char>(text[0])))
+  {
+    return false;
+  }
+  errno = 0;
+  char* end = nullptr;
+  const double parsed = std::strtod(text.c_str(), &end);
+  if (errno != 0 || *end != '\0' || !(parsed >= 0.0 && parsed <= 1.0))
+  {
+    return false;
+  }
+  value = parsed;
+  return true;
+}
+
+bool reportInvalidValue(const std::string& option, const std::string& value, const char* expected)
+{
+  std::cerr << "Invalid value for " << option << ": '" << value << "' (expected " << expected << ")\n";
+  return false;
 }
 
 bool parseCliOptions(int argc, char* argv[], CliOptions& options)
@@ -566,32 +615,32 @@ bool parseCliOptions(int argc, char* argv[], CliOptions& options)
     if (arg == "--seed")
     {
       options.seedProvided = parseUnsigned(value, options.seed);
-      if (!options.seedProvided) return false;
+      if (!options.seedProvided) return reportInvalidValue(arg, value, "an integer from 0 to 4294967295");
     }
     else if (arg == "--population")
     {
-      options.populationProvided = parseInt(value, options.population);
-      if (!options.populationProvided) return false;
+      options.populationProvided = parsePositiveInt(value, options.population);
+      if (!options.populationProvided) return reportInvalidValue(arg, value, "a positive integer");
     }
     else if (arg == "--trials")
     {
-      options.trialsProvided = parseInt(value, options.trials);
-      if (!options.trialsProvided) return false;
+      options.trialsProvided = parsePositiveInt(value, options.trials);
+      if (!options.trialsProvided) return reportInvalidValue(arg, value, "a positive integer");
     }
     else if (arg == "--mutation")
     {
-      options.mutationProvided = parseDouble(value, options.mutation);
-      if (!options.mutationProvided) return false;
+      options.mutationProvided = parseProbability(value, options.mutation);
+      if (!options.mutationProvided) return reportInvalidValue(arg, value, "a number from 0 to 1");
     }
     else if (arg == "--crossover")
     {
-      options.crossoverProvided = parseDouble(value, options.crossover);
-      if (!options.crossoverProvided) return false;
+      options.crossoverProvided = parseProbability(value, options.crossover);
+      if (!options.crossoverProvided) return reportInvalidValue(arg, value, "a number from 0 to 1");
     }
     else if (arg == "--grid")
     {
-      options.gridProvided = parseInt(value, options.grid);
-      if (!options.gridProvided) return false;
+      options.gridProvided = parsePositiveInt(value, options.grid);
+      if (!options.gridProvided) return reportInvalidValue(arg, value, "a positive integer");
     }
     else if (arg == "--report-json")
     {
@@ -675,7 +724,7 @@ int runPopulation(Population& population, const CliOptions& cli)
 }
 }
 
-int main(int argc,char *argv[])
+int runGa(int argc, char *argv[])
 {
   CliOptions cli;
   if (!parseCliOptions(argc, argv, cli))
@@ -788,5 +837,21 @@ int main(int argc,char *argv[])
     default:
       usage(std::cerr);
       return EXIT_FAILURE;
+  }
+}
+
+int main(int argc, char *argv[])
+{
+  // Configuration problems (for example a population too small for the
+  // deletion mode) surface as GAFatalException; report them cleanly instead
+  // of terminating with an uncaught exception.
+  try
+  {
+    return runGa(argc, argv);
+  }
+  catch (const std::exception& error)
+  {
+    std::cerr << "GA: " << error.what() << '\n';
+    return EXIT_FAILURE;
   }
 }

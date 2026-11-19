@@ -34,8 +34,14 @@ public:
   int bitsPerValue() const         { return baseLength; }
   int bitCount() const             { return bitLength; }
 
-  // Read or write the symbolic value stored at a gene position.
+  // Read or write the symbolic value stored at a gene position. Within a
+  // gene the lowest-numbered bit is the least significant. `setValue` throws
+  // if `value` is outside [0, states()).
   int valueAt(int index) const;
+  // Decode the raw bit range [startBit, endBit) as an unsigned integer with
+  // the lowest-numbered bit as the MOST significant (the opposite order to
+  // `valueAt`). Intended for binary encodings of numeric parameters; do not
+  // mix it with `valueAt` on the same field.
   int decodeBits(int startBit, int endBit) const;
   void setValue(int index,int value = 1);
   void clearValue(int index);

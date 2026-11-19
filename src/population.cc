@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
-#include <ctime>
+#include <random>
 #include <iomanip>
 #include <iostream>
 #include <stdexcept>
@@ -13,10 +13,15 @@
 #include "population.hh"
 #include "population_report.hh"
 #include "except.hh"
+#include "random.hh"
 
 namespace
 {
 constexpr double kFitnessSelectionEpsilon = 1e-12;
+// Upper bound on mating attempts per replacement slot in one generation.
+constexpr long kMaxMatingsPerReplacement = 50;
+// Consecutive generations with zero insertions before a run is declared stalled.
+constexpr int kMaxStalledGenerations = 50;
 
 bool IsVerboseEnabled()
 {
@@ -36,9 +41,9 @@ Population::Population(const Settings& settings, PopulationProblem& problem)
    }
    else
    {
-      std::time_t currenttime;
-      std::time(&currenttime);
-      setRandomSeed(static_cast<unsigned int>(currenttime));
+      // random_device rather than time() so populations created in the same
+      // second do not share a seed.
+      setRandomSeed(std::random_device{}());
    }
    problem_.validatePopulation(*this);
 }
@@ -150,10 +155,14 @@ Population::PopulationSummary Population::buildPopulationSummary() const
    summary.mostFit.reserve(summaryCount);
    summary.leastFit.reserve(summaryCount);
 
+   // The table is sorted ascending, so the fittest end depends on the
+   // optimization direction.
+   const bool maximize = settings_.operation == Population::OperationMode::Maximize;
    for ( int i = 0 ; i < summaryCount ; i++ )
    {
-      summary.mostFit.push_back(fitnessTable[(settings_.numberOfIndividuals - 1) - i]);
-      summary.leastFit.push_back(fitnessTable[i]);
+      const int highIndex = (settings_.numberOfIndividuals - 1) - i;
+      summary.mostFit.push_back(fitnessTable[maximize ? highIndex : i]);
+      summary.leastFit.push_back(fitnessTable[maximize ? i : highIndex]);
    }
    return summary;
 }
@@ -191,8 +200,7 @@ int Population::randomIndex(int upperBoundExclusive)
       throw GAFatalException(__FILE__,__LINE__,"Random index requested with non-positive upper bound");
    }
 
-   std::uniform_int_distribution<int> distribution(0, upperBoundExclusive - 1);
-   return distribution(randomGenerator);
+   return gak::uniformIndex(randomGenerator, upperBoundExclusive);
 }
 
 long Population::randomBelow(long upperBoundExclusive)
@@ -202,8 +210,7 @@ long Population::randomBelow(long upperBoundExclusive)
       throw GAFatalException(__FILE__,__LINE__,"Random value requested with non-positive upper bound");
    }
 
-   std::uniform_int_distribution<long> distribution(0, upperBoundExclusive - 1);
-   return distribution(randomGenerator);
+   return gak::uniformInt(randomGenerator, 0, upperBoundExclusive - 1);
 }
 
 bool Population::appendReplacement(std::vector<std::unique_ptr<Chromosome> >& replacementList,
@@ -234,6 +241,26 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
    RunResult result;
    result.randomSeed = activeRandomSeed_;
    result.usedConfiguredSeed = settings_.useFixedRandomSeed;
+   if (settings_.numberOfIndividuals <= 0)
+   {
+      throw GAFatalException(__FILE__,__LINE__,"Population requires at least one individual");
+   }
+   if (!(settings_.crossOverRate >= 0.0 && settings_.crossOverRate <= 1.0))
+   {
+      throw GAFatalException(__FILE__,__LINE__,"Crossover rate must be between 0 and 1");
+   }
+   if (!(settings_.bitMutationRate >= 0.0 && settings_.bitMutationRate <= 1.0))
+   {
+      throw GAFatalException(__FILE__,__LINE__,"Mutation rate must be between 0 and 1");
+   }
+   const int numToReplace = replacementCount();
+   if (numToReplace < 1 || numToReplace > settings_.numberOfIndividuals)
+   {
+      // A generation that replaces nobody never advances the trial count,
+      // so the run would never terminate.
+      throw GAFatalException(__FILE__,__LINE__,
+                             "Deletion mode replaces no individuals (or more than exist) for this population size");
+   }
    int numberBorn = initializePopulation();
    evaluatePopulation();
    if (hasReachedSolution())
@@ -246,11 +273,13 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
       return result;
    }
    int numGen = 0;
-   const int numToReplace = replacementCount();
+   int stalledGenerations = 0;
    while ( numberBorn < settings_.numberOfTrials )
    {
       std::vector<std::unique_ptr<Chromosome> > replacementList = breedPopulation(numToReplace);
-      numberBorn += insertNewPopulation(std::move(replacementList),numToReplace);
+      const int inserted = insertNewPopulation(std::move(replacementList),numToReplace);
+      numberBorn += inserted;
+      stalledGenerations = (inserted == 0) ? stalledGenerations + 1 : 0;
       evaluatePopulation();
       const bool solutionFound = hasReachedSolution();
       if (captureGenerationSummaries)
@@ -276,6 +305,15 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
       {
          result.stoppedEarly = true;
          result.solutionFound = true;
+         break;
+      }
+      if (stalledGenerations >= kMaxStalledGenerations)
+      {
+         // Duplicate rejection has stopped producing any new individuals
+         // (typically a converged population), so the trial budget can never
+         // be consumed.
+         result.stoppedEarly = true;
+         result.stalled = true;
          break;
       }
    }
@@ -332,7 +370,14 @@ void Population::evaluatePopulation()
    {
       if (!fitnessEvaluated[i])
       {
-	 fitnessTable[i] = problem_.evaluateFitness(populationTable[i].get()->genes());
+	 const double fitness = problem_.evaluateFitness(populationTable[i].get()->genes());
+	 if (!std::isfinite(fitness))
+	 {
+	    // NaN breaks the ordering std::stable_sort relies on, and neither
+	    // NaN nor infinity can be written to a JSON report.
+	    throw GAFatalException(__FILE__,__LINE__,"evaluateFitness returned a non-finite value (NaN or infinity)");
+	 }
+	 fitnessTable[i] = fitness;
          fitnessEvaluated[i] = true;
       }
    }
@@ -352,72 +397,97 @@ void Population::evaluatePopulation()
    return;
 }
 //
-// Roulette Wheel parrent select.
-// Select a parrent based upon the total Fitness of the
-// population.
+// Roulette wheel parent selection.
 //
-int Population::selectParent(const std::vector<double>& rouletteTable)
+// The wheel (cumulative weights, already oriented so that larger means
+// fitter) is built once per generation by `buildSelectionWheel`, and each
+// parent pick is then a single binary search, so breeding is O(N log N)
+// rather than O(N^2).
+//
+Population::SelectionWheel Population::buildSelectionWheel(const std::vector<double>& rouletteTable) const
 {
-  double totalFitness = 0.0;
-  double maximumFitness = 0.0;
-   
-  for ( int i = 0 ; i < settings_.numberOfIndividuals ; i++ )
-    {
-      totalFitness += rouletteTable[i];
-      if (rouletteTable[i] > maximumFitness) maximumFitness = rouletteTable[i];
-    }
-   
-  std::vector<double> invertedrouletteTable(settings_.numberOfIndividuals);
-  double invertedTotalFitness = 0.00;
-
-   for ( int i = 0 ; i < settings_.numberOfIndividuals ; i++ )
-     {
-       double invertedFitness = (maximumFitness - rouletteTable[i]) + 1.00;
-       invertedrouletteTable[i] = invertedFitness;
-       invertedTotalFitness += invertedFitness;
-     }
-   
-   auto selectFromWeights = [&](const std::vector<double>& weights, double totalWeight) -> int
-   {
-      std::uniform_real_distribution<double> distribution(0.0, totalWeight);
-      double selectValue = distribution(randomGenerator);
-      for ( int i = 0 ; i < settings_.numberOfIndividuals ; i++ )
-      {
-         selectValue -= weights[i];
-         if (selectValue <= 0.0)
-         {
-            return i;
-         }
-      }
-
-      for (int i = settings_.numberOfIndividuals - 1 ; i >= 0 ; --i)
-      {
-         if (weights[i] > kFitnessSelectionEpsilon)
-         {
-            return i;
-         }
-      }
-
-      return randomIndex(settings_.numberOfIndividuals);
-   };
+   const int count = settings_.numberOfIndividuals;
+   std::vector<double> weights(rouletteTable.begin(), rouletteTable.begin() + count);
 
    switch (settings_.operation)
-     {
-     case Population::OperationMode::Maximize:
-       if (totalFitness <= kFitnessSelectionEpsilon)
-       {
-          return randomIndex(settings_.numberOfIndividuals);
-       }
-       return selectFromWeights(rouletteTable, totalFitness);
-     case Population::OperationMode::Minimize:
-       if (invertedTotalFitness <= kFitnessSelectionEpsilon)
-       {
-          return randomIndex(settings_.numberOfIndividuals);
-       }
-       return selectFromWeights(invertedrouletteTable, invertedTotalFitness);
-     default:
-       throw GAFatalException(__FILE__,__LINE__,"Unsupported operation technique");
-     }
+   {
+   case Population::OperationMode::Maximize:
+      if (settings_.fitness == Population::FitnessMode::Evaluation)
+      {
+         for (double weight : weights)
+         {
+            if (weight < 0.0)
+            {
+               throw GAFatalException(__FILE__,__LINE__,
+                                      "Roulette selection with FitnessMode::Evaluation requires non-negative "
+                                      "fitness when maximizing; use FitnessMode::Windowed or LinearNormalized");
+            }
+         }
+      }
+      break;
+   case Population::OperationMode::Minimize:
+      // Windowed weights are already oriented so the best (smallest)
+      // fitness gets the largest weight; inverting them again would favour
+      // the worst candidates. Other tables are inverted around their maximum
+      // so every weight is at least 1.
+      if (settings_.fitness != Population::FitnessMode::Windowed && count > 0)
+      {
+         const double maximumFitness = *std::max_element(weights.begin(), weights.end());
+         for (double& weight : weights)
+         {
+            weight = (maximumFitness - weight) + 1.00;
+         }
+      }
+      break;
+   default:
+      throw GAFatalException(__FILE__,__LINE__,"Unsupported operation technique");
+   }
+
+   SelectionWheel wheel;
+   wheel.cumulative.resize(count);
+   double total = 0.0;
+   for (int i = 0 ; i < count ; i++)
+   {
+      total += weights[i];
+      wheel.cumulative[i] = total;
+   }
+   wheel.total = total;
+   wheel.uniform = total <= kFitnessSelectionEpsilon;
+   return wheel;
+}
+
+int Population::spinSelectionWheel(const SelectionWheel& wheel)
+{
+   const int count = settings_.numberOfIndividuals;
+   if (wheel.uniform)
+   {
+      return randomIndex(count);
+   }
+
+   const double selectValue = gak::uniformReal(randomGenerator, 0.0, wheel.total);
+   // upper_bound so a pick of exactly 0.0 cannot land on a zero-weight entry.
+   const auto found = std::upper_bound(wheel.cumulative.begin(), wheel.cumulative.end(), selectValue);
+   if (found != wheel.cumulative.end())
+   {
+      return static_cast<int>(found - wheel.cumulative.begin());
+   }
+
+   // Floating-point slack put the pick past the end: fall back to the last
+   // entry that actually carries weight.
+   for (int i = count - 1 ; i >= 0 ; --i)
+   {
+      const double previous = (i == 0) ? 0.0 : wheel.cumulative[i - 1];
+      if (wheel.cumulative[i] - previous > kFitnessSelectionEpsilon)
+      {
+         return i;
+      }
+   }
+   return randomIndex(count);
+}
+
+int Population::selectParent(const std::vector<double>& rouletteTable)
+{
+   return spinSelectionWheel(buildSelectionWheel(rouletteTable));
 }
 
 const std::vector<double>& Population::selectFitnessWeights()
@@ -447,15 +517,19 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
    {
    case Population::ParentSelectionMode::RouletteWheel:
    case Population::ParentSelectionMode::Random:
-      while (static_cast<int>(replacementList.size()) < numberToReplace)
+   {
+      const bool roulette = settings_.parentSelection == Population::ParentSelectionMode::RouletteWheel;
+      // Weights cannot change while breeding, so build the wheel once.
+      const SelectionWheel wheel = roulette ? buildSelectionWheel(selectFitnessWeights()) : SelectionWheel();
+      // Bound the number of matings so duplicate rejection cannot loop
+      // forever when fewer distinct children exist than slots to fill.
+      for (long matings = 0 ;
+           static_cast<int>(replacementList.size()) < numberToReplace &&
+           matings < static_cast<long>(numberToReplace) * kMaxMatingsPerReplacement ;
+           ++matings)
       {
-	 const std::vector<double>& fitnessWeights = selectFitnessWeights();
-	 const int fatherIndex = (settings_.parentSelection == Population::ParentSelectionMode::RouletteWheel)
-	    ? selectParent(fitnessWeights)
-	    : selectRandomParent();
-	 const int motherIndex = (settings_.parentSelection == Population::ParentSelectionMode::RouletteWheel)
-	    ? selectParent(fitnessWeights)
-	    : selectRandomParent();
+	 const int fatherIndex = roulette ? spinSelectionWheel(wheel) : selectRandomParent();
+	 const int motherIndex = roulette ? spinSelectionWheel(wheel) : selectRandomParent();
          std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
             mateChromosomes(*populationTable[motherIndex], *populationTable[fatherIndex]);
          mutateChromosome(*children.first);
@@ -486,6 +560,7 @@ std::vector<std::unique_ptr<Chromosome> > Population::breedPopulation(int number
 	 }
       }
       break;
+   }
    default:
       throw GAFatalException(__FILE__,__LINE__,"Unsupported parent selection technique");
    }
@@ -497,34 +572,15 @@ std::unique_ptr<Chromosome> Population::createInitialChromosome()
    return problem_.initializeCandidate(*this);
 }
 
-std::unique_ptr<Chromosome> Population::createDefaultChromosome()
-{
-   return std::make_unique<Chromosome>(settings_.chromosomeLength,
-                                       settings_.variableLength == Population::VariableLengthMode::Variable,
-                                       settings_.baseStates,
-                                       &randomGenerator);
-}
-
 std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
 Population::mateChromosomes(Chromosome& mother, Chromosome& father)
 {
    return problem_.mateCandidates(*this, mother, father);
 }
 
-std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-Population::mateDefaultChromosomes(Chromosome& mother, Chromosome& father)
-{
-   return mother.mate(father,settings_.crossOverRate,Chromosome::CrossoverType::SinglePoint,&randomGenerator);
-}
-
 void Population::mutateChromosome(Chromosome& chromosome)
 {
    problem_.mutateCandidate(*this, chromosome);
-}
-
-void Population::mutateDefaultChromosome(Chromosome& chromosome)
-{
-   chromosome.mutate(settings_.bitMutationRate, &randomGenerator);
 }
 
 bool Population::containsChromosome(const Chromosome& candidate,
@@ -553,7 +609,8 @@ int Population::insertNewPopulation(std::vector<std::unique_ptr<Chromosome> > re
       throw GAFatalException(__FILE__,__LINE__,"Cannot replace more individuals than exist in the population");
    }
    int replaced = 0;
-   for ( int i = 0 ; i < numToReplace; i++ )
+   const int available = std::min(numToReplace, static_cast<int>(replacementList.size()));
+   for ( int i = 0 ; i < available; i++ )
    {
       const int index = replacementSlotIndex(i);
       if (settings_.reproduction == Population::ReproductionMode::DisallowDuplicates &&
@@ -581,7 +638,9 @@ void Population::sortPopulation()
       order[i] = i;
    }
 
-   std::sort(order.begin(), order.end(),
+   // stable_sort so tied fitness values keep a defined order on every
+   // standard library, which keeps fixed-seed runs reproducible.
+   std::stable_sort(order.begin(), order.end(),
              [this](int left, int right) { return fitnessTable[left] < fitnessTable[right]; });
 
    std::vector<double> sortedFitness(settings_.numberOfIndividuals);

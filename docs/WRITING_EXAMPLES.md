@@ -11,10 +11,10 @@ subclass `Population`.
 
 Good files to study before adding a new example:
 
-1. [examples/nqueens.hh](/Users/donaldmolaro/src/GAK/examples/nqueens.hh) and [examples/nqueens.cc](/Users/donaldmolaro/src/GAK/examples/nqueens.cc)
-2. [examples/knapsack.hh](/Users/donaldmolaro/src/GAK/examples/knapsack.hh) and [examples/knapsack.cc](/Users/donaldmolaro/src/GAK/examples/knapsack.cc)
-3. [examples/sudoku_constrained.hh](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.hh) and [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
-4. [examples/GA.cc](/Users/donaldmolaro/src/GAK/examples/GA.cc)
+1. [examples/nqueens.hh](../examples/nqueens.hh) and [examples/nqueens.cc](../examples/nqueens.cc)
+2. [examples/knapsack.hh](../examples/knapsack.hh) and [examples/knapsack.cc](../examples/knapsack.cc)
+3. [examples/sudoku_constrained.hh](../examples/sudoku_constrained.hh) and [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc)
+4. [examples/GA.cc](../examples/GA.cc)
 
 ## Choose The Right Example Style
 
@@ -198,9 +198,9 @@ operators do not understand.
 To make a new example part of the supported tree:
 
 1. Add the `.hh` and `.cc` files under `examples/`
-2. Update [examples/Makefile](/Users/donaldmolaro/src/GAK/examples/Makefile)
-3. Add a mode in [examples/GA.cc](/Users/donaldmolaro/src/GAK/examples/GA.cc)
-4. Add focused checks in [examples/test_main.cc](/Users/donaldmolaro/src/GAK/examples/test_main.cc)
+2. Update [examples/Makefile](../examples/Makefile)
+3. Add a mode in [examples/GA.cc](../examples/GA.cc)
+4. Add focused checks in [examples/test_main.cc](../examples/test_main.cc)
 
 ## Testing Guidance
 

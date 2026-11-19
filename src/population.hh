@@ -53,6 +53,9 @@ public:
       int numberOfIndividuals = 100;
       int numberOfTrials = 4000;
       int chromosomeLength = 44;
+      // Per-gene probability that mutation changes a gene (binary genes flip;
+      // symbolic genes move to a different value). Applies to symbolic
+      // chromosomes too despite the historical name.
       double bitMutationRate = 0.008;
       double crossOverRate = 0.65;
       ReproductionMode reproduction = ReproductionMode::AllowDuplicates;
@@ -68,7 +71,9 @@ public:
    struct PopulationSummary
    {
       // Snapshot of the strongest and weakest fitness values observed in a
-      // generation or at the end of a run.
+      // generation or at the end of a run. "Fit" follows the operation mode:
+      // `mostFit` runs best-first and `leastFit` worst-first, so under
+      // Minimize `mostFit` holds the smallest values.
       std::vector<double> mostFit;
       std::vector<double> leastFit;
    };
@@ -81,6 +86,9 @@ public:
       bool usedConfiguredSeed = false;
       bool stoppedEarly = false;
       bool solutionFound = false;
+      // True when the run stopped because duplicate rejection kept every
+      // child out of the population for many consecutive generations.
+      bool stalled = false;
       int generationsCompleted = 0;
       int evaluations = 0;
       std::vector<GenerationReport> generationReports;
@@ -119,6 +127,14 @@ private:
    int randomIndex(int upperBoundExclusive);
    long randomBelow(long upperBoundExclusive);
    const std::vector<double>& selectFitnessWeights();
+   struct SelectionWheel
+   {
+      std::vector<double> cumulative;
+      double total = 0.0;
+      bool uniform = true;
+   };
+   SelectionWheel buildSelectionWheel(const std::vector<double>& rouletteTable) const;
+   int spinSelectionWheel(const SelectionWheel& wheel);
    int selectParent(const std::vector<double>& rouletteTable);
    std::vector<std::unique_ptr<Chromosome> > breedPopulation(int numberToReplace);
    bool containsChromosome(const Chromosome& candidate,
@@ -132,10 +148,6 @@ private:
    std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
       mateChromosomes(Chromosome& mother, Chromosome& father);
    void mutateChromosome(Chromosome& chromosome);
-   std::unique_ptr<Chromosome> createDefaultChromosome();
-   std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
-      mateDefaultChromosomes(Chromosome& mother, Chromosome& father);
-   void mutateDefaultChromosome(Chromosome& chromosome);
 public:
    Population(const Settings& settings, PopulationProblem& problem);
    ~Population();

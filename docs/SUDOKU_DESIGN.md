@@ -2,8 +2,8 @@
 
 This repo contains two Sudoku examples:
 
-- [examples/sudoku.cc](/Users/donaldmolaro/src/GAK/examples/sudoku.cc)
-- [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
+- [examples/sudoku.cc](../examples/sudoku.cc)
+- [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc)
 
 They solve the same fixed 9x9 puzzle, but they use very different genetic
 operator strategies. Reading them together is the clearest way to understand
@@ -110,7 +110,7 @@ the constraint-aware Sudoku example is the better starting point.
 ## Design Lessons For The Rest Of The Project
 
 This comparison led directly to the modern extension points in
-[src/population.hh](/Users/donaldmolaro/src/GAK/src/population.hh):
+[src/population.hh](../src/population.hh):
 
 - `initializeCandidate(...)`
 - `mateCandidates(...)`
@@ -127,9 +127,9 @@ That is the intended modernization direction for this codebase:
 
 ## Which Sudoku Example Should You Study First
 
-Read [examples/sudoku.cc](/Users/donaldmolaro/src/GAK/examples/sudoku.cc) first
+Read [examples/sudoku.cc](../examples/sudoku.cc) first
 if you want to understand the baseline encoding and fitness approach.
 
-Read [examples/sudoku_constrained.cc](/Users/donaldmolaro/src/GAK/examples/sudoku_constrained.cc)
+Read [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc)
 first if you want to understand how to build strong constrained examples in the
 modernized library.

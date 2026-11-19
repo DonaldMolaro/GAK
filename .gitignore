@@ -6,6 +6,7 @@
 *.a
 GA
 gak_tests
+example_tests
 
 # Coverage artifacts
 *.profraw

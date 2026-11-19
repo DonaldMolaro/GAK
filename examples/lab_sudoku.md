@@ -9,7 +9,7 @@ See why operator design matters more than parameter tuning for some problems.
 ## Run
 
 ```sh
-cd /Users/donaldmolaro/src/GAK/examples
+cd examples   # from the repository root
 ./GA U --seed 1
 ./GA C --seed 1
 ```

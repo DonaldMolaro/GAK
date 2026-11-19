@@ -38,6 +38,12 @@ int LatinSquare::squareSize(const BaseString& genes) const
    return size;
 }
 
+bool LatinSquare::hasReachedSolution(const Population&, const BaseString& genes, double fitness) const
+{
+   const int size = squareSize(genes);
+   return fitness >= 2.0 * size * size;
+}
+
 double LatinSquare::evaluateFitness(const BaseString& genes)
 {
    const int size = squareSize(genes);

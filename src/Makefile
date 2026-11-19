@@ -3,14 +3,14 @@ CXX ?= c++
 CXXFLAGS ?= -O2 -g -std=c++14
 WARNING_FLAGS = -Wall -Wextra -Wpedantic
 CPPFLAGS ?=
-CPPFLAGS += -I.
+override CPPFLAGS += -I.
 DEPFLAGS = -MMD -MP
 
-CXXFLAGS += $(WARNING_FLAGS)
+override CXXFLAGS += $(WARNING_FLAGS)
 
 ifeq ($(COVERAGE),1)
-CXXFLAGS += -fprofile-instr-generate -fcoverage-mapping
-LDFLAGS += -fprofile-instr-generate
+override CXXFLAGS += -fprofile-instr-generate -fcoverage-mapping
+override LDFLAGS += -fprofile-instr-generate
 endif
 
 LIB = libga.a

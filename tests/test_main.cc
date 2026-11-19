@@ -1,5 +1,6 @@
 #include <cstdlib>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <random>
 #include <sstream>
@@ -9,6 +10,7 @@
 #include "base.hh"
 #include "chromosome.hh"
 #include "except.hh"
+#include "random.hh"
 
 #include "population.hh"
 #include "population_report.hh"
@@ -31,6 +33,11 @@ public:
   static void evaluatePopulation(Population& population)
   {
     population.evaluatePopulation();
+  }
+
+  static Population::PopulationSummary buildPopulationSummary(const Population& population)
+  {
+    return population.buildPopulationSummary();
   }
 
   static int randomIndex(Population& population, int upper_bound_exclusive)
@@ -1598,6 +1605,343 @@ void test_delete_all_but_best_runs()
 	      "Best chromosome should remain present after DeleteAllButBest runs");
 }
 
+void test_windowed_minimize_selection_favours_best()
+{
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Minimize, 3, 3, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Windowed,
+						    Population::VariableLengthMode::Fixed, 3));
+  PopulationTestRig::initializePopulation(pop);
+  for (int i = 0 ; i < 3 ; i++)
+    {
+      BaseString genes(1, 3);
+      genes.setValue(0, i);
+      PopulationTestRig::chromosomes(pop)[i] = std::make_unique<Chromosome>(std::move(genes), false, 3);
+      PopulationTestRig::evaluatedFitness(pop)[i] = false;
+    }
+  PopulationTestRig::setPopulationInitialized(pop, true);
+  PopulationTestRig::evaluatePopulation(pop);
+
+  // Sorted ascending: index 0 holds fitness 0 (best when minimizing).
+  int picks[3] = {0, 0, 0};
+  for (int draw = 0 ; draw < 3000 ; draw++)
+    {
+      picks[PopulationTestRig::selectParent(pop, PopulationTestRig::selectFitnessWeights(pop))]++;
+    }
+  expect_true(picks[0] > picks[2],
+	      "Windowed roulette selection should favour the best candidate when minimizing");
+}
+
+void test_deletion_mode_that_replaces_nobody_throws()
+{
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 3, 100, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteQuarter,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+  expect_throws<GAFatalException>(
+    [&pop]() { (void)pop.execute(); },
+    "DeleteQuarter on a population smaller than 4 should throw instead of hanging");
+
+  InspectablePopulation single(make_population_options(Population::OperationMode::Maximize, 1, 100, 1, 0.0, 0.0,
+						       Population::ReproductionMode::AllowDuplicates,
+						       Population::ParentSelectionMode::RouletteWheel,
+						       Population::DeletionMode::DeleteLast,
+						       Population::FitnessMode::Evaluation,
+						       Population::VariableLengthMode::Fixed, 2));
+  expect_throws<GAFatalException>(
+    [&single]() { (void)single.execute(); },
+    "DeleteLast on a single-member population should throw");
+}
+
+void test_duplicate_rejection_stall_terminates()
+{
+  // Only two distinct 1-bit chromosomes exist, so with duplicates disallowed
+  // a population of 4 quickly stops accepting children.
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 4, 1000000, 1, 0.0, 0.0,
+						    Population::ReproductionMode::DisallowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+  Population::RunResult result = pop.execute();
+  expect_true(result.stalled, "A run that can no longer insert children should report a stall");
+  expect_true(result.stoppedEarly, "A stalled run should be marked as stopped early");
+  expect_true(!result.solutionFound, "A stalled run should not claim a solution");
+  expect_true(result.evaluations < pop.settings().numberOfTrials,
+	      "A stalled run should end before exhausting its trial budget");
+}
+
+void test_mutation_always_changes_genes()
+{
+  std::mt19937 random_generator(11);
+  Chromosome binary(makeBinaryString("01100101"));
+  const std::string before = binary.genes().bitString();
+  binary.mutate(1.0, &random_generator);
+  for (int i = 0 ; i < binary.length() ; i++)
+    {
+      expect_true(binary.genes().valueAt(i) != (before[i] - '0'),
+		  "Binary mutation with probability one should flip every bit");
+    }
+
+  BaseString symbolic_genes(6, 5);
+  for (int i = 0 ; i < 6 ; i++)
+    {
+      symbolic_genes.setValue(i, i % 5);
+    }
+  Chromosome symbolic(std::move(symbolic_genes), false, 5);
+  symbolic.mutate(1.0, &random_generator);
+  for (int i = 0 ; i < symbolic.length() ; i++)
+    {
+      const int value = symbolic.genes().valueAt(i);
+      expect_true(value != i % 5, "Symbolic mutation with probability one should change every gene");
+      expect_true(value >= 0 && value < 5, "Symbolic mutation should stay in range");
+    }
+}
+
+void test_set_value_rejects_out_of_range_states()
+{
+  BaseString genes(3, 5);
+  genes.setValue(0, 4);
+  expect_true(genes.valueAt(0) == 4, "setValue should accept the largest valid state");
+  expect_throws<GAFatalException>([&genes]() { genes.setValue(1, 5); },
+				  "setValue should reject a value equal to the state count");
+  expect_throws<GAFatalException>([&genes]() { genes.setValue(1, 7); },
+				  "setValue should reject values the packed bits could hold but the alphabet cannot");
+  expect_throws<GAFatalException>([&genes]() { genes.setValue(1, -1); },
+				  "setValue should reject negative values");
+}
+
+void test_chromosome_rejects_mismatched_state_count()
+{
+  expect_throws<GAFatalException>([]() { Chromosome bad(BaseString(4, 3), false, 5); },
+				  "Chromosome should reject a state count that differs from its BaseString");
+}
+
+void test_variable_length_crossover_is_capped()
+{
+  BaseString long_genes(2048, 2);
+  Chromosome mother(BaseString(2048, 2), true, 2);
+  Chromosome father(std::move(long_genes), true, 2);
+  std::mt19937 random_generator(3);
+  for (int trial = 0 ; trial < 50 ; trial++)
+    {
+      std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+	mother.mate(father, 1.0, Chromosome::CrossoverType::SinglePoint, &random_generator);
+      expect_true(children.first->length() <= 2048 && children.second->length() <= 2048,
+		  "Variable-length crossover should never exceed the 2048-gene limit");
+    }
+  expect_throws<GAFatalException>([]() { Chromosome too_long(BaseString(2049, 2), true, 2); },
+				  "Chromosome built from an oversized BaseString should throw");
+}
+
+void test_maximize_roulette_rejects_negative_fitness()
+{
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 2, 2, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+  PopulationTestRig::initializePopulation(pop);
+  std::vector<double> roulette = {-1.0, 2.0};
+  expect_throws<GAFatalException>([&pop, &roulette]() { PopulationTestRig::selectParent(pop, roulette); },
+				  "Maximize roulette on raw fitness should reject negative values");
+}
+
+void test_minimize_roulette_handles_all_negative_fitness()
+{
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Minimize, 2, 2, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+  PopulationTestRig::initializePopulation(pop);
+  // -10 is the best when minimizing; inverted around the true maximum (-1)
+  // it should receive weight 10 against weight 1.
+  std::vector<double> roulette = {-10.0, -1.0};
+  int best = 0;
+  for (int draw = 0 ; draw < 2000 ; draw++)
+    {
+      if (PopulationTestRig::selectParent(pop, roulette) == 0) ++best;
+    }
+  expect_true(best > 1600, "Minimize roulette should strongly favour the most negative fitness");
+}
+
+void test_minimize_summary_is_best_first()
+{
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Minimize, 8, 8, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 8));
+  PopulationTestRig::initializePopulation(pop);
+  for (int i = 0 ; i < 8 ; i++)
+    {
+      BaseString genes(1, 8);
+      genes.setValue(0, 7 - i);
+      PopulationTestRig::chromosomes(pop)[i] = std::make_unique<Chromosome>(std::move(genes), false, 8);
+      PopulationTestRig::evaluatedFitness(pop)[i] = false;
+    }
+  PopulationTestRig::setPopulationInitialized(pop, true);
+  PopulationTestRig::evaluatePopulation(pop);
+
+  Population::RunResult result;
+  result.finalSummary = PopulationTestRig::buildPopulationSummary(pop);
+  const std::vector<double> expected_best = {0.0, 1.0, 2.0, 3.0, 4.0};
+  const std::vector<double> expected_worst = {7.0, 6.0, 5.0, 4.0, 3.0};
+  expect_true(result.finalSummary.mostFit == expected_best,
+	      "Minimize summaries should list the smallest fitness values as most fit, best first");
+  expect_true(result.finalSummary.leastFit == expected_worst,
+	      "Minimize summaries should list the largest fitness values as least fit, worst first");
+
+  std::ostringstream csv;
+  result.generationReports.resize(1);
+  result.generationReports[0].summary = result.finalSummary;
+  PopulationReporter::writeGenerationCsv(csv, pop, result);
+  expect_true(csv.str().find("\n0,0,0.00000000,7.00000000\n") != std::string::npos,
+	      "CSV best_fitness/worst_fitness for a minimize run should be the smallest/largest values");
+}
+
+class NonFiniteFitnessProblem : public PopulationProblem
+{
+public:
+  explicit NonFiniteFitnessProblem(double value) : value_(value) {}
+  double evaluateFitness(const BaseString&) override { return value_; }
+  void printCandidate(const BaseString&, std::ostream&) const override {}
+private:
+  double value_;
+};
+
+void test_non_finite_fitness_throws()
+{
+  const double values[] = {std::numeric_limits<double>::quiet_NaN(),
+                           std::numeric_limits<double>::infinity(),
+                           -std::numeric_limits<double>::infinity()};
+  for (double value : values)
+    {
+      NonFiniteFitnessProblem problem(value);
+      Population pop(make_population_options(Population::OperationMode::Maximize, 4, 8, 2, 0.0, 0.0,
+                                             Population::ReproductionMode::AllowDuplicates,
+                                             Population::ParentSelectionMode::RouletteWheel,
+                                             Population::DeletionMode::DeleteAll,
+                                             Population::FitnessMode::Evaluation,
+                                             Population::VariableLengthMode::Fixed, 2),
+                     problem);
+      expect_throws<GAFatalException>([&pop]() { (void)pop.execute(); },
+                                      "Non-finite fitness values should be rejected");
+    }
+}
+
+void test_out_of_range_crossover_rate_throws()
+{
+  for (double rate : {1.5, -0.5, std::numeric_limits<double>::quiet_NaN()})
+    {
+      InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 4, 8, 2, 0.0, rate,
+                                                        Population::ReproductionMode::AllowDuplicates,
+                                                        Population::ParentSelectionMode::RouletteWheel,
+                                                        Population::DeletionMode::DeleteAll,
+                                                        Population::FitnessMode::Evaluation,
+                                                        Population::VariableLengthMode::Fixed, 2));
+      expect_throws<GAFatalException>([&pop]() { (void)pop.execute(); },
+                                      "Population should reject crossover rates outside [0, 1]");
+    }
+  InspectablePopulation bad_mutation(make_population_options(Population::OperationMode::Maximize, 4, 8, 2, 1.5, 0.5,
+                                                             Population::ReproductionMode::AllowDuplicates,
+                                                             Population::ParentSelectionMode::RouletteWheel,
+                                                             Population::DeletionMode::DeleteAll,
+                                                             Population::FitnessMode::Evaluation,
+                                                             Population::VariableLengthMode::Fixed, 2));
+  expect_throws<GAFatalException>([&bad_mutation]() { (void)bad_mutation.execute(); },
+                                  "Population should reject mutation rates outside [0, 1]");
+
+  Chromosome mother(makeBinaryString("0000"));
+  Chromosome father(makeBinaryString("1111"));
+  expect_throws<GAFatalException>([&]() { (void)mother.mate(father, 1.5); },
+                                  "Chromosome::mate should reject crossover rates above 1");
+}
+
+void test_reporters_restore_stream_state()
+{
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 12, 1, 0.0, 0.0,
+                                                    Population::ReproductionMode::AllowDuplicates,
+                                                    Population::ParentSelectionMode::RouletteWheel,
+                                                    Population::DeletionMode::DeleteAll,
+                                                    Population::FitnessMode::Evaluation,
+                                                    Population::VariableLengthMode::Fixed, 2));
+  Population::RunResult result = pop.execute(true);
+  std::ostringstream out;
+  out.precision(3);
+  const std::ios::fmtflags flags = out.flags();
+  PopulationReporter::write(out, pop, result, PopulationRunReportOptions(true, true));
+  PopulationReporter::writeJson(out, pop, result);
+  PopulationReporter::writeGenerationCsv(out, pop, result);
+  expect_true(out.precision() == 3 && out.flags() == flags,
+              "Reporters should leave the caller's stream formatting unchanged");
+}
+
+void test_verbose_report_prints_generation_snapshot()
+{
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 24, 1, 0.0, 0.0,
+                                                    Population::ReproductionMode::AllowDuplicates,
+                                                    Population::ParentSelectionMode::RouletteWheel,
+                                                    Population::DeletionMode::DeleteAll,
+                                                    Population::FitnessMode::Evaluation,
+                                                    Population::VariableLengthMode::Fixed, 2));
+  Population::RunResult result = pop.execute(true);
+  std::ostringstream out;
+  PopulationReporter::write(out, pop, result, PopulationRunReportOptions(false, true));
+  expect_true(out.str().find("Best Member:") != std::string::npos,
+              "Verbose reports should print each generation's own best-member snapshot");
+  expect_true(out.str().find("Members are:") == std::string::npos,
+              "Verbose reports should not pair the final population with historical fitness values");
+}
+
+void test_portable_random_golden_values()
+{
+  // These values come from the portable helpers alone (raw mt19937 output is
+  // fixed by the standard), so they must match on libstdc++ and libc++.
+  std::mt19937 generator(1);
+  const int expected_indices[5] = {5, 9, 4, 8, 3};
+  for (int i = 0 ; i < 5 ; i++)
+    {
+      expect_true(gak::uniformIndex(generator, 10) == expected_indices[i],
+                  "gak::uniformIndex should produce the documented sequence for seed 1");
+    }
+  const double unit = gak::uniformUnit(generator);
+  expect_true(unit > 0.1281 && unit < 0.1282, "gak::uniformUnit should produce the documented value");
+  expect_true(gak::chance(generator, 0.5) == false, "gak::chance should produce the documented value");
+  expect_true(gak::uniformInt(generator, -5, 5) == -5, "gak::uniformInt should produce the documented value");
+  std::vector<int> values = {0, 1, 2, 3, 4, 5};
+  gak::shuffle(values.begin(), values.end(), generator);
+  expect_true(values == std::vector<int>({3, 1, 5, 0, 4, 2}),
+              "gak::shuffle should produce the documented permutation");
+}
+
+void test_selection_wheel_matches_weights()
+{
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 3, 3, 1, 0.0, 0.0,
+						    Population::ReproductionMode::AllowDuplicates,
+						    Population::ParentSelectionMode::RouletteWheel,
+						    Population::DeletionMode::DeleteAll,
+						    Population::FitnessMode::Evaluation,
+						    Population::VariableLengthMode::Fixed, 2));
+  PopulationTestRig::initializePopulation(pop);
+  std::vector<double> roulette = {0.0, 1.0, 3.0};
+  int picks[3] = {0, 0, 0};
+  for (int draw = 0 ; draw < 4000 ; draw++)
+    {
+      picks[PopulationTestRig::selectParent(pop, roulette)]++;
+    }
+  expect_true(picks[0] == 0, "Zero-weight candidates should never be selected");
+  expect_true(picks[2] > 2 * picks[1], "Selection frequency should follow the roulette weights");
+}
+
 }
 
 int main()
@@ -1647,6 +1991,22 @@ int main()
   test_population_default_operator_hooks_are_explicitly_exercised();
   test_population_operator_strategies_override_default_hooks();
   test_delete_all_but_best_runs();
+  test_windowed_minimize_selection_favours_best();
+  test_deletion_mode_that_replaces_nobody_throws();
+  test_duplicate_rejection_stall_terminates();
+  test_mutation_always_changes_genes();
+  test_set_value_rejects_out_of_range_states();
+  test_chromosome_rejects_mismatched_state_count();
+  test_variable_length_crossover_is_capped();
+  test_maximize_roulette_rejects_negative_fitness();
+  test_minimize_roulette_handles_all_negative_fitness();
+  test_selection_wheel_matches_weights();
+  test_minimize_summary_is_best_first();
+  test_non_finite_fitness_throws();
+  test_out_of_range_crossover_rate_throws();
+  test_reporters_restore_stream_state();
+  test_verbose_report_prints_generation_snapshot();
+  test_portable_random_golden_values();
 
   if (g_failures != 0)
     {

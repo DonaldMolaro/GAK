@@ -84,8 +84,8 @@ At the highest level, `GAK` consists of three layers.
 
 ### 3.1 Core engine
 
-The engine lives primarily in [src/population.hh](/Users/donaldmolaro/src/GAK/src/population.hh) and
-[src/population.cc](/Users/donaldmolaro/src/GAK/src/population.cc).
+The engine lives primarily in [src/population.hh](../src/population.hh) and
+[src/population.cc](../src/population.cc).
 
 Its responsibilities include:
 
@@ -142,7 +142,7 @@ The structured reporting path also supports visual analysis. Each generation
 report can carry the best candidate's fitness, decoded gene values, and an
 optional problem-specific visualization frame. Those frames can then be
 consumed by lightweight tools such as the local browser viewer in
-[examples/viewer.html](/Users/donaldmolaro/src/GAK/examples/viewer.html).
+[examples/viewer.html](../examples/viewer.html).
 
 ### 3.4 Visual feedback and analysis
 
@@ -176,7 +176,7 @@ The current visualization stack supports:
 ## 4. Candidate Representation
 
 The fundamental gene storage type is `BaseString`, implemented in
-[src/base.hh](/Users/donaldmolaro/src/GAK/src/base.hh) and [src/base.cc](/Users/donaldmolaro/src/GAK/src/base.cc).
+[src/base.hh](../src/base.hh) and [src/base.cc](../src/base.cc).
 
 ### 4.1 Packed symbolic representation
 
@@ -210,8 +210,8 @@ on floating-point vectors.
 
 ## 5. Chromosomes And Built-In Operators
 
-`Chromosome`, in [src/chromosome.hh](/Users/donaldmolaro/src/GAK/src/chromosome.hh) and
-[src/chromosome.cc](/Users/donaldmolaro/src/GAK/src/chromosome.cc), wraps a
+`Chromosome`, in [src/chromosome.hh](../src/chromosome.hh) and
+[src/chromosome.cc](../src/chromosome.cc), wraps a
 `BaseString` and provides the built-in operator set used by generic problems.
 
 ### 5.1 Built-in mutation
@@ -478,7 +478,10 @@ search as inherently untestable.
 ### 10.1 Seed control
 
 Runs can be fixed-seed and reported with their active seed, making both
-debugging and experimental comparison much easier.
+debugging and experimental comparison much easier. Seeded runs are identical
+across platforms and standard libraries: random draws go through portable
+helpers in `src/random.hh` that consume only raw `std::mt19937` output, and
+the population sort is stable, so tied fitness values keep a defined order.
 
 ### 10.2 Test coverage
 
@@ -678,9 +681,9 @@ problem structure.
 
 ## References In This Repo
 
-- [README.md](/Users/donaldmolaro/src/GAK/README.md)
-- [docs/PROBLEM_FIT.md](/Users/donaldmolaro/src/GAK/docs/PROBLEM_FIT.md)
-- [docs/WRITING_EXAMPLES.md](/Users/donaldmolaro/src/GAK/docs/WRITING_EXAMPLES.md)
-- [docs/SUDOKU_DESIGN.md](/Users/donaldmolaro/src/GAK/docs/SUDOKU_DESIGN.md)
-- [docs/CROSSOVER_MODES.md](/Users/donaldmolaro/src/GAK/docs/CROSSOVER_MODES.md)
-- [examples/course.md](/Users/donaldmolaro/src/GAK/examples/course.md)
+- [README.md](../README.md)
+- [docs/PROBLEM_FIT.md](PROBLEM_FIT.md)
+- [docs/WRITING_EXAMPLES.md](WRITING_EXAMPLES.md)
+- [docs/SUDOKU_DESIGN.md](SUDOKU_DESIGN.md)
+- [docs/CROSSOVER_MODES.md](CROSSOVER_MODES.md)
+- [examples/course.md](../examples/course.md)
