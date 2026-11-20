@@ -30,15 +30,21 @@ SRCS = test_main.cc
 OBJS = $(SRCS:.cc=.o)
 DEPS = $(OBJS:.o=.d)
 
-.PHONY: all clean run coverage
+.PHONY: all clean FORCE run coverage
 
 all: $(OUTPUT)
 
 $(OUTPUT): $(OBJS) ../src/libga.a
 	$(CXX) $(LDFLAGS) -o $@ $(OBJS) $(LDLIBS)
 
-../src/libga.a:
+# Always ask the library's own (incremental) Makefile to bring libga.a up
+# to date. Without FORCE this rule ran only when libga.a was missing, so
+# building here after the library sources changed linked against a stale
+# library whose structure layouts no longer matched the headers.
+../src/libga.a: FORCE
 	$(MAKE) -C ../src COVERAGE=$(COVERAGE)
+
+FORCE:
 
 %.o: %.cc
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
