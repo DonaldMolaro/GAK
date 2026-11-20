@@ -34,6 +34,6 @@ $(LIB): $(LIBOBJ)
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEPFLAGS) -c -o $@ $<
 
 clean:
-	rm -f *~ *.o core *.d $(LIB)
+	rm -f *~ *.o core *.d $(LIB) *.gcda *.gcno *.gcov
 
 -include $(DEPS)

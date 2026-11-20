@@ -1595,12 +1595,18 @@ void test_population_operator_strategies_override_default_hooks()
 
 void test_delete_all_but_best_runs()
 {
-  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 20, 1, 0.0, 0.0,
+  // Fixed seed: with mutation and crossover off no new 1 bit can appear, so
+  // an unseeded run failed whenever all 6 random initial members were 0
+  // (about 1 run in 64). Seed 1 starts with at least one 1 on every platform.
+  Population::Settings settings = make_population_options(Population::OperationMode::Maximize, 6, 20, 1, 0.0, 0.0,
 						    Population::ReproductionMode::AllowDuplicates,
 						    Population::ParentSelectionMode::RouletteWheel,
 						    Population::DeletionMode::DeleteAllButBest,
 						    Population::FitnessMode::Evaluation,
-						    Population::VariableLengthMode::Fixed, 2));
+						    Population::VariableLengthMode::Fixed, 2);
+  settings.useFixedRandomSeed = true;
+  settings.randomSeed = 1;
+  InspectablePopulation pop(settings);
   std::ostringstream out;
   pop.run(out, PopulationRunReportOptions{false, false});
 
@@ -1928,6 +1934,127 @@ void test_portable_random_golden_values()
               "gak::shuffle should produce the documented permutation");
 }
 
+// Maximize the number of 1 bits; "solved" once every bit is set. The
+// initial population is forced to be all zeros so the solution can only be
+// found by breeding.
+class OneMaxProblem : public PopulationProblem
+{
+public:
+  double evaluateFitness(const BaseString& genes) override
+  {
+    int ones = 0;
+    for (int i = 0 ; i < genes.length() ; i++) ones += genes.valueAt(i);
+    return ones;
+  }
+  void printCandidate(const BaseString&, std::ostream&) const override {}
+  bool hasReachedSolution(const Population&, const BaseString& genes, double fitness) const override
+  {
+    return fitness >= genes.length();
+  }
+  std::unique_ptr<Chromosome> initializeCandidate(Population& population) override
+  {
+    return std::make_unique<Chromosome>(BaseString(population.settings().chromosomeLength, 2), false, 2);
+  }
+};
+
+void test_population_stops_when_solution_found_mid_run()
+{
+  OneMaxProblem problem;
+  Population::Settings settings = make_population_options(Population::OperationMode::Maximize, 20, 200000, 6,
+                                                          0.1, 0.7,
+                                                          Population::ReproductionMode::AllowDuplicates,
+                                                          Population::ParentSelectionMode::Tournament,
+                                                          Population::DeletionMode::DeleteHalf,
+                                                          Population::FitnessMode::Evaluation,
+                                                          Population::VariableLengthMode::Fixed, 2);
+  settings.useFixedRandomSeed = true;
+  settings.randomSeed = 7;
+  Population pop(settings, problem);
+  Population::RunResult result = pop.execute(true);
+  expect_true(result.solutionFound && result.stoppedEarly && !result.stalled,
+              "execute should stop as soon as breeding produces a solution");
+  expect_true(result.generationsCompleted > 0 && result.evaluations < settings.numberOfTrials,
+              "a mid-run solution should end the run before the trial budget is spent");
+  expect_true(!result.generationReports.empty() &&
+              result.generationReports.back().bestCandidateFitness == 6.0 &&
+              result.finalSummary.mostFit.front() == 6.0,
+              "the final generation report should contain the solution");
+}
+
+void test_report_labels_cover_every_mode()
+{
+  struct Case { Population::DeletionMode deletion; Population::FitnessMode fitness;
+                Population::ParentSelectionMode selection; const char* labels[3]; };
+  const Case cases[] = {
+    {Population::DeletionMode::DeleteAll, Population::FitnessMode::Evaluation,
+     Population::ParentSelectionMode::RouletteWheel, {"delete_all", "evaluation", "roulette"}},
+    {Population::DeletionMode::DeleteAllButBest, Population::FitnessMode::Windowed,
+     Population::ParentSelectionMode::Random, {"delete_all_but_best", "windowed", "random"}},
+    {Population::DeletionMode::DeleteHalf, Population::FitnessMode::LinearNormalized,
+     Population::ParentSelectionMode::Tournament, {"delete_half", "linear_normalized", "tournament"}},
+    {Population::DeletionMode::DeleteQuarter, Population::FitnessMode::Evaluation,
+     Population::ParentSelectionMode::RouletteWheel, {"delete_quarter", "evaluation", "roulette"}},
+    {Population::DeletionMode::DeleteLast, Population::FitnessMode::Evaluation,
+     Population::ParentSelectionMode::RouletteWheel, {"delete_last", "evaluation", "roulette"}},
+  };
+  for (const Case& c : cases)
+    {
+      InspectablePopulation pop(make_population_options(Population::OperationMode::Minimize, 8, 16, 2, 0.1, 0.5,
+                                                        Population::ReproductionMode::AllowDuplicates,
+                                                        c.selection, c.deletion, c.fitness,
+                                                        Population::VariableLengthMode::Fixed, 2));
+      Population::RunResult result = pop.execute(true);
+      std::ostringstream json;
+      PopulationReporter::writeJson(json, pop, result);
+      const std::string text = json.str();
+      expect_true(text.find(std::string("\"deletion\": \"") + c.labels[0] + "\"") != std::string::npos &&
+                  text.find(std::string("\"fitness\": \"") + c.labels[1] + "\"") != std::string::npos &&
+                  text.find(std::string("\"parent_selection\": \"") + c.labels[2] + "\"") != std::string::npos,
+                  std::string("JSON report should label deletion/fitness/selection modes: ") + c.labels[0]);
+      expect_true(text.find("\"operation\": \"minimize\"") != std::string::npos,
+                  "JSON report should label the operation mode");
+    }
+}
+
+void test_population_public_helpers_and_validation()
+{
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 2, 2, 1, 0.0, 0.0,
+                                                    Population::ReproductionMode::AllowDuplicates,
+                                                    Population::ParentSelectionMode::RouletteWheel,
+                                                    Population::DeletionMode::DeleteAll,
+                                                    Population::FitnessMode::Evaluation,
+                                                    Population::VariableLengthMode::Fixed, 2));
+  Population& population = pop;
+  expect_true(population.evaluateFitness(makeBinaryString("1")) == 1.0,
+              "Population::evaluateFitness should delegate to the problem");
+
+  InspectablePopulation empty(make_population_options(Population::OperationMode::Maximize, 0, 2, 1, 0.0, 0.0,
+                                                      Population::ReproductionMode::AllowDuplicates,
+                                                      Population::ParentSelectionMode::RouletteWheel,
+                                                      Population::DeletionMode::DeleteAll,
+                                                      Population::FitnessMode::Evaluation,
+                                                      Population::VariableLengthMode::Fixed, 2));
+  expect_throws<GAFatalException>([&empty]() { (void)empty.execute(); },
+                                  "A population with no individuals should be rejected");
+
+  std::vector<std::unique_ptr<Chromosome> > replacements;
+  expect_true(!PopulationTestRig::appendReplacement(pop, replacements, std::unique_ptr<Chromosome>(), 2, true),
+              "appendReplacement should ignore a missing child");
+
+  InspectablePopulation reporting(make_population_options(Population::OperationMode::Maximize, 4, 8, 1, 0.0, 0.0,
+                                                          Population::ReproductionMode::AllowDuplicates,
+                                                          Population::ParentSelectionMode::RouletteWheel,
+                                                          Population::DeletionMode::DeleteAll,
+                                                          Population::FitnessMode::Evaluation,
+                                                          Population::VariableLengthMode::Fixed, 2));
+  Population::RunResult result = reporting.execute(true);
+  reporting.setOperationMode(static_cast<Population::OperationMode>(99));
+  std::ostringstream out;
+  expect_throws<GAFatalException>(
+    [&]() { PopulationReporter::write(out, reporting, result, PopulationRunReportOptions()); },
+    "The text reporter should reject an unsupported operation mode");
+}
+
 void test_tournament_selection()
 {
   for (Population::OperationMode mode : {Population::OperationMode::Maximize, Population::OperationMode::Minimize})
@@ -2066,6 +2193,9 @@ int main()
   test_verbose_report_prints_generation_snapshot();
   test_portable_random_golden_values();
   test_tournament_selection();
+  test_population_stops_when_solution_found_mid_run();
+  test_report_labels_cover_every_mode();
+  test_population_public_helpers_and_validation();
 
   if (g_failures != 0)
     {

@@ -9,6 +9,9 @@ gak_tests
 example_tests
 
 # Coverage artifacts
+*.gcda
+*.gcno
+*.gcov
 *.profraw
 *.profdata
 coverage.txt
