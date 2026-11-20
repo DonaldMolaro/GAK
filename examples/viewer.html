@@ -702,8 +702,13 @@
         note.textContent = visualization.selection_note;
         wrapper.appendChild(note);
       }
+      const inputCount = (visualization.inputs || []).length;
+      const used = Array.isArray(visualization.inputs_used) && inputCount > 1
+        ? `, uses ${visualization.inputs_used.length} of ${inputCount} inputs` +
+          (visualization.inputs_used.length > 0 ? `: ${visualization.inputs_used.join(", ")}` : "")
+        : "";
       caption.textContent = `${visualization.target} ≈ ${visualization.formula}   ` +
-        `(nodes ${visualization.nodes}, train R² ${trainR2}, test R² ${testR2})`;
+        `(nodes ${visualization.nodes}, train R² ${trainR2}, test R² ${testR2}${used})`;
       wrapper.appendChild(caption);
 
       const canvas = document.createElement("canvas");

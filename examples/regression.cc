@@ -17,57 +17,172 @@ constexpr double kVarianceEpsilon = 1e-12;
 constexpr int kCurveSamples = 200;
 constexpr int kSampleCurvePoints = 60;
 
-struct Scaling
+constexpr int kMaxTerms = 8;
+
+// The linear model fitted on top of a formula: y ~= intercept + sum of
+// weights[i] * term i, where the terms are the formula's top-level additive
+// terms (see Expression::additiveTerms). With one term this is the classic
+// linear scaling a + b*f.
+struct TermModel
 {
    double intercept = 0.0;
-   double slope = 0.0;
+   std::vector<double> weights;
 };
 
-// Least-squares a, b minimizing sum (y - (a + b p))^2. A (near-)constant
-// prediction carries no shape information, so it falls back to the mean.
-Scaling fitScaling(const std::vector<double>& predictions, const std::vector<double>& targets)
+// The terms that get a fitted coefficient: the formula's additive terms that
+// depend on an input (a variable-free term only shifts the intercept).
+std::vector<int> modelTerms(const Expression& expression)
 {
-   const std::size_t count = targets.size();
-   double meanP = 0.0;
-   double meanY = 0.0;
-   for (std::size_t i = 0 ; i < count ; i++)
+   std::vector<int> terms;
+   for (int node : expression.additiveTerms(kMaxTerms))
    {
-      meanP += predictions[i];
-      meanY += targets[i];
+      if (expression.usesVariable(node))
+      {
+         terms.push_back(node);
+      }
    }
-   meanP /= static_cast<double>(count);
-   meanY /= static_cast<double>(count);
-
-   double covariance = 0.0;
-   double variance = 0.0;
-   for (std::size_t i = 0 ; i < count ; i++)
-   {
-      covariance += (predictions[i] - meanP) * (targets[i] - meanY);
-      variance += (predictions[i] - meanP) * (predictions[i] - meanP);
-   }
-
-   Scaling scaling;
-   if (variance <= kVarianceEpsilon * static_cast<double>(count))
-   {
-      scaling.intercept = meanY;
-      return scaling;
-   }
-   scaling.slope = covariance / variance;
-   scaling.intercept = meanY - scaling.slope * meanP;
-   return scaling;
+   return terms;
 }
 
-double meanSquaredError(const std::vector<double>& predictions,
-                        const std::vector<double>& targets,
-                        const Scaling& scaling)
+// Least squares for y ~= a + sum w_i t_i, solved on centred data with a tiny
+// ridge so that duplicated or (near-)constant terms cannot make it singular.
+// A term with no variation gets weight 0, so a formula carrying no shape
+// information falls back to predicting the mean.
+TermModel fitTerms(const std::vector<std::vector<double> >& terms, const std::vector<double>& targets)
+{
+   const std::size_t count = targets.size();
+   const std::size_t k = terms.size();
+   TermModel model;
+   model.weights.assign(k, 0.0);
+   double meanY = 0.0;
+   for (double target : targets) meanY += target;
+   meanY /= static_cast<double>(count);
+
+   std::vector<double> means(k, 0.0);
+   for (std::size_t i = 0 ; i < k ; i++)
+   {
+      for (double value : terms[i]) means[i] += value;
+      means[i] /= static_cast<double>(count);
+   }
+   // Normal equations A w = b on centred columns; columns with no variation
+   // are left out (weight 0).
+   std::vector<std::size_t> active;
+   for (std::size_t i = 0 ; i < k ; i++)
+   {
+      double variance = 0.0;
+      for (double value : terms[i]) variance += (value - means[i]) * (value - means[i]);
+      if (variance > kVarianceEpsilon * static_cast<double>(count))
+      {
+         active.push_back(i);
+      }
+   }
+   const std::size_t m = active.size();
+   if (m > 0)
+   {
+      std::vector<double> a(m * m, 0.0);
+      std::vector<double> b(m, 0.0);
+      for (std::size_t r = 0 ; r < m ; r++)
+      {
+         const std::vector<double>& tr = terms[active[r]];
+         for (std::size_t row = 0 ; row < count ; row++)
+         {
+            b[r] += (tr[row] - means[active[r]]) * (targets[row] - meanY);
+         }
+         for (std::size_t c = r ; c < m ; c++)
+         {
+            const std::vector<double>& tc = terms[active[c]];
+            double sum = 0.0;
+            for (std::size_t row = 0 ; row < count ; row++)
+            {
+               sum += (tr[row] - means[active[r]]) * (tc[row] - means[active[c]]);
+            }
+            a[r * m + c] = sum;
+            a[c * m + r] = sum;
+         }
+      }
+      double trace = 0.0;
+      for (std::size_t r = 0 ; r < m ; r++) trace += a[r * m + r];
+      const double ridge = 1e-10 * trace / static_cast<double>(m);
+      for (std::size_t r = 0 ; r < m ; r++) a[r * m + r] += ridge;
+      // Gaussian elimination with partial pivoting.
+      std::vector<double> w(m, 0.0);
+      bool solved = true;
+      for (std::size_t col = 0 ; col < m && solved ; col++)
+      {
+         std::size_t pivot = col;
+         for (std::size_t r = col + 1 ; r < m ; r++)
+         {
+            if (std::fabs(a[r * m + col]) > std::fabs(a[pivot * m + col])) pivot = r;
+         }
+         if (!(std::fabs(a[pivot * m + col]) > 0.0))
+         {
+            solved = false;
+            break;
+         }
+         if (pivot != col)
+         {
+            for (std::size_t c = 0 ; c < m ; c++) std::swap(a[col * m + c], a[pivot * m + c]);
+            std::swap(b[col], b[pivot]);
+         }
+         for (std::size_t r = col + 1 ; r < m ; r++)
+         {
+            const double factor = a[r * m + col] / a[col * m + col];
+            for (std::size_t c = col ; c < m ; c++) a[r * m + c] -= factor * a[col * m + c];
+            b[r] -= factor * b[col];
+         }
+      }
+      if (solved)
+      {
+         for (std::size_t r = m ; r-- > 0 ; )
+         {
+            double sum = b[r];
+            for (std::size_t c = r + 1 ; c < m ; c++) sum -= a[r * m + c] * w[c];
+            w[r] = sum / a[r * m + r];
+         }
+         for (std::size_t r = 0 ; r < m ; r++)
+         {
+            if (std::isfinite(w[r])) model.weights[active[r]] = w[r];
+         }
+      }
+   }
+   model.intercept = meanY;
+   for (std::size_t i = 0 ; i < k ; i++) model.intercept -= model.weights[i] * means[i];
+   return model;
+}
+
+double predictRow(const TermModel& model, const std::vector<std::vector<double> >& terms, std::size_t row)
+{
+   double value = model.intercept;
+   for (std::size_t i = 0 ; i < terms.size() ; i++) value += model.weights[i] * terms[i][row];
+   return value;
+}
+
+double meanSquaredError(const TermModel& model,
+                        const std::vector<std::vector<double> >& terms,
+                        const std::vector<double>& targets)
 {
    double total = 0.0;
-   for (std::size_t i = 0 ; i < targets.size() ; i++)
+   for (std::size_t row = 0 ; row < targets.size() ; row++)
    {
-      const double error = targets[i] - (scaling.intercept + scaling.slope * predictions[i]);
+      const double error = targets[row] - predictRow(model, terms, row);
       total += error * error;
    }
    return total / static_cast<double>(targets.size());
+}
+
+// The values of the model terms on `inputs`; terms.empty() still checks the
+// whole formula is defined, by evaluating its root.
+bool evaluateTerms(const Expression& expression, const std::vector<int>& terms,
+                   const std::vector<std::vector<double> >& inputs,
+                   std::vector<std::vector<double> >& values)
+{
+   if (terms.empty())
+   {
+      std::vector<double> root;
+      values.clear();
+      return expression.evaluate(inputs, root);
+   }
+   return expression.evaluateNodes(inputs, terms, values);
 }
 
 double rSquared(double mse, double variance)
@@ -106,7 +221,7 @@ constexpr double SymbolicRegression::kInvalidFitness;
 SymbolicRegression::SymbolicRegression(Dataset dataset, Config config)
    : dataset_(std::move(dataset)),
      config_(config),
-     instructions_(dataset_.inputCount())
+     instructions_(dataset_.inputCount(), config.variableCopies)
 {
    if (!(config_.holdoutFraction >= 0.0 && config_.holdoutFraction < 1.0))
    {
@@ -206,12 +321,13 @@ SymbolicRegression::Split SymbolicRegression::makeSplit(const Dataset& dataset, 
 
 double SymbolicRegression::scaledError(const Expression& expression, const Split& rows) const
 {
-   thread_local std::vector<double> predictions;
-   if (!expression.evaluate(rows.inputs, predictions))
+   thread_local std::vector<std::vector<double> > values;
+   const std::vector<int> terms = modelTerms(expression);
+   if (!evaluateTerms(expression, terms, rows.inputs, values))
    {
       return std::numeric_limits<double>::infinity();
    }
-   const double mse = meanSquaredError(predictions, rows.targets, fitScaling(predictions, rows.targets));
+   const double mse = meanSquaredError(fitTerms(values, rows.targets), values, rows.targets);
    return std::isfinite(mse) ? mse : std::numeric_limits<double>::infinity();
 }
 
@@ -276,31 +392,64 @@ SymbolicRegression::Fit SymbolicRegression::describe(const BaseString& genes) co
    fit.size = expression.size();
    fit.formula = expression.toString(dataset_.inputNames);
 
-   std::vector<double> predictions;
-   if (!expression.evaluate(train_.inputs, predictions))
+   const std::vector<int> terms = modelTerms(expression);
+   std::vector<std::vector<double> > values;
+   if (!evaluateTerms(expression, terms, train_.inputs, values))
    {
       return fit;
    }
-   const Scaling scaling = fitScaling(predictions, train_.targets);
-   const double trainMse = meanSquaredError(predictions, train_.targets, scaling);
+   const TermModel model = fitTerms(values, train_.targets);
+   const double trainMse = meanSquaredError(model, values, train_.targets);
    if (!std::isfinite(trainMse))
    {
       return fit;
    }
 
    fit.valid = true;
-   fit.intercept = scaling.intercept;
-   fit.slope = scaling.slope;
+   fit.intercept = model.intercept;
+   fit.weights = model.weights;
+   fit.slope = model.weights.size() == 1 ? model.weights[0] : 0.0;
+   for (int node : terms)
+   {
+      fit.terms.push_back(expression.nodeText(dataset_.inputNames, node));
+   }
+   for (int variable : expression.variablesUsed())
+   {
+      fit.inputsUsed.push_back(dataset_.inputNames[variable]);
+   }
    fit.trainRmse = std::sqrt(trainMse);
    fit.trainR2 = rSquared(trainMse, train_.variance);
-   fit.fitness = trainMse / train_.variance + config_.parsimony * fit.size;
+   const double extraTerms = terms.size() > 1 ? static_cast<double>(terms.size() - 1) : 0.0;
+   fit.fitness = trainMse / train_.variance +
+                 config_.parsimony * (fit.size + config_.termPenaltyNodes * extraTerms);
 
-   heldOutScore(expression, fit.intercept, fit.slope, test_, fit.testR2, fit.testRmse);
+   heldOutScore(expression, fit, test_, fit.testR2, fit.testRmse);
    return fit;
 }
 
-// Score a held-out split with the scaling fitted on the training rows.
-void SymbolicRegression::heldOutScore(const Expression& expression, double intercept, double slope,
+bool SymbolicRegression::predictRows(const Expression& expression, const Fit& fit,
+                                     const std::vector<std::vector<double> >& inputs,
+                                     std::vector<double>& predictions) const
+{
+   const std::vector<int> terms = modelTerms(expression);
+   std::vector<std::vector<double> > values;
+   if (!fit.valid || terms.size() != fit.weights.size() || !evaluateTerms(expression, terms, inputs, values))
+   {
+      return false;
+   }
+   TermModel model;
+   model.intercept = fit.intercept;
+   model.weights = fit.weights;
+   predictions.resize(inputs.size());
+   for (std::size_t row = 0 ; row < inputs.size() ; row++)
+   {
+      predictions[row] = predictRow(model, values, row);
+   }
+   return true;
+}
+
+// Score a held-out split with the model fitted on the training rows.
+void SymbolicRegression::heldOutScore(const Expression& expression, const Fit& fit,
                                       const Split& split, double& r2, double& rmse) const
 {
    r2 = 0.0;
@@ -310,17 +459,20 @@ void SymbolicRegression::heldOutScore(const Expression& expression, double inter
       return;
    }
    std::vector<double> predictions;
-   if (!expression.evaluate(split.inputs, predictions))
+   if (!predictRows(expression, fit, split.inputs, predictions))
    {
       // Defined on the training rows but not on held-out ones: it does not
       // generalize, so report it as having no predictive value.
       rmse = std::sqrt(split.variance);
       return;
    }
-   Scaling scaling;
-   scaling.intercept = intercept;
-   scaling.slope = slope;
-   const double mse = meanSquaredError(predictions, split.targets, scaling);
+   double total = 0.0;
+   for (std::size_t row = 0 ; row < predictions.size() ; row++)
+   {
+      const double error = split.targets[row] - predictions[row];
+      total += error * error;
+   }
+   const double mse = total / static_cast<double>(predictions.size());
    rmse = std::sqrt(mse);
    r2 = rSquared(mse, split.variance);
 }
@@ -386,21 +538,22 @@ bool SymbolicRegression::crossValidationStats(const BaseString& genes, double& m
    const Expression structure = Expression::compile(genes, instructions_);
    std::vector<double> squared;
    squared.reserve(trainRows_.size());
-   std::vector<double> fitPredictions;
-   std::vector<double> heldPredictions;
+   const std::vector<int> terms = modelTerms(structure);
+   std::vector<std::vector<double> > fitValues;
+   std::vector<std::vector<double> > heldValues;
    for (std::size_t fold = 0 ; fold < foldFit_.size() ; fold++)
    {
       Expression expression = structure;
       tuneConstants(expression, foldFit_[fold]);
-      if (!expression.evaluate(foldFit_[fold].inputs, fitPredictions) ||
-          !expression.evaluate(foldHeld_[fold].inputs, heldPredictions))
+      if (!evaluateTerms(expression, terms, foldFit_[fold].inputs, fitValues) ||
+          !evaluateTerms(expression, terms, foldHeld_[fold].inputs, heldValues))
       {
          return false;
       }
-      const Scaling scaling = fitScaling(fitPredictions, foldFit_[fold].targets);
-      for (std::size_t i = 0 ; i < heldPredictions.size() ; i++)
+      const TermModel model = fitTerms(fitValues, foldFit_[fold].targets);
+      for (std::size_t i = 0 ; i < foldHeld_[fold].targets.size() ; i++)
       {
-         const double error = foldHeld_[fold].targets[i] - (scaling.intercept + scaling.slope * heldPredictions[i]);
+         const double error = foldHeld_[fold].targets[i] - predictRow(model, heldValues, i);
          squared.push_back(error * error);
       }
    }
@@ -423,28 +576,46 @@ std::string SymbolicRegression::scaledFormula(const Fit& fit) const
    {
       return "(undefined on the data)";
    }
-   if (fit.slope == 0.0)
+   std::vector<std::size_t> shown;
+   for (std::size_t i = 0 ; i < fit.weights.size() ; i++)
+   {
+      if (fit.weights[i] != 0.0) shown.push_back(i);
+   }
+   if (shown.empty())
    {
       out << fit.intercept;
       return out.str();
    }
-   const bool hasIntercept = std::fabs(fit.intercept) > 1e-9;
-   if (hasIntercept)
+   // Each term is printed with its own fitted coefficient. The coefficient
+   // belongs to the term as split off (any top-level minus sign removed), so
+   // the term's own text is printed, not the whole formula's.
+   bool first = true;
+   if (std::fabs(fit.intercept) > 1e-9)
    {
-      out << fit.intercept << (fit.slope < 0.0 ? " - " : " + ");
+      out << fit.intercept;
+      first = false;
    }
-   else if (fit.slope < 0.0)
+   for (std::size_t i : shown)
    {
-      out << '-';
+      const double weight = fit.weights[i];
+      if (first)
+      {
+         if (weight < 0.0) out << '-';
+      }
+      else
+      {
+         out << (weight < 0.0 ? " - " : " + ");
+      }
+      first = false;
+      // Omit a factor that prints as 1 at the displayed precision.
+      std::ostringstream magnitude;
+      magnitude << std::setprecision(4) << std::fabs(weight);
+      if (magnitude.str() != "1")
+      {
+         out << magnitude.str() << '*';
+      }
+      out << '(' << fit.terms[i] << ')';
    }
-   // Omit a factor that prints as 1 at the displayed precision.
-   std::ostringstream magnitude;
-   magnitude << std::setprecision(4) << std::fabs(fit.slope);
-   if (magnitude.str() != "1")
-   {
-      out << magnitude.str() << '*';
-   }
-   out << '(' << fit.formula << ')';
    return out.str();
 }
 
@@ -498,6 +669,16 @@ void SymbolicRegression::printCandidate(const BaseString& genes, std::ostream& o
          out << " | test R2=" << fit.testR2 << " RMSE=" << fit.testRmse;
       }
       out << std::defaultfloat;
+      // With several inputs, which ones the formula reads is a result in
+      // itself (an input it never uses is one it found irrelevant).
+      if (dataset_.inputCount() > 1)
+      {
+         out << " | uses " << fit.inputsUsed.size() << " of " << dataset_.inputCount() << " inputs:";
+         for (const std::string& name : fit.inputsUsed)
+         {
+            out << ' ' << name;
+         }
+      }
    }
    out << " ::";
 }
@@ -508,7 +689,7 @@ void SymbolicRegression::writeVisualizationJson(const BaseString& genes, std::os
    Expression expression = Expression::compile(genes, instructions_);
    tuneConstants(expression, train_);
    std::vector<double> predictions;
-   const bool defined = fit.valid && expression.evaluate(dataset_.inputs, predictions);
+   const bool defined = predictRows(expression, fit, dataset_.inputs, predictions);
 
    out << "{ \"type\": \"regression\", \"target\": ";
    writeJsonString(out, dataset_.targetName);
@@ -522,6 +703,13 @@ void SymbolicRegression::writeVisualizationJson(const BaseString& genes, std::os
    writeJsonString(out, scaledFormula(fit));
    out << std::setprecision(10)
        << ", \"nodes\": " << fit.size
+       << ", \"inputs_used\": [";
+   for (std::size_t i = 0 ; i < fit.inputsUsed.size() ; i++)
+   {
+      if (i > 0) out << ", ";
+      writeJsonString(out, fit.inputsUsed[i]);
+   }
+   out << "]"
        << ", \"train_r2\": " << (fit.valid ? fit.trainR2 : 0.0)
        << ", \"test_r2\": " << (fit.valid ? fit.testR2 : 0.0)
        << ", \"points\": [";
@@ -540,7 +728,7 @@ void SymbolicRegression::writeVisualizationJson(const BaseString& genes, std::os
       out << "], \"y\": " << dataset_.targets[row];
       if (defined)
       {
-         out << ", \"predicted\": " << (fit.intercept + fit.slope * predictions[row]);
+         out << ", \"predicted\": " << predictions[row];
       }
       out << ", \"set\": \"" << (isTest[row] ? "test" : "train") << "\" }";
    }
@@ -562,13 +750,13 @@ void SymbolicRegression::writeVisualizationJson(const BaseString& genes, std::os
       {
          const double x = low + (high - low) * sample / (kCurveSamples - 1);
          std::vector<double> value;
-         if (!expression.evaluate(std::vector<std::vector<double> >(1, std::vector<double>(1, x)), value))
+         if (!predictRows(expression, fit, std::vector<std::vector<double> >(1, std::vector<double>(1, x)), value))
          {
             continue;
          }
          if (!first) out << ", ";
          first = false;
-         out << "{ \"x\": " << x << ", \"y\": " << (fit.intercept + fit.slope * value[0]) << " }";
+         out << "{ \"x\": " << x << ", \"y\": " << value[0] << " }";
       }
    }
    out << "] }" << std::defaultfloat << std::setprecision(6);
@@ -600,11 +788,11 @@ void SymbolicRegression::writeSampleJson(const BaseString& genes, std::ostream& 
       {
          const double x = low + (high - low) * sample / (kSampleCurvePoints - 1);
          std::vector<double> value;
-         if (!expression.evaluate(std::vector<std::vector<double> >(1, std::vector<double>(1, x)), value))
+         if (!predictRows(expression, fit, std::vector<std::vector<double> >(1, std::vector<double>(1, x)), value))
          {
             continue;
          }
-         out << (first ? "" : ", ") << "[" << x << ", " << (fit.intercept + fit.slope * value[0]) << "]";
+         out << (first ? "" : ", ") << "[" << x << ", " << value[0] << "]";
          first = false;
       }
       out << "]";
@@ -612,12 +800,12 @@ void SymbolicRegression::writeSampleJson(const BaseString& genes, std::ostream& 
    else if (fit.valid)
    {
       std::vector<double> predictions;
-      if (expression.evaluate(dataset_.inputs, predictions))
+      if (predictRows(expression, fit, dataset_.inputs, predictions))
       {
          out << ", \"predicted\": [";
          for (std::size_t row = 0 ; row < predictions.size() ; row++)
          {
-            out << (row == 0 ? "" : ", ") << (fit.intercept + fit.slope * predictions[row]);
+            out << (row == 0 ? "" : ", ") << predictions[row];
          }
          out << "]";
       }

@@ -114,6 +114,12 @@ expect 0 "test rows         : 0" "--holdout 0 keeps every row for training" -- \
   $GA R --data data/pendulum.csv $QUICK --restarts 1 --holdout 0
 expect 0 "inputs            : x1 x2" "multi-input CSVs are supported" -- \
   $GA R --data data/two_input.csv $QUICK --restarts 1
+expect 0 " of 5 inputs: " "mode R reports which inputs a formula uses" -- \
+  $GA R --data data/five_inputs.csv $QUICK --restarts 1
+expect 0 "trials            : 45000" "the default budget grows with the number of inputs" -- \
+  $GA R --data data/five_inputs.csv --seed 1 --population 20 --restarts 1 --tuning 0 --folds 0 --samples 0
+expect 0 "trials            : 15000" "one or two inputs keep the base budget" -- \
+  $GA R --data data/two_input.csv --seed 1 --population 20 --restarts 1 --tuning 0 --folds 0 --samples 0
 expect 0 "target            : length_m" "--target selects the output column" -- \
   $GA R --data data/pendulum.csv --target length_m $QUICK --restarts 1 --tuning 0
 

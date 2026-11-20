@@ -58,6 +58,19 @@ means it is fitting the noise).
 | `linear_outliers.csv` | `x`, `y` | y = 1.5x + 4 | Gaussian, σ = 1.2, plus 5 outliers of ±8–15 | 50 | Robustness: squared error gets pulled by the outliers |
 | `two_input.csv` | `x1`, `x2`, `y` | y = x1·x2 + sin(x1) | Gaussian, σ = 0.9 | 120 | Multiple inputs (random 2-D scatter) |
 
+### Three or more inputs
+
+The physics laws use relative noise, like real measurements, and unit systems
+that keep values readable at 4 decimal places.
+
+| File | Columns | Ground truth | Noise | Rows | What it tests |
+|---|---|---|---|---|---|
+| `gravitation.csv` | `m1`, `m2`, `r`, `F` | F = m1·m2 / r² (G = 1) | 8% relative | 100 | A product and an inverse square |
+| `ideal_gas.csv` | `n_mol`, `T_K`, `V_L`, `P_bar` | P = 0.08314·n·T / V | 5% relative | 100 | A ratio of products, with a physical constant |
+| `mechanical_energy.csv` | `m_kg`, `v_mps`, `h_m`, `E_J` | E = m·v²/2 + 9.81·m·h | 5% relative | 100 | A sum of two terms sharing an input |
+| `five_inputs.csv` | `x1` … `x5`, `y` | y = 2·x1·x3 − x4² | Gaussian, σ = 0.95 | 150 | Two of the five inputs are irrelevant |
+| `friedman1.csv` | `x1` … `x10`, `y` | y = 10 sin(π·x1·x2) + 20(x3 − 0.5)² + 10·x4 + 5·x5 | Gaussian, σ = 1 | 250 | The Friedman #1 benchmark: ten inputs, five used |
+
 ## Checking a result
 
 How well the true formula itself fits each file. A discovered formula should
@@ -74,6 +87,11 @@ rows means it is fitting the noise.
 | `rational.csv` | 0.084 | 0.933 | 26% |
 | `linear_outliers.csv` | 3.568 (median absolute residual 1.179) | 0.637 | — |
 | `two_input.csv` | 0.920 | 0.931 | 29% |
+| `gravitation.csv` | 0.594 | 0.986 | 11% |
+| `ideal_gas.csv` | 0.162 | 0.991 | 10% |
+| `mechanical_energy.csv` | 46.16 | 0.990 | 10% |
+| `five_inputs.csv` | 0.995 | 0.907 | 32% |
+| `friedman1.csv` | 0.938 | 0.964 | 19% |
 
 With this much noise, comparing errors is only part of the check. Because
 the true formula is known, the sharper test is how far the fitted curve is

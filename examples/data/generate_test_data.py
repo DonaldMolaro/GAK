@@ -104,12 +104,71 @@ def linear_outliers(rng):
 
 
 def two_input(rng):
-    # For later multi-input work: y = x1*x2 + sin(x1), noise sigma 0.9
+    # Two inputs: y = x1*x2 + sin(x1), noise sigma 0.9
     rows = []
     for _ in range(120):
         x1 = rng.uniform(-3.0, 3.0)
         x2 = rng.uniform(-3.0, 3.0)
         rows.append((x1, x2, x1 * x2 + math.sin(x1) + noise(rng, 0.9)))
+    return rows
+
+
+def gravitation(rng):
+    # Newton's law of gravitation with G = 1: F = m1*m2 / r^2, 8% relative
+    # noise. Three inputs, two multiplied and one an inverse square.
+    rows = []
+    for _ in range(100):
+        m1 = rng.uniform(1.0, 10.0)
+        m2 = rng.uniform(1.0, 10.0)
+        r = rng.uniform(1.0, 5.0)
+        rows.append((m1, m2, r, m1 * m2 / (r * r) * (1.0 + noise(rng, 0.08))))
+    return rows
+
+
+def ideal_gas(rng):
+    # Ideal gas law in litres, bar and kelvin: P = n R T / V with
+    # R = 0.08314 L bar / (mol K), 5% relative noise.
+    rows = []
+    for _ in range(100):
+        n = rng.uniform(0.5, 5.0)
+        t = rng.uniform(250.0, 400.0)
+        v = rng.uniform(10.0, 50.0)
+        rows.append((n, t, v, 0.08314 * n * t / v * (1.0 + noise(rng, 0.05))))
+    return rows
+
+
+def mechanical_energy(rng):
+    # Kinetic plus potential energy: E = m v^2 / 2 + m g h with g = 9.81,
+    # 5% relative noise. A sum of two products sharing the mass.
+    rows = []
+    for _ in range(100):
+        m = rng.uniform(1.0, 10.0)
+        v = rng.uniform(0.0, 10.0)
+        h = rng.uniform(0.0, 20.0)
+        rows.append((m, v, h, (0.5 * m * v * v + m * 9.81 * h) * (1.0 + noise(rng, 0.05))))
+    return rows
+
+
+def five_inputs(rng):
+    # Five inputs, two of them irrelevant: y = 2*x1*x3 - x4^2, noise sigma
+    # 0.95 (about 30% of the signal). x2 and x5 do not affect y.
+    rows = []
+    for _ in range(150):
+        x = [rng.uniform(-2.0, 2.0) for _ in range(5)]
+        rows.append(tuple(x) + (2.0 * x[0] * x[2] - x[3] * x[3] + noise(rng, 0.95),))
+    return rows
+
+
+def friedman1(rng):
+    # The Friedman #1 benchmark (Friedman 1991): ten inputs uniform on
+    # [0, 1], only the first five used:
+    # y = 10 sin(pi x1 x2) + 20 (x3 - 0.5)^2 + 10 x4 + 5 x5, noise sigma 1.
+    rows = []
+    for _ in range(250):
+        x = [rng.uniform(0.0, 1.0) for _ in range(10)]
+        y = (10.0 * math.sin(math.pi * x[0] * x[1]) + 20.0 * (x[2] - 0.5) ** 2
+             + 10.0 * x[3] + 5.0 * x[4])
+        rows.append(tuple(x) + (y + noise(rng, 1.0),))
     return rows
 
 
@@ -122,6 +181,11 @@ DATASETS = [
     ("rational.csv", ["x", "y"], rational, 106),
     ("linear_outliers.csv", ["x", "y"], linear_outliers, 107),
     ("two_input.csv", ["x1", "x2", "y"], two_input, 108),
+    ("gravitation.csv", ["m1", "m2", "r", "F"], gravitation, 109),
+    ("ideal_gas.csv", ["n_mol", "T_K", "V_L", "P_bar"], ideal_gas, 110),
+    ("mechanical_energy.csv", ["m_kg", "v_mps", "h_m", "E_J"], mechanical_energy, 111),
+    ("five_inputs.csv", ["x1", "x2", "x3", "x4", "x5", "y"], five_inputs, 112),
+    ("friedman1.csv", [f"x{i}" for i in range(1, 11)] + ["y"], friedman1, 113),
 ]
 
 
