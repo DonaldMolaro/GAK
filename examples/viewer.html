@@ -732,22 +732,23 @@
             .filter(points => points.length > 1)
         : [];
 
-      const xs = plotted.map(xOf).concat(curve.map(c => c.x));
-      const ys = plotted.map(yOf).concat(curve.map(c => c.y));
-      // Sample curves may run far outside the data; keep the scale on the data.
-      const dataMinY = Math.min(...ys), dataMaxY = Math.max(...ys);
-      if (!singleInput) {
-        xs.push(...plotted.map(p => p.predicted));
-        ys.push(...plotted.map(p => p.y));
-      }
-      if (xs.length === 0) {
+      // The scale comes from the measured data only, which is the same in
+      // every frame, so the axes stay fixed while formulas evolve. Curves
+      // and predictions that leave that range are clipped to the plot.
+      const measured = points.map(point => point.y).filter(Number.isFinite);
+      const inputs = singleInput ? points.map(point => point.inputs[0]).filter(Number.isFinite) : measured;
+      if (measured.length === 0 || inputs.length === 0) {
         return;
       }
       const padding = 56;
-      let minX = Math.min(...xs), maxX = Math.max(...xs);
-      let minY = Math.min(...ys), maxY = Math.max(...ys);
-      if (maxX === minX) { maxX += 1; minX -= 1; }
-      if (maxY === minY) { maxY += 1; minY -= 1; }
+      const span = values => {
+        let low = Math.min(...values), high = Math.max(...values);
+        if (high === low) { high += 1; low -= 1; }
+        const margin = (high - low) * 0.06;
+        return [low - margin, high + margin];
+      };
+      const [minY, maxY] = span(measured);
+      const [minX, maxX] = singleInput ? span(inputs) : [minY, maxY];
       const toX = x => padding + (x - minX) * (canvas.width - padding * 2) / (maxX - minX);
       const toY = y => canvas.height - padding - (y - minY) * (canvas.height - padding * 2) / (maxY - minY);
 
@@ -771,23 +772,27 @@
       ctx.fillText(singleInput ? visualization.target : `predicted ${visualization.target}`, 0, 0);
       ctx.restore();
 
+      // Everything drawn from here on stays inside the plot area. Values far
+      // outside it are pulled in to a few plot-heights away first, so a
+      // runaway early formula still draws as a line leaving the frame.
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(padding, padding, canvas.width - padding * 2, canvas.height - padding * 2);
+      ctx.clip();
+      const reach = (maxY - minY) * 4;
+      const limitY = y => Math.max(minY - reach, Math.min(maxY + reach, y));
+
       if (sampleCurves.length > 0) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(padding, padding, canvas.width - padding * 2, canvas.height - padding * 2);
-        ctx.clip();
         ctx.strokeStyle = "rgba(120, 112, 100, 0.45)";
         ctx.lineWidth = 1.5;
         sampleCurves.forEach(points => {
           ctx.beginPath();
           points.forEach(([x, y], index) => {
-            const py = toY(Math.max(dataMinY - (dataMaxY - dataMinY), Math.min(dataMaxY + (dataMaxY - dataMinY), y)));
-            if (index === 0) ctx.moveTo(toX(x), py);
-            else ctx.lineTo(toX(x), py);
+            if (index === 0) ctx.moveTo(toX(x), toY(limitY(y)));
+            else ctx.lineTo(toX(x), toY(limitY(y)));
           });
           ctx.stroke();
         });
-        ctx.restore();
       }
 
       ctx.strokeStyle = "#1b6f5f";
@@ -795,13 +800,12 @@
       ctx.beginPath();
       if (singleInput) {
         curve.forEach((sample, index) => {
-          if (index === 0) ctx.moveTo(toX(sample.x), toY(sample.y));
-          else ctx.lineTo(toX(sample.x), toY(sample.y));
+          if (index === 0) ctx.moveTo(toX(sample.x), toY(limitY(sample.y)));
+          else ctx.lineTo(toX(sample.x), toY(limitY(sample.y)));
         });
       } else {
-        const low = Math.max(minX, minY), high = Math.min(maxX, maxY);
-        ctx.moveTo(toX(low), toY(low));
-        ctx.lineTo(toX(high), toY(high));
+        ctx.moveTo(toX(minX), toY(minY));
+        ctx.lineTo(toX(maxX), toY(maxY));
       }
       ctx.stroke();
 
@@ -817,6 +821,7 @@
           ctx.fill();
         }
       });
+      ctx.restore();
 
       ctx.textAlign = "left";
       ctx.font = "13px Georgia, serif";
