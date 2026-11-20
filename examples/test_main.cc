@@ -1,4 +1,5 @@
 #include <cmath>
+#include <functional>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -1407,6 +1408,268 @@ void test_regression_run_recovers_formula()
 
 }
 
+namespace {
+
+int countOccurrences(const std::string& text, const std::string& needle)
+{
+  int count = 0;
+  for (std::size_t at = text.find(needle) ; at != std::string::npos ; at = text.find(needle, at + 1)) ++count;
+  return count;
+}
+
+void test_regression_output_and_visualization()
+{
+  SymbolicRegression::Config config;
+  config.constantTuningBudget = 0;
+  // These checks are about output, not selection; the 12-row two-input
+  // dataset below is too small for 5-fold cross-validation.
+  config.crossValidationFolds = 0;
+  Dataset data = makeDataset(quadraticTarget, 20, -2.0, 2.0);
+  data.targetName = "y \"quoted\"\tname";  // exercises JSON string escaping
+  SymbolicRegression regression(data, config);
+  InstructionSet set(1);
+  const int x = geneFor(set, Operation::Variable);
+  const int square = geneFor(set, Operation::Square);
+  const BaseString genes = program(set, {x, square});
+
+  std::ostringstream printed;
+  regression.printCandidate(genes, printed);
+  expect_contains(printed.str(), "~= 2 + 3*(x^2)", "printCandidate should show the scaled formula");
+  expect_contains(printed.str(), "nodes=2", "printCandidate should show the formula size");
+  expect_contains(printed.str(), "| test R2=1.0000", "printCandidate should show the held-out score");
+  expect_true(printed.str().size() >= 3 && printed.str().compare(printed.str().size() - 3, 3, " ::") == 0,
+              "printCandidate should end with the fitness separator");
+
+  std::ostringstream json;
+  regression.writeVisualizationJson(genes, json);
+  const std::string text = json.str();
+  expect_contains(text, "\"type\": \"regression\"", "Regression visualization should be typed");
+  expect_contains(text, "\"target\": \"y \\\"quoted\\\"\\u0009name\"",
+                  "Regression visualization should escape quotes and control characters");
+  expect_contains(text, "\"formula\": \"2 + 3*(x^2)\"", "Regression visualization should include the formula");
+  expect_true(countOccurrences(text, "\"set\": ") == 20 &&
+              countOccurrences(text, "\"set\": \"test\"") == regression.testRowCount(),
+              "Regression visualization should label every point as train or test");
+  expect_true(countOccurrences(text, "\"predicted\": ") == 20,
+              "Regression visualization should include a prediction for every point");
+  expect_true(countOccurrences(text, "{ \"x\": ") == 200,
+              "Regression visualization should sample the fitted curve for one input");
+
+  // An undefined formula still produces a valid payload: no predictions, no curve.
+  const int one = geneFor(set, Operation::Constant, 1.0);
+  const int subtract = geneFor(set, Operation::Subtract);
+  const int divide = geneFor(set, Operation::Divide);
+  const BaseString undefined = program(set, {one, x, x, subtract, divide});
+  std::ostringstream badJson;
+  regression.writeVisualizationJson(undefined, badJson);
+  expect_true(countOccurrences(badJson.str(), "\"predicted\"") == 0 &&
+              badJson.str().find("\"curve\": [] }") != std::string::npos,
+              "An undefined formula should have no predictions and no curve");
+  std::ostringstream badPrinted;
+  regression.printCandidate(undefined, badPrinted);
+  expect_contains(badPrinted.str(), "(undefined on the data) ::",
+                  "printCandidate should say when a formula is undefined");
+
+  // Two inputs: points carry both inputs and there is no curve.
+  Dataset twoInputs;
+  twoInputs.source = "two";
+  twoInputs.inputNames = {"a", "b"};
+  twoInputs.targetName = "y";
+  for (int i = 0 ; i < 12 ; i++)
+    {
+      twoInputs.inputs.push_back({static_cast<double>(i), static_cast<double>(i % 3)});
+      twoInputs.targets.push_back(i * (i % 3) + 1.0);
+    }
+  SymbolicRegression multi(twoInputs, config);
+  InstructionSet multiSet(2);
+  std::ostringstream multiJson;
+  multi.writeVisualizationJson(program(multiSet, {0, 1, geneFor(multiSet, Operation::Multiply)}), multiJson);
+  expect_contains(multiJson.str(), "\"inputs\": [\"a\", \"b\"]", "Visualization should list every input");
+  expect_true(multiJson.str().find("\"curve\": [] }") != std::string::npos,
+              "Multi-input visualizations should not include a curve");
+}
+
+void test_regression_formula_variants_and_holdout()
+{
+  SymbolicRegression::Config config;
+  config.constantTuningBudget = 0;
+  InstructionSet set(1);
+  const int x = geneFor(set, Operation::Variable);
+  const int negate = geneFor(set, Operation::Negate);
+  const int two = geneFor(set, Operation::Constant, 2.0);
+
+  // y = -x exactly: no intercept, negative slope on f = x.
+  Dataset line = makeDataset([](double v) { return -v; }, 20, -3.0, 3.0);
+  SymbolicRegression lineRegression(line, config);
+  SymbolicRegression::Fit fit = lineRegression.describe(program(set, {x}));
+  expect_true(lineRegression.scaledFormula(fit) == "-(x)",
+              "A pure negative slope should print without an intercept");
+  fit = lineRegression.describe(program(set, {x, negate}));
+  expect_true(lineRegression.scaledFormula(fit) == "(-x)",
+              "A unit slope should print without a factor");
+
+  // A constant formula carries no shape: it falls back to the mean.
+  SymbolicRegression::Fit constant = lineRegression.describe(program(set, {two}));
+  expect_true(constant.valid && constant.slope == 0.0 && constant.trainR2 < 1e-9,
+              "A constant formula should reduce to predicting the mean");
+  expect_true(lineRegression.scaledFormula(constant).find('(') == std::string::npos,
+              "A constant formula should print as just a number");
+
+  // No held-out rows: everything trains and the test score is not printed.
+  SymbolicRegression::Config noHoldout = config;
+  noHoldout.holdoutFraction = 0.0;
+  SymbolicRegression all(line, noHoldout);
+  expect_true(all.testRowCount() == 0 && all.trainRowCount() == 20, "Holdout 0 should train on every row");
+  std::ostringstream printed;
+  all.printCandidate(program(set, {x}), printed);
+  expect_true(printed.str().find("test R2") == std::string::npos,
+              "With no held-out rows the test score should not be printed");
+
+  // A formula defined on every training row but undefined on a test row
+  // reports no predictive value on the test split. The split depends only
+  // on the row count, so find a test row, then shift x so 1/(x - 2) is
+  // undefined exactly there.
+  SymbolicRegression probe(makeDataset(quadraticTarget, 24, 0.0, 23.0), config);
+  std::ostringstream probeJson;
+  probe.writeVisualizationJson(program(set, {x}), probeJson);
+  const std::size_t firstTest = probeJson.str().find("\"set\": \"test\"");
+  const int testRow = countOccurrences(probeJson.str().substr(0, firstTest), "\"set\": ");
+  Dataset shifted;
+  shifted.source = "shifted";
+  shifted.inputNames = {"x"};
+  shifted.targetName = "y";
+  for (int i = 0 ; i < 24 ; i++)
+    {
+      const double value = i - testRow + 2.0;
+      shifted.inputs.push_back(std::vector<double>(1, value));
+      shifted.targets.push_back(value * value);
+    }
+  SymbolicRegression testOnly(shifted, config);
+  const int one = geneFor(set, Operation::Constant, 1.0);
+  const int subtract = geneFor(set, Operation::Subtract);
+  const int divide = geneFor(set, Operation::Divide);
+  SymbolicRegression::Fit testUndefined = testOnly.describe(program(set, {one, x, two, subtract, divide}));
+  expect_true(testUndefined.valid && testUndefined.testR2 == 0.0 && testUndefined.testRmse > 0.0,
+              "A formula undefined only on held-out rows should report no test predictive value");
+}
+
+void test_regression_configuration_errors()
+{
+  Dataset data = makeDataset(quadraticTarget, 20, -2.0, 2.0);
+  auto rejects = [&](SymbolicRegression::Config config, const Dataset& dataset, const std::string& message) {
+    expect_throws<GAFatalException>([&]() { SymbolicRegression regression(dataset, config); }, message);
+  };
+  SymbolicRegression::Config holdout;
+  holdout.holdoutFraction = 1.0;
+  rejects(holdout, data, "A holdout fraction of 1 should be rejected");
+  SymbolicRegression::Config lengths;
+  lengths.maximumInitialLength = 2;
+  lengths.minimumInitialLength = 5;
+  rejects(lengths, data, "Inconsistent program lengths should be rejected");
+  SymbolicRegression::Config growth;
+  growth.maximumLength = 10;
+  rejects(growth, data, "A maximum length below the initial length should be rejected");
+  SymbolicRegression::Config mostlyHeldOut;
+  mostlyHeldOut.holdoutFraction = 0.9;
+  rejects(mostlyHeldOut, makeDataset(quadraticTarget, 10, 0.0, 1.0), "Fewer than 3 training rows should be rejected");
+  rejects(SymbolicRegression::Config(), makeDataset([](double) { return 4.0; }, 10, 0.0, 1.0),
+          "A constant target should be rejected");
+
+  SymbolicRegression regression(data, SymbolicRegression::Config());
+  expect_throws<GAFatalException>(
+    [&]() {
+      Population::Settings settings = make_options(Population::OperationMode::Minimize, 10,
+                                                   Population::VariableLengthMode::Variable, 5);
+      Population population(settings, regression);
+    },
+    "Regression should reject a gene alphabet of the wrong size");
+}
+
+void test_dataset_file_and_format_edges()
+{
+  Dataset file = loadCsvDataset("data/linear_noisy.csv");
+  expect_true(file.rowCount() == 60 && file.targetName == "y" && file.source == "data/linear_noisy.csv",
+              "CSV loader should read a file from disk");
+  auto failsWith = [](const std::function<void()>& load, const std::string& needle) {
+    try { load(); }
+    catch (const GAFatalException& error) { return std::string(error.what()).find(needle) != std::string::npos; }
+    return false;
+  };
+  expect_true(failsWith([]() { loadCsvDataset("data/does_not_exist.csv"); }, "cannot open file"),
+              "CSV loader should report a missing file");
+  expect_true(failsWith([]() { std::istringstream in("\n  \n"); loadCsvDataset(in, "blank.csv"); },
+                        "no header row"),
+              "CSV loader should reject a file with no header");
+  expect_true(failsWith([]() { std::istringstream in("x,,y\n1,2,3\n"); loadCsvDataset(in, "e.csv"); },
+                        "empty column name"),
+              "CSV loader should reject an empty column name");
+  expect_true(failsWith([]() { std::istringstream in("x,y\n1,2,\n3,4\n5,6\n"); loadCsvDataset(in, "t.csv"); },
+                        "t.csv:2: expected 2 values, found 3"),
+              "CSV loader should count a trailing comma as an extra empty value");
+  expect_true(failsWith([]() { std::istringstream in("x,y\n1,\n3,4\n5,6\n"); loadCsvDataset(in, "m.csv"); },
+                        "non-numeric value ''"),
+              "CSV loader should reject an empty value");
+  expect_true(failsWith([]() { std::istringstream in("x,y\n1,inf\n3,4\n5,6\n"); loadCsvDataset(in, "i.csv"); },
+                        "non-numeric value 'inf'"),
+              "CSV loader should reject non-finite values");
+}
+
+void test_expression_construction_errors()
+{
+  expect_throws<GAFatalException>([]() { InstructionSet none(0); },
+                                  "An instruction set needs at least one input");
+  InstructionSet set(1);
+  expect_throws<GAFatalException>([&set]() { Expression::compile(BaseString(4, set.size() + 1), set); },
+                                  "Compiling genes from a different alphabet should be rejected");
+}
+
+void test_example_printers_and_edges()
+{
+  Spell spell;
+  expect_true(spell.evaluateFitness(makeSymbolicString("eggheadx")) < spell.evaluateFitness(makeSymbolicString("egghead")),
+              "Spell should penalize letters beyond the target length");
+  std::ostringstream spelled;
+  spell.printCandidate(makeSymbolicString("egghead"), spelled);
+  expect_true(spelled.str() == "egghead ::", "Spell should print the candidate word");
+
+  NQueens queens;
+  BaseString diagonal(8, 8);
+  for (int column = 0 ; column < 8 ; column++) diagonal.setValue(column, column);
+  std::ostringstream queensJson;
+  queens.writeVisualizationJson(diagonal, queensJson);
+  expect_true(countOccurrences(queensJson.str(), "\"same_diagonal\": true") == 28,
+              "N-Queens visualization should list every diagonal conflict");
+
+  Population::Settings sudokuOptions = make_options(Population::OperationMode::Maximize, 81,
+                                                    Population::VariableLengthMode::Fixed, 9);
+  SudokuConstrained sudoku(sudokuOptions);
+  Population sudokuPopulation(sudokuOptions, sudoku);
+  std::unique_ptr<Chromosome> board = PopulationTestRig::createInitialChromosome(sudokuPopulation);
+  std::ostringstream boardOut;
+  sudoku.printCandidate(board->genes(), boardOut);
+  expect_contains(boardOut.str(), "Constraint-aware Sudoku candidate:", "Constrained Sudoku should label its board");
+  expect_true(countOccurrences(boardOut.str(), "------+-------+------") == 2 &&
+              countOccurrences(boardOut.str(), " | ") == 18,
+              "Constrained Sudoku should print box separators");
+
+  // TSP: without crossover, children are copies of the parents.
+  Population::Settings tspOptions = make_options(Population::OperationMode::Minimize, 6,
+                                                 Population::VariableLengthMode::Fixed, 6);
+  tspOptions.crossOverRate = 0.0;
+  TravelingSalesman tsp(tspOptions, 10);
+  Population tspPopulation(tspOptions, tsp);
+  std::unique_ptr<Chromosome> mother = PopulationTestRig::createInitialChromosome(tspPopulation);
+  std::unique_ptr<Chromosome> father = PopulationTestRig::createInitialChromosome(tspPopulation);
+  std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> > children =
+    PopulationTestRig::mateChromosomes(tspPopulation, *mother, *father);
+  expect_true((children.first->equals(*mother) && children.second->equals(*father)) ||
+              (children.first->equals(*father) && children.second->equals(*mother)),
+              "TSP mating without crossover should copy the parents");
+
+}
+
+}
+
 int main()
 {
   test_dome_fitness();
@@ -1455,6 +1718,12 @@ int main()
   test_regression_run_recovers_formula();
   test_regression_tunes_constants();
   test_regression_archive_and_cross_validated_selection();
+  test_regression_output_and_visualization();
+  test_regression_formula_variants_and_holdout();
+  test_regression_configuration_errors();
+  test_dataset_file_and_format_edges();
+  test_expression_construction_errors();
+  test_example_printers_and_edges();
 
   if (g_failures != 0)
     {

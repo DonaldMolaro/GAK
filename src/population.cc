@@ -29,6 +29,11 @@ bool IsVerboseEnabled()
 }
 }
 
+// Out-of-class definition: std::min takes its arguments by reference, which
+// odr-uses the constant, and C++14 then requires a definition (unoptimized
+// builds otherwise fail to link).
+const int Population::kSummaryCount;
+
 Population::Population(const Settings& settings, PopulationProblem& problem)
    : populationInitialized(false),
      problem_(problem),
