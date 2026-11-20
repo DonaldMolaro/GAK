@@ -1,5 +1,6 @@
 #include <cctype>
 #include <cerrno>
+#include <cmath>
 #include <cstdlib>
 #include <limits>
 #include <memory>
@@ -66,6 +67,10 @@ struct CliOptions
   std::string targetColumn;
   bool holdoutProvided = false;
   double holdout = 0.0;
+  bool foldsProvided = false;
+  int folds = 0;
+  bool cvStandardErrorsProvided = false;
+  double cvStandardErrors = 0.0;
   bool tuningProvided = false;
   int tuning = 0;
   bool restartsProvided = false;
@@ -509,6 +514,7 @@ void printRegressionInput(const SymbolicRegression& regression)
   printLabeledLine("inputs", inputs);
   printLabeledLine("target", data.targetName);
   printLabeledLine("train rows", regression.trainRowCount());
+  printLabeledLine("cv folds", regression.crossValidationFolds());
   printLabeledLine("test rows", regression.testRowCount());
   printLabeledLine("operators", "+ - * / sin cos exp log sqrt ^2 neg");
   printLabeledLine("constants", "0.1 0.5 1 2 3 5 10");
@@ -582,6 +588,10 @@ void usage(std::ostream& out)
   out << "  --data P          CSV of measured points for mode R (header row, numeric values)\n";
   out << "  --target NAME     Output column for mode R (default: the last column)\n";
   out << "  --holdout R       Share of rows held out for testing in mode R (default 0.25)\n";
+  out << "  --folds N         Cross-validation folds for choosing the final formula in mode R\n";
+  out << "                    (default 5; 0 reports the GA's best training fit instead)\n";
+  out << "  --cv-se R         Choose the smallest formula within R standard errors of the best\n";
+  out << "                    cross-validated error (default 1; lower favours richer formulas)\n";
   out << "  --restarts N      Independent runs in mode R; the best training fit is reported (default 4)\n";
   out << "  --tuning N        Constant-tuning evaluations per formula in mode R (default 40, 0 = off)\n";
   out << "  --report-json P   Write a structured JSON run report to path P\n";
@@ -643,6 +653,23 @@ bool parseProbability(const std::string& text, double& value)
   char* end = nullptr;
   const double parsed = std::strtod(text.c_str(), &end);
   if (errno != 0 || *end != '\0' || !(parsed >= 0.0 && parsed <= 1.0))
+  {
+    return false;
+  }
+  value = parsed;
+  return true;
+}
+
+bool parseNonNegativeDouble(const std::string& text, double& value)
+{
+  if (text.empty() || std::isspace(static_cast<unsigned char>(text[0])))
+  {
+    return false;
+  }
+  errno = 0;
+  char* end = nullptr;
+  const double parsed = std::strtod(text.c_str(), &end);
+  if (errno != 0 || *end != '\0' || !(parsed >= 0.0) || !std::isfinite(parsed))
   {
     return false;
   }
@@ -744,6 +771,16 @@ bool parseCliOptions(int argc, char* argv[], CliOptions& options)
     {
       options.dataPath = value;
     }
+    else if (arg == "--cv-se")
+    {
+      options.cvStandardErrorsProvided = parseNonNegativeDouble(value, options.cvStandardErrors);
+      if (!options.cvStandardErrorsProvided) return reportInvalidValue(arg, value, "a non-negative number");
+    }
+    else if (arg == "--folds")
+    {
+      options.foldsProvided = parseInt(value, options.folds) && options.folds >= 0;
+      if (!options.foldsProvided) return reportInvalidValue(arg, value, "a non-negative integer");
+    }
     else if (arg == "--target")
     {
       options.targetColumn = value;
@@ -812,7 +849,8 @@ bool shouldCaptureGenerations(const CliOptions& cli)
          !cli.reportCsvPath.empty();
 }
 
-int reportRun(Population& population, const Population::RunResult& result, const CliOptions& cli)
+int reportRun(Population& population, const Population::RunResult& result, const CliOptions& cli,
+              const std::string& extraJsonResultMembers = std::string())
 {
   const bool captureGenerationSummaries = shouldCaptureGenerations(cli);
   PopulationReporter::write(std::cout,
@@ -828,7 +866,7 @@ int reportRun(Population& population, const Population::RunResult& result, const
       std::cerr << "Failed to open JSON report path: " << cli.reportJsonPath << '\n';
       return EXIT_FAILURE;
     }
-    PopulationReporter::writeJson(jsonOut, population, result);
+    PopulationReporter::writeJson(jsonOut, population, result, extraJsonResultMembers);
   }
 
   if (!cli.reportCsvPath.empty())
@@ -898,7 +936,38 @@ int runRegression(SymbolicRegression& regression, const Population::Settings& ba
   {
     std::cout << "Best restart seed: " << best->randomSeed() << "\n\n";
   }
-  return reportRun(*best, bestResult, cli);
+
+  // The GA's best formula minimizes TRAINING error, which on noisy data
+  // rewards terms that fit the noise. The final answer is chosen instead from
+  // the best formula of each size, by cross-validated error.
+  std::vector<int> selectedGenes;
+  SymbolicRegression::Fit selectedFit;
+  std::string selectedJson;
+  const bool selected = regression.selectByCrossValidation(selectedGenes, selectedFit);
+  if (selected)
+  {
+    std::ostringstream json;
+    json << "\"selected\": { \"archived_sizes\": " << regression.archivedSizeCount()
+         << ", \"cv_folds\": " << regression.crossValidationFolds()
+         << ", \"cv_r2\": " << selectedFit.crossValidatedR2
+         << ", \"cv_rmse\": " << selectedFit.crossValidatedRmse
+         << ", \"visualization\": ";
+    regression.writeVisualizationJson(regression.genesFromValues(selectedGenes), json);
+    json << " }";
+    selectedJson = json.str();
+  }
+  const int status = reportRun(*best, bestResult, cli, selectedJson);
+  if (selected)
+  {
+    std::cout << "\nSelected by " << regression.crossValidationFolds()
+              << "-fold cross-validation (from the best formula of each of "
+              << regression.archivedSizeCount() << " sizes; cv R2="
+              << std::fixed << std::setprecision(4) << selectedFit.crossValidatedR2
+              << " RMSE=" << selectedFit.crossValidatedRmse << std::defaultfloat << "):\n";
+    regression.printCandidate(regression.genesFromValues(selectedGenes), std::cout);
+    std::cout << std::fixed << std::setprecision(6) << selectedFit.fitness << std::defaultfloat << '\n';
+  }
+  return status;
 }
 }
 
@@ -1028,6 +1097,14 @@ int runGa(int argc, char *argv[])
         if (cli.tuningProvided)
         {
           config.constantTuningBudget = cli.tuning;
+        }
+        if (cli.foldsProvided)
+        {
+          config.crossValidationFolds = cli.folds;
+        }
+        if (cli.cvStandardErrorsProvided)
+        {
+          config.selectionStandardErrors = cli.cvStandardErrors;
         }
         SymbolicRegression regression(loadCsvDataset(cli.dataPath, cli.targetColumn), config);
         printRegressionInput(regression);

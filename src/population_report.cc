@@ -225,7 +225,8 @@ void PopulationReporter::write(std::ostream& out,
 
 void PopulationReporter::writeJson(std::ostream& out,
                                    const Population& population,
-                                   const Population::RunResult& result)
+                                   const Population::RunResult& result,
+                                   const std::string& extraResultMembers)
 {
    StreamStateGuard guard(out);
    const Population::Settings& settings = population.settings();
@@ -290,8 +291,12 @@ void PopulationReporter::writeJson(std::ostream& out,
       }
       out << '\n';
    }
-   out << "    ]\n";
-   out << "  }\n";
+   out << "    ]";
+   if (!extraResultMembers.empty())
+   {
+      out << ",\n    " << extraResultMembers;
+   }
+   out << "\n  }\n";
    out << "}\n";
 }
 
