@@ -15,3 +15,12 @@ example_tests
 *.profraw
 *.profdata
 coverage.txt
+
+# Claude Code session worktrees (other .claude/ files, such as project
+# settings, can still be committed)
+.claude/worktrees/
+
+# Run reports written by --report-json / --report-csv in examples/.
+# Only files directly in examples/ are ignored: examples/data/*.csv is tracked.
+/examples/*.json
+/examples/*.csv
