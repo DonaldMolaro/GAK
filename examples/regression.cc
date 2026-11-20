@@ -13,10 +13,30 @@
 
 namespace
 {
-constexpr double kVarianceEpsilon = 1e-12;
+// Variation is judged relative to a quantity's own magnitude, never
+// absolutely, so data measured in very small or very large units behaves
+// like the same data in convenient units.
+constexpr double kRelativeVariation = 1e-20;
+
+// Whether values whose summed squared deviation from their mean is
+// `deviations` (and summed squares `squares`) actually vary.
+bool varies(double deviations, double squares)
+{
+   return deviations > 0.0 && deviations > kRelativeVariation * squares;
+}
+
+// The same test for a split's population variance and mean.
+bool hasVariance(double variance, double mean)
+{
+   return varies(variance, variance + mean * mean);
+}
 constexpr int kCurveSamples = 200;
 constexpr int kSampleCurvePoints = 60;
 constexpr int kEffectPoints = 25;
+// Visualizations plot at most this many rows (evenly spaced through the
+// file); fitting and scoring always use every row. Keeps reports and the
+// viewer manageable for large files.
+constexpr int kMaxVisualizationRows = 1000;
 
 constexpr int kMaxTerms = 8;
 
@@ -70,9 +90,14 @@ TermModel fitTerms(const std::vector<std::vector<double> >& terms, const std::ve
    std::vector<std::size_t> active;
    for (std::size_t i = 0 ; i < k ; i++)
    {
-      double variance = 0.0;
-      for (double value : terms[i]) variance += (value - means[i]) * (value - means[i]);
-      if (variance > kVarianceEpsilon * static_cast<double>(count))
+      double deviations = 0.0;
+      double squares = 0.0;
+      for (double value : terms[i])
+      {
+         deviations += (value - means[i]) * (value - means[i]);
+         squares += value * value;
+      }
+      if (varies(deviations, squares))
       {
          active.push_back(i);
       }
@@ -101,6 +126,11 @@ TermModel fitTerms(const std::vector<std::vector<double> >& terms, const std::ve
             a[c * m + r] = sum;
          }
       }
+      // A small ridge, the same for every column, scaled by the average
+      // column. It shrinks terms far smaller than the others (scales more
+      // than about 1e4 apart), which a per-column ridge would not; that was
+      // tried and halved recovery on Friedman #1 (21/60 to 11/60 seeds),
+      // because the shared ridge also discourages explosive terms.
       double trace = 0.0;
       for (std::size_t r = 0 ; r < m ; r++) trace += a[r * m + r];
       const double ridge = 1e-10 * trace / static_cast<double>(m);
@@ -188,14 +218,55 @@ bool evaluateTerms(const Expression& expression, const std::vector<int>& terms,
 
 double rSquared(double mse, double variance)
 {
-   return variance > kVarianceEpsilon ? 1.0 - mse / variance : 0.0;
+   return variance > 0.0 ? 1.0 - mse / variance : 0.0;
 }
 
+// Length of the valid UTF-8 sequence starting at text[at], or 0 if the bytes
+// there are not valid UTF-8 (overlong forms and surrogates included).
+std::size_t utf8SequenceLength(const std::string& text, std::size_t at)
+{
+   const unsigned char lead = static_cast<unsigned char>(text[at]);
+   std::size_t length = 0;
+   unsigned int code = 0;
+   if (lead < 0x80) return 1;
+   else if ((lead & 0xE0) == 0xC0) { length = 2; code = lead & 0x1F; }
+   else if ((lead & 0xF0) == 0xE0) { length = 3; code = lead & 0x0F; }
+   else if ((lead & 0xF8) == 0xF0) { length = 4; code = lead & 0x07; }
+   else return 0;
+   if (at + length > text.size()) return 0;
+   for (std::size_t i = 1 ; i < length ; i++)
+   {
+      const unsigned char next = static_cast<unsigned char>(text[at + i]);
+      if ((next & 0xC0) != 0x80) return 0;
+      code = (code << 6) | (next & 0x3F);
+   }
+   const unsigned int minimum[] = {0, 0, 0x80, 0x800, 0x10000};
+   if (code < minimum[length] || code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF)) return 0;
+   return length;
+}
+
+// A JSON string literal. Bytes that are not valid UTF-8 (for example a
+// Latin-1 column name) become U+FFFD so the report stays valid JSON.
 void writeJsonString(std::ostream& out, const std::string& text)
 {
    out << '"';
-   for (char c : text)
+   for (std::size_t at = 0 ; at < text.size() ; )
    {
+      const char c = text[at];
+      const std::size_t length = utf8SequenceLength(text, at);
+      if (length == 0)
+      {
+         out << "\\ufffd";
+         ++at;
+         continue;
+      }
+      if (length > 1)
+      {
+         out << text.substr(at, length);
+         at += length;
+         continue;
+      }
+      ++at;
       switch (c)
       {
       case '"': out << "\\\""; break;
@@ -263,6 +334,29 @@ SymbolicRegression::SymbolicRegression(Dataset dataset, Config config)
    train_ = makeSplit(dataset_, trainRows_);
    test_ = makeSplit(dataset_, testRows_);
 
+   const int shown = std::min(dataset_.rowCount(), kMaxVisualizationRows);
+   for (int i = 0 ; i < shown ; i++)
+   {
+      const int row = static_cast<int>(static_cast<long long>(i) * dataset_.rowCount() / shown);
+      visualizationRows_.push_back(row);
+      visualizationInputs_.push_back(dataset_.inputs[row]);
+   }
+
+   // Values beyond the formula evaluator's overflow limit cannot take part
+   // in any operation, which would silently restrict the search; ask for the
+   // data to be rescaled instead.
+   for (int row = 0 ; row < dataset_.rowCount() ; row++)
+   {
+      bool tooLarge = std::fabs(dataset_.targets[row]) > Expression::kMaximumMagnitude;
+      for (double value : dataset_.inputs[row]) tooLarge = tooLarge || std::fabs(value) > Expression::kMaximumMagnitude;
+      if (tooLarge)
+      {
+         throw GAFatalException(__FILE__, __LINE__,
+                                "Data values above 1e12 in magnitude are not supported; rescale the column "
+                                "(for example to other units) and try again");
+      }
+   }
+
    // Cross-validation folds over the training rows, assigned from a fixed
    // shuffle so every GA seed is judged on the same folds.
    const int folds = config_.crossValidationFolds;
@@ -292,7 +386,7 @@ SymbolicRegression::SymbolicRegression(Dataset dataset, Config config)
          foldHeld_.push_back(makeSplit(dataset_, heldRows));
       }
    }
-   if (train_.variance <= kVarianceEpsilon)
+   if (!hasVariance(train_.variance, train_.mean))
    {
       throw GAFatalException(__FILE__, __LINE__, "The target column is constant on the training rows");
    }
@@ -424,7 +518,7 @@ SymbolicRegression::Fit SymbolicRegression::describe(const BaseString& genes) co
    fit.fitness = trainMse / train_.variance +
                  config_.parsimony * (fit.size + config_.termPenaltyNodes * extraTerms);
 
-   heldOutScore(expression, fit, test_, fit.testR2, fit.testRmse);
+   heldOutScore(expression, fit, test_, fit.testR2, fit.testRmse, fit.testR2Defined);
    return fit;
 }
 
@@ -451,10 +545,11 @@ bool SymbolicRegression::predictRows(const Expression& expression, const Fit& fi
 
 // Score a held-out split with the model fitted on the training rows.
 void SymbolicRegression::heldOutScore(const Expression& expression, const Fit& fit,
-                                      const Split& split, double& r2, double& rmse) const
+                                      const Split& split, double& r2, double& rmse, bool& defined) const
 {
    r2 = 0.0;
    rmse = 0.0;
+   defined = false;
    if (split.targets.empty())
    {
       return;
@@ -465,6 +560,7 @@ void SymbolicRegression::heldOutScore(const Expression& expression, const Fit& f
       // Defined on the training rows but not on held-out ones: it does not
       // generalize, so report it as having no predictive value.
       rmse = std::sqrt(split.variance);
+      defined = hasVariance(split.variance, split.mean);
       return;
    }
    double total = 0.0;
@@ -476,6 +572,7 @@ void SymbolicRegression::heldOutScore(const Expression& expression, const Fit& f
    const double mse = total / static_cast<double>(predictions.size());
    rmse = std::sqrt(mse);
    r2 = rSquared(mse, split.variance);
+   defined = hasVariance(split.variance, split.mean);
 }
 
 BaseString SymbolicRegression::genesFromValues(const std::vector<int>& values) const
@@ -516,7 +613,10 @@ bool SymbolicRegression::selectByCrossValidation(std::vector<int>& genes, Fit& f
          bestStandardError = standardError;
       }
    }
-   const double threshold = bestMse + config_.selectionStandardErrors * bestStandardError;
+   // The floor keeps rounding-level differences on (near-)exact data from
+   // counting as evidence that a larger formula is better.
+   const double threshold = bestMse + config_.selectionStandardErrors * bestStandardError +
+                            1e-9 * train_.variance;
    for (const Scored& candidate : scored)
    {
       if (candidate.mse <= threshold)
@@ -591,7 +691,8 @@ std::string SymbolicRegression::scaledFormula(const Fit& fit) const
    // belongs to the term as split off (any top-level minus sign removed), so
    // the term's own text is printed, not the whole formula's.
    bool first = true;
-   if (std::fabs(fit.intercept) > 1e-9)
+   // An intercept that is rounding noise relative to the target is omitted.
+   if (std::fabs(fit.intercept) > 1e-9 * (std::sqrt(train_.variance) + std::fabs(train_.mean)))
    {
       out << fit.intercept;
       first = false;
@@ -667,7 +768,10 @@ void SymbolicRegression::printCandidate(const BaseString& genes, std::ostream& o
           << " train R2=" << fit.trainR2 << " RMSE=" << fit.trainRmse;
       if (testRowCount() > 0)
       {
-         out << " | test R2=" << fit.testR2 << " RMSE=" << fit.testRmse;
+         out << " | test R2=";
+         if (fit.testR2Defined) out << fit.testR2;
+         else out << "n/a";
+         out << " RMSE=" << fit.testRmse;
       }
       out << std::defaultfloat;
       // With several inputs, which ones the formula reads is a result in
@@ -690,7 +794,7 @@ void SymbolicRegression::writeVisualizationJson(const BaseString& genes, std::os
    Expression expression = Expression::compile(genes, instructions_);
    tuneConstants(expression, train_);
    std::vector<double> predictions;
-   const bool defined = predictRows(expression, fit, dataset_.inputs, predictions);
+   const bool defined = predictRows(expression, fit, visualizationInputs_, predictions);
 
    out << "{ \"type\": \"regression\", \"target\": ";
    writeJsonString(out, dataset_.targetName);
@@ -711,15 +815,27 @@ void SymbolicRegression::writeVisualizationJson(const BaseString& genes, std::os
       writeJsonString(out, fit.inputsUsed[i]);
    }
    out << "]"
-       << ", \"train_r2\": " << (fit.valid ? fit.trainR2 : 0.0)
-       << ", \"test_r2\": " << (fit.valid ? fit.testR2 : 0.0)
+       << ", \"train_r2\": " << (fit.valid ? fit.trainR2 : 0.0);
+   // test_r2 is null when the test rows have no variance.
+   if (fit.valid && fit.testR2Defined) out << ", \"test_r2\": " << fit.testR2;
+   else out << ", \"test_r2\": null";
+   // Exact coefficients (the formula text rounds them to 4 digits).
+   out << std::setprecision(17) << ", \"intercept\": " << (fit.valid ? fit.intercept : 0.0)
+       << ", \"term_weights\": [";
+   for (std::size_t i = 0 ; fit.valid && i < fit.weights.size() ; i++)
+   {
+      out << (i == 0 ? "" : ", ") << fit.weights[i];
+   }
+   out << "]" << std::setprecision(10)
+       << ", \"rows_total\": " << dataset_.rowCount()
        << ", \"points\": [";
 
    std::vector<char> isTest(dataset_.rowCount(), 0);
    for (int row : testRows_) isTest[row] = 1;
-   for (int row = 0 ; row < dataset_.rowCount() ; row++)
+   for (std::size_t shown = 0 ; shown < visualizationRows_.size() ; shown++)
    {
-      if (row > 0) out << ", ";
+      const int row = visualizationRows_[shown];
+      if (shown > 0) out << ", ";
       out << "{ \"inputs\": [";
       for (int i = 0 ; i < dataset_.inputCount() ; i++)
       {
@@ -729,7 +845,7 @@ void SymbolicRegression::writeVisualizationJson(const BaseString& genes, std::os
       out << "], \"y\": " << dataset_.targets[row];
       if (defined)
       {
-         out << ", \"predicted\": " << predictions[row];
+         out << ", \"predicted\": " << predictions[shown];
       }
       out << ", \"set\": \"" << (isTest[row] ? "test" : "train") << "\" }";
    }
@@ -772,15 +888,15 @@ void SymbolicRegression::writeVisualizationJson(const BaseString& genes, std::os
    out << " }" << std::defaultfloat << std::setprecision(6);
 }
 
-// Partial dependence: for each input, the prediction averaged over every
-// data row with that input set to each value on a grid across its range.
+// Partial dependence: for each input, the prediction averaged over the
+// plotted data rows (every row for files up to 1000 rows) with that input set to each value on a grid across its range.
 // Averaging over the data (rather than holding the other inputs at fixed
 // values) keeps interactions such as x1*x2 honest. A grid value at which the
 // formula is undefined for some row is left out.
 void SymbolicRegression::writeEffectsJson(const Expression& expression, const Fit& fit, std::ostream& out) const
 {
    out << ", \"effects\": [";
-   std::vector<std::vector<double> > rows = dataset_.inputs;
+   std::vector<std::vector<double> > rows = visualizationInputs_;
    std::vector<double> predictions;
    for (int column = 0 ; column < dataset_.inputCount() ; column++)
    {
@@ -809,7 +925,7 @@ void SymbolicRegression::writeEffectsJson(const Expression& expression, const Fi
          out << (first ? "" : ", ") << "[" << x << ", " << mean << "]";
          first = false;
       }
-      for (std::size_t row = 0 ; row < rows.size() ; row++) rows[row][column] = dataset_.inputs[row][column];
+      for (std::size_t row = 0 ; row < rows.size() ; row++) rows[row][column] = visualizationInputs_[row][column];
       out << "] }";
    }
    out << "]";
@@ -899,7 +1015,7 @@ void SymbolicRegression::writeSampleJson(const BaseString& genes, std::ostream& 
    else if (fit.valid)
    {
       std::vector<double> predictions;
-      if (predictRows(expression, fit, dataset_.inputs, predictions))
+      if (predictRows(expression, fit, visualizationInputs_, predictions))
       {
          out << ", \"predicted\": [";
          for (std::size_t row = 0 ; row < predictions.size() ; row++)

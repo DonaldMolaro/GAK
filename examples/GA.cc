@@ -154,7 +154,7 @@ void printF6Input()
   printSectionHeading("Problem input:");
   printLabeledLine("problem", "F6 objective");
   printLabeledLine("encoding", "22 bits for X, 22 bits for Y");
-  printLabeledLine("scaling", "decoded / 1000, then shift by -100");
+  printLabeledLine("scaling", "each axis mapped linearly onto [-100, 100]");
   std::cout << '\n';
   finishInputSection();
 }

@@ -79,6 +79,9 @@ public:
       int size = 0;                 // formula nodes
       double trainR2 = 0.0;
       double testR2 = 0.0;
+      // False when the test rows have no variance (R² is then undefined),
+      // for example with very few test rows.
+      bool testR2Defined = false;
       double trainRmse = 0.0;
       double testRmse = 0.0;
       // Set only by selectByCrossValidation.
@@ -154,7 +157,7 @@ private:
       std::vector<int> genes;
    };
    void heldOutScore(const Expression& expression, const Fit& fit,
-                     const Split& split, double& r2, double& rmse) const;
+                     const Split& split, double& r2, double& rmse, bool& defined) const;
    // Predictions of a fitted formula on `inputs`; false if it is undefined.
    bool predictRows(const Expression& expression, const Fit& fit,
                     const std::vector<std::vector<double> >& inputs,
@@ -175,4 +178,6 @@ private:
    std::vector<Split> foldHeld_; // per fold: the training rows inside it
    Split test_;
    std::map<int, Archived> archive_;
+   std::vector<int> visualizationRows_;                     // rows plotted, at most 1000
+   std::vector<std::vector<double> > visualizationInputs_;  // their inputs
 };

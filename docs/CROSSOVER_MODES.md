@@ -3,7 +3,12 @@
 The built-in chromosome crossover strategies live in
 [src/chromosome.cc](../src/chromosome.cc) and are
 selected through `Chromosome::CrossoverType` in
-[src/chromosome.hh](../src/chromosome.hh).
+[src/chromosome.hh](../src/chromosome.hh) when calling `Chromosome::mate`.
+
+`Population` itself always uses `SinglePoint` (in the default
+`PopulationProblem::mateCandidates`); there is no setting for it. To use
+another mode in a run, override `mateCandidates` in your problem and pass the
+type to `mother.mate(...)`.
 
 Available built-in modes:
 
@@ -88,7 +93,7 @@ The built-in modes are intentionally generic. They are a good fit for examples
 such as:
 
 - `D`
-- `F6`
+- `6` (F6)
 - `K`
 - some symbolic search problems
 

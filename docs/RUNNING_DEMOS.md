@@ -209,8 +209,10 @@ constraint-aware operators.
 ./GA T --seed 1 --grid 200
 ```
 
-This is a good reminder that generic operators can attack ordering problems,
-but may not preserve structure as well as a custom route encoding would.
+The traveling salesman mode uses permutation-preserving operators
+(random-permutation initialization, order crossover and swap mutation), so
+every candidate is a valid tour. Compare it with `A`, an ordering problem
+solved with the generic operators and a pairwise-order score.
 
 ## When To Move Beyond CLI Tuning
 
@@ -232,3 +234,17 @@ and
 
 For repeatable multi-seed experiments, see
 [examples/experiments.md](../examples/experiments.md).
+
+## Viewer Troubleshooting
+
+### The file button does nothing (Firefox on Linux)
+
+On Linux, Firefox opens file dialogs through the desktop portal service
+(`xdg-desktop-portal`). When Firefox runs on a remote machine and is shown
+through SSH X forwarding, that service is started without a display and
+fails, so clicking the file button silently does nothing. Either:
+
+- open `about:config` and set `widget.use-xdg-desktop-portal.file-picker` to
+  `0`, so Firefox draws its own file dialog; or
+- open the report in an editor, copy it, and paste it into the viewer's
+  **Or paste JSON directly** box.

@@ -177,6 +177,10 @@ The current visualization stack supports:
 - grid and assignment views for timetable problems
 - board and selection views for other visual examples such as N-Queens,
   Latin squares, and knapsack
+- for symbolic regression: the data with the fitted curve (one input) or
+  predicted against measured values (several inputs), plus, with several
+  inputs, each term's share of the explained variance, residuals and effect
+  curves for each input, and how much of the population uses each input
 
 ## 4. Candidate Representation
 
@@ -457,6 +461,9 @@ The framework is especially well suited to:
 - symbolic sequence problems such as spelling and ordering
 - board and constraint problems such as N-Queens and Latin squares
 - black-box benchmark optimization with discrete encodings
+- symbolic regression: discovering a formula that fits measured data, with
+  formulas encoded as postfix programs over a symbolic gene alphabet (see
+  [SYMBOLIC_REGRESSION.md](SYMBOLIC_REGRESSION.md))
 
 ### 9.2 Problems that usually need custom operators
 
@@ -486,9 +493,13 @@ search as inherently untestable.
 
 Runs can be fixed-seed and reported with their active seed, making both
 debugging and experimental comparison much easier. Seeded runs are identical
-across platforms and standard libraries: random draws go through portable
-helpers in `src/random.hh` that consume only raw `std::mt19937` output, and
-the population sort is stable, so tied fitness values keep a defined order.
+across GCC/libstdc++ and Clang/libc++: random draws go through portable
+helpers in `src/random.hh` that consume only raw `std::mt19937` output, the
+population sort is stable, so tied fitness values keep a defined order, and
+the build disables floating-point contraction (`-ffp-contract=off`). Fitness
+functions that call math-library routines (`std::sin`, `std::exp`) can still
+differ in the last bit on another operating system's math library; see
+[LIMITATIONS.md](LIMITATIONS.md#reproducibility).
 
 ### 10.2 Test coverage
 
@@ -602,7 +613,9 @@ limitations fall into three categories.
 
 These limits are not merely missing features. They define the project’s
 current position: a compact, explicit, reproducible GA toolkit for symbolic,
-discrete, and structure-aware search.
+discrete, and structure-aware search. The concrete, operational limits (hard
+size limits, what reproducibility covers, what symbolic regression cannot do)
+are listed in [LIMITATIONS.md](LIMITATIONS.md).
 
 ## 13. Roadmap
 

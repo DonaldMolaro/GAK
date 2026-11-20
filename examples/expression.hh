@@ -60,6 +60,10 @@ struct ExpressionNode
 class Expression
 {
 public:
+   // Any value whose magnitude exceeds this counts as overflow, which makes
+   // the formula undefined.
+   static constexpr double kMaximumMagnitude = 1e12;
+
    static Expression compile(const BaseString& genes, const InstructionSet& instructions);
 
    bool empty() const { return nodes_.empty(); }

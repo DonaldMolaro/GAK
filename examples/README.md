@@ -51,7 +51,7 @@ Run the example driver from this directory:
 Supported modes:
 
 - `D`: Dome benchmark minimization
-- `F6`: F6 benchmark minimization
+- `6`: F6 benchmark minimization
 - `A`: alphabet ordering
 - `S`: spelling a target word
 - `T`: traveling salesman
@@ -68,7 +68,7 @@ Supported modes:
 
 1. `K` for binary decision vectors
 2. `A` and `S` for symbolic chromosomes
-3. `D` and `F6` for numeric black-box optimization
+3. `D` and `6` (F6) for numeric black-box optimization
 4. `Q`, `L`, and `G` for constraint scoring on boards and graphs
 5. `M` for scheduling-style symbolic search
 6. `U` and `C` for representation and operator design

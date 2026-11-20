@@ -140,9 +140,13 @@ Why custom operators help:
 - generic crossover often duplicates values or breaks uniqueness
 - swap-based mutation and row/order-aware crossover are usually better
 
-Reference example:
+Reference examples:
 
-- [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc)
+- [examples/ts.cc](../examples/ts.cc): a whole-chromosome permutation with
+  random-permutation initialization, order crossover and swap mutation, the
+  most direct template for routing and ordering problems
+- [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc):
+  permutations within rows, with locked positions
 
 ### Problems With Exact Known Wins
 

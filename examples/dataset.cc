@@ -82,6 +82,12 @@ Dataset loadCsvDataset(std::istream& in,
    while (std::getline(in, line))
    {
       ++lineNumber;
+      // A UTF-8 byte-order mark (written by some spreadsheet exports) is
+      // not part of the first column's name.
+      if (lineNumber == 1 && line.compare(0, 3, "\xEF\xBB\xBF") == 0)
+      {
+         line.erase(0, 3);
+      }
       if (!trim(line).empty())
       {
          header = splitFields(line);
@@ -96,11 +102,18 @@ Dataset loadCsvDataset(std::istream& in,
    {
       fail(sourceName, lineNumber, "need at least one input column and one target column");
    }
-   for (const std::string& name : header)
+   for (std::size_t column = 0 ; column < header.size() ; column++)
    {
-      if (name.empty())
+      if (header[column].empty())
       {
          fail(sourceName, lineNumber, "header has an empty column name");
+      }
+      for (std::size_t other = 0 ; other < column ; other++)
+      {
+         if (header[other] == header[column])
+         {
+            fail(sourceName, lineNumber, "column name '" + header[column] + "' appears more than once");
+         }
       }
    }
 

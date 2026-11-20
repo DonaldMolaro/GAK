@@ -69,7 +69,8 @@ inline double uniformReal(std::mt19937& generator, double low, double high)
    return low + (high - low) * uniformUnit(generator);
 }
 
-// True with the given probability (always consumes one draw).
+// True with the given probability (always consumes one uniformUnit, which is
+// two raw generator draws).
 inline bool chance(std::mt19937& generator, double probability)
 {
    return uniformUnit(generator) < probability;
