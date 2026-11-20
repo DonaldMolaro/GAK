@@ -7,15 +7,19 @@ coefficients of a model you chose in advance.
 ```sh
 make examples
 cd examples
-./GA R --data data/pendulum.csv --seed 1
+./GA R --data data/exponential_decay.csv --seed 1
 ```
 
 ```
-period_s ~= 0.01133 + 1.997*(sqrt(length_m)) | nodes=2 train R2=0.9981 RMSE=0.0282 | test R2=0.9983 RMSE=0.0243
+Selected by 5-fold cross-validation (from the best formula of each of 35 sizes; cv R2=0.9398 RMSE=31.8478):
+counts ~= -3.863 + 497.7*(exp(time_s*(-0.3079))) | nodes=4 train R2=0.9526 RMSE=28.2623 | test R2=0.7880 RMSE=34.8576 ::0.055440
 ```
 
-The true law is `T = 2π√(L/9.81) ≈ 2.006 √L`; the GA recovered the square-root
-law and a coefficient within 0.5% from 30 noisy training points.
+The true law is `counts = 500 e^(−0.3t)`; the GA recovered the exponential,
+its amplitude within 0.5% and its rate within 3%, from 38 heavily noisy
+training points. The lower test R² is not overfitting: the noise is
+largest where the counts are high, and a few of those early points landed in
+the held-out rows.
 
 ## Options
 
@@ -26,6 +30,8 @@ law and a coefficient within 0.5% from 30 noisy training points.
 | `--holdout R` | Share of rows held out to test generalization (default `0.25`, may be `0`). |
 | `--restarts N` | Independent populations; the one with the best *training* fitness is reported (default `4`). |
 | `--tuning N` | Constant-tuning evaluations per formula (default `40`; `0` turns tuning off). |
+| `--folds N` | Cross-validation folds for choosing the final formula (default `5`; `0` reports the GA's best training fit instead). |
+| `--cv-se R` | Choose the smallest formula within R standard errors of the best cross-validated error (default `1`; lower favours richer formulas). |
 | `--trials N` | Evaluation budget **per restart** (default `15000`). |
 | `--seed N`, `--population N`, `--mutation R`, `--crossover R`, `--selection S`, `--tournament N` | As for every mode. |
 | `--report-json P`, `--report-csv P` | Reports; the JSON includes a `regression` visualization for `viewer.html`. |
@@ -36,7 +42,8 @@ Test datasets with known answers are in [examples/data](../examples/data/README.
 
 ## Reading the output
 
-Each result line shows:
+The run ends with the **selected** formula (see "Choosing the final formula"
+below), printed after the GA's own best formulas. Each result line shows:
 
 - the formula, as `a + b*(f)`: `f` is what the GA evolved, and `a` and `b`
   are fitted afterwards (see linear scaling below);
@@ -92,6 +99,31 @@ derived from `--seed`, and reports the one with the lowest training fitness.
 The held-out rows never influence that choice, so the reported test score
 stays an honest estimate. Restart 1 always uses the `--seed` value itself.
 
+### Choosing the final formula
+
+The GA minimizes *training* error, and on noisy data training error always
+rewards extra terms that follow the noise: on `linear_noisy` most runs end on
+a line decorated with wiggles such as `0.58·cos(x²)`. So the GA's best
+formula is not the answer. Instead:
+
+1. **Archive.** Throughout the search (all restarts), the formula with the
+   lowest training error is kept for each formula size.
+2. **Cross-validate.** Each archived structure is scored by 5-fold
+   cross-validation on the training rows: its constants and scaling are refit
+   on four folds and it predicts the fifth, so every training row is predicted
+   by a fit that never saw it.
+3. **One-standard-error rule.** Among the formulas whose cross-validated
+   error is within one standard error of the best, the smallest wins. With a
+   few dozen noisy points, smaller differences in error are not evidence that
+   a larger formula is better.
+
+The test rows play no part, so the reported test score stays honest.
+`--folds 0` turns selection off; `--cv-se` makes the rule stricter or looser.
+
+A single validation split was tried first and rejected: on small files it
+leaves too few rows (9 for `pendulum`), and its noisy error estimate chose
+badly in both directions.
+
 ### Linear scaling
 
 For each candidate `f`, the intercept `a` and slope `b` minimizing the squared
@@ -130,41 +162,62 @@ with constant tuning it lowered the recovery rate.
 
 ## Results on the bundled datasets
 
-A run counts as a recovery when the reported formula's RMSE on the full
-dataset is within 5% of the true formula's RMSE (the noise level listed in
-[examples/data](../examples/data/README.md)). The defaults were chosen using
-seeds 1–10; the table reports seeds **11–20**, which played no part in that
-choice:
+The datasets carry heavy noise (about 30% of each signal's spread; see
+[examples/data](../examples/data/README.md)). Two measures, seeds 11–20:
 
-| Dataset | Before (no tuning, 1 run) | Tuning only | Default (tuning + 4 restarts) |
-|---|---|---|---|
-| `linear_noisy` | 10 / 10 | 10 / 10 | 10 / 10 |
-| `quadratic` | 9 / 10 | 10 / 10 | 10 / 10 |
-| `sine_trend` | 3 / 10 | 10 / 10 | 10 / 10 |
-| `exponential_decay` | 2 / 10 | 6 / 10 | 10 / 10 |
-| `pendulum` | 10 / 10 | 10 / 10 | 10 / 10 |
-| `rational` | 1 / 10 | 6 / 10 | 7 / 10 |
-| `two_input` | 1 / 10 | 2 / 10 | 2 / 10 |
-| **Total** | **36 / 70** | **54 / 70** | **59 / 70** |
+- **Test R²**: how well the formula predicts the held-out rows. This is what
+  you can measure on real data.
+- **Structure recovered**: how often the fitted curve matches the noise-free
+  true curve as closely as the true formula fitted to the same noisy rows
+  could (within 0.15 of that "oracle" curve error, in units of the noise).
+  This needs the known truth, so it is only available for test data.
 
-The "before" and "tuning only" columns use a single run of 60,000
-evaluations, the same total budget as the default's 4 × 15,000.
+| Dataset | Median test R², GA's best | Median test R², selected (default) | Structure recovered, GA's best | Structure recovered, selected |
+|---|---|---|---|---|
+| `linear_noisy` | 0.945 | **0.960** | 3 / 10 | 6 / 10 |
+| `quadratic` | 0.863 | 0.863 | 10 / 10 | 10 / 10 |
+| `sine_trend` | 0.902 | 0.902 | 8 / 10 | 9 / 10 |
+| `exponential_decay` | 0.788 | 0.788 | 10 / 10 | 9 / 10 |
+| `pendulum` | 0.921 | **0.933** | 9 / 10 | 2 / 10 |
+| `rational` | 0.882 | 0.882 | 6 / 10 | 6 / 10 |
+| `two_input` | 0.918 | 0.918 | 7 / 10 | 7 / 10 |
+| **Total** | | | **53 / 70** | **49 / 70** |
 
-Typical recovered formulas:
+Selection never lowers the median test score, and raises it on the two
+datasets where it changes the answer. The two measures disagree on
+`pendulum`: at this noise level, over 0.1–3 m, a straight line in `L`
+predicts the held-out rows as well as `√L` (better, in fact), so the
+one-standard-error rule picks the simpler line. It is the better predictor
+but not the true law. `--cv-se 0.5` keeps `√L` on 8 of 10 seeds at the cost
+of keeping noise wiggles on `linear_noisy` (4 / 10 there).
 
-- `counts ≈ 500·exp(−0.3015·t)` (true `500 e^(−0.3t)`)
-- `y ≈ 0.9956·x / (1 + x²)` (true `x / (1 + x²)`)
-- `period_s ≈ 1.997·√length_m` (true `2.006 √L`)
+| Selection rule | Structure recovered (of 70) |
+|---|---|
+| None (GA's best) | 53 |
+| 5-fold CV, lowest error (0 SE) | 42 |
+| 5-fold CV, 0.5 SE | 54 |
+| 5-fold CV, 1 SE (default) | 49 |
+| 10-fold CV, 0.5 / 1 SE | 52 / 49 |
 
-`linear_outliers` is left out of the count: squared error is pulled by the
+Picking the lowest cross-validated error is worse than no selection: choosing
+the best of 20 or more formulas by a noisy estimate overfits that estimate.
+
+The same structure criterion on the earlier low-noise versions of these files
+(noise 3–12% of the signal) gave 59 / 70 with the GA's best.
+
+`linear_outliers` is left out of the counts: squared error is pulled by the
 outliers, so the best-scoring formula is not the true line.
 
 ## Known limitations and next steps
 
-- **Two-input interactions.** `two_input` (`x1·x2 + sin(x1)`) is still found
-  on only about 2–7 seeds in 10. Most misses stop at `x1·(x2 + c)`, a good
-  approximation that the search rarely leaves. More restarts help (6/10 with
-  4 × 60,000 evaluations on seeds 1–10); island populations with migration
+- **What noisy data cannot tell apart.** With a few dozen points at 30%
+  noise, `√L` and a straight line, or a line with and without a small
+  wiggle, predict about equally well. Cross-validated selection then prefers
+  the simpler formula, which predicts at least as well but may not be the
+  true law. More data, or lower noise, is the only real cure; `--cv-se`
+  chooses which way to lean.
+- **Two-input interactions.** `x1·(x2 + c)` is a strong local optimum for
+  `x1·x2 + sin(x1)`; restarts help, and island populations with migration
   would be the next step.
 - **Outliers.** The loss is squared error, so a few gross outliers pull the
   fit. A robust loss (absolute or Huber error) would be an option to add.

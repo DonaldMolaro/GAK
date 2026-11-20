@@ -111,6 +111,14 @@ SymbolicRegression::SymbolicRegression(Dataset dataset, Config config)
    {
       throw GAFatalException(__FILE__, __LINE__, "Holdout fraction must be at least 0 and below 1");
    }
+   if (config_.crossValidationFolds < 0)
+   {
+      throw GAFatalException(__FILE__, __LINE__, "Cross-validation folds must not be negative");
+   }
+   if (!(config_.selectionStandardErrors >= 0.0))
+   {
+      throw GAFatalException(__FILE__, __LINE__, "The selection standard-error margin must not be negative");
+   }
    if (config_.minimumInitialLength < 1 ||
        config_.maximumInitialLength < config_.minimumInitialLength ||
        config_.maximumLength < config_.maximumInitialLength)
@@ -137,6 +145,36 @@ SymbolicRegression::SymbolicRegression(Dataset dataset, Config config)
    }
    train_ = makeSplit(dataset_, trainRows_);
    test_ = makeSplit(dataset_, testRows_);
+
+   // Cross-validation folds over the training rows, assigned from a fixed
+   // shuffle so every GA seed is judged on the same folds.
+   const int folds = config_.crossValidationFolds;
+   if (folds >= 2)
+   {
+      if (static_cast<int>(trainRows_.size()) < 2 * folds)
+      {
+         throw GAFatalException(__FILE__, __LINE__,
+                                "Too few training rows for the requested cross-validation folds");
+      }
+      std::vector<int> positions(trainRows_.size());
+      for (std::size_t i = 0 ; i < positions.size() ; i++)
+      {
+         positions[i] = static_cast<int>(i);
+      }
+      std::mt19937 foldGenerator(config_.splitSeed + 1u);
+      gak::shuffle(positions.begin(), positions.end(), foldGenerator);
+      for (int fold = 0 ; fold < folds ; fold++)
+      {
+         std::vector<int> fitRows;
+         std::vector<int> heldRows;
+         for (std::size_t i = 0 ; i < positions.size() ; i++)
+         {
+            (static_cast<int>(i) % folds == fold ? heldRows : fitRows).push_back(trainRows_[positions[i]]);
+         }
+         foldFit_.push_back(makeSplit(dataset_, fitRows));
+         foldHeld_.push_back(makeSplit(dataset_, heldRows));
+      }
+   }
    if (train_.variance <= kVarianceEpsilon)
    {
       throw GAFatalException(__FILE__, __LINE__, "The target column is constant on the training rows");
@@ -165,14 +203,14 @@ SymbolicRegression::Split SymbolicRegression::makeSplit(const Dataset& dataset, 
    return split;
 }
 
-double SymbolicRegression::trainingError(const Expression& expression) const
+double SymbolicRegression::scaledError(const Expression& expression, const Split& rows) const
 {
    thread_local std::vector<double> predictions;
-   if (!expression.evaluate(train_.inputs, predictions))
+   if (!expression.evaluate(rows.inputs, predictions))
    {
       return std::numeric_limits<double>::infinity();
    }
-   const double mse = meanSquaredError(predictions, train_.targets, fitScaling(predictions, train_.targets));
+   const double mse = meanSquaredError(predictions, rows.targets, fitScaling(predictions, rows.targets));
    return std::isfinite(mse) ? mse : std::numeric_limits<double>::infinity();
 }
 
@@ -182,14 +220,14 @@ double SymbolicRegression::trainingError(const Expression& expression) const
 // structure; this finds values such as the 0.3 in exp(-0.3 t) that the
 // constant table cannot express directly. No randomness is used, so the
 // result depends only on the formula and the data.
-void SymbolicRegression::tuneConstants(Expression& expression) const
+void SymbolicRegression::tuneConstants(Expression& expression, const Split& rows) const
 {
    const std::vector<int> constants = expression.constantNodes();
    if (constants.empty() || config_.constantTuningBudget <= 0)
    {
       return;
    }
-   double best = trainingError(expression);
+   double best = scaledError(expression, rows);
    if (!std::isfinite(best))
    {
       return;
@@ -206,7 +244,7 @@ void SymbolicRegression::tuneConstants(Expression& expression) const
          for (double candidate : {original + delta, original - delta})
          {
             expression.setConstant(node, candidate);
-            const double error = trainingError(expression);
+            const double error = scaledError(expression, rows);
             ++evaluations;
             if (error < best)
             {
@@ -233,7 +271,7 @@ SymbolicRegression::Fit SymbolicRegression::describe(const BaseString& genes) co
    Fit fit;
    fit.fitness = kInvalidFitness;
    Expression expression = Expression::compile(genes, instructions_);
-   tuneConstants(expression);
+   tuneConstants(expression, train_);
    fit.size = expression.size();
    fit.formula = expression.toString(dataset_.inputNames);
 
@@ -256,24 +294,124 @@ SymbolicRegression::Fit SymbolicRegression::describe(const BaseString& genes) co
    fit.trainR2 = rSquared(trainMse, train_.variance);
    fit.fitness = trainMse / train_.variance + config_.parsimony * fit.size;
 
-   if (!test_.targets.empty())
+   heldOutScore(expression, fit.intercept, fit.slope, test_, fit.testR2, fit.testRmse);
+   return fit;
+}
+
+// Score a held-out split with the scaling fitted on the training rows.
+void SymbolicRegression::heldOutScore(const Expression& expression, double intercept, double slope,
+                                      const Split& split, double& r2, double& rmse) const
+{
+   r2 = 0.0;
+   rmse = 0.0;
+   if (split.targets.empty())
    {
-      std::vector<double> testPredictions;
-      if (expression.evaluate(test_.inputs, testPredictions))
+      return;
+   }
+   std::vector<double> predictions;
+   if (!expression.evaluate(split.inputs, predictions))
+   {
+      // Defined on the training rows but not on held-out ones: it does not
+      // generalize, so report it as having no predictive value.
+      rmse = std::sqrt(split.variance);
+      return;
+   }
+   Scaling scaling;
+   scaling.intercept = intercept;
+   scaling.slope = slope;
+   const double mse = meanSquaredError(predictions, split.targets, scaling);
+   rmse = std::sqrt(mse);
+   r2 = rSquared(mse, split.variance);
+}
+
+BaseString SymbolicRegression::genesFromValues(const std::vector<int>& values) const
+{
+   BaseString genes(static_cast<int>(values.size()), alphabetSize());
+   for (int i = 0 ; i < static_cast<int>(values.size()) ; i++)
+   {
+      genes.setValue(i, values[i]);
+   }
+   return genes;
+}
+
+bool SymbolicRegression::selectByCrossValidation(std::vector<int>& genes, Fit& fit) const
+{
+   if (foldFit_.empty() || archive_.empty())
+   {
+      return false;
+   }
+   // One-standard-error rule: find the lowest cross-validated error, then
+   // take the smallest formula (the archive is ordered by size) whose error
+   // is within `selectionStandardErrors` standard errors of it.
+   struct Scored { const Archived* archived; double mse; };
+   std::vector<Scored> scored;
+   double bestMse = std::numeric_limits<double>::infinity();
+   double bestStandardError = 0.0;
+   for (const auto& entry : archive_)
+   {
+      double mse = 0.0;
+      double standardError = 0.0;
+      if (!crossValidationStats(genesFromValues(entry.second.genes), mse, standardError))
       {
-         const double testMse = meanSquaredError(testPredictions, test_.targets, scaling);
-         fit.testRmse = std::sqrt(testMse);
-         fit.testR2 = rSquared(testMse, test_.variance);
+         continue;
       }
-      else
+      scored.push_back(Scored{&entry.second, mse});
+      if (mse < bestMse)
       {
-         // Defined on the training rows but not on held-out ones: it does
-         // not generalize, so report it as having no predictive value.
-         fit.testRmse = std::sqrt(test_.variance);
-         fit.testR2 = 0.0;
+         bestMse = mse;
+         bestStandardError = standardError;
       }
    }
-   return fit;
+   const double threshold = bestMse + config_.selectionStandardErrors * bestStandardError;
+   for (const Scored& candidate : scored)
+   {
+      if (candidate.mse <= threshold)
+      {
+         genes = candidate.archived->genes;
+         fit = describe(genesFromValues(genes));
+         fit.crossValidatedRmse = std::sqrt(candidate.mse);
+         fit.crossValidatedR2 = rSquared(candidate.mse, train_.variance);
+         return true;
+      }
+   }
+   return false;
+}
+
+// Refit the formula (constants and scaling) on each fold's complement and
+// collect the squared errors on the held-out fold, so every training row is
+// predicted by a fit that never saw it.
+bool SymbolicRegression::crossValidationStats(const BaseString& genes, double& mse, double& standardError) const
+{
+   const Expression structure = Expression::compile(genes, instructions_);
+   std::vector<double> squared;
+   squared.reserve(trainRows_.size());
+   std::vector<double> fitPredictions;
+   std::vector<double> heldPredictions;
+   for (std::size_t fold = 0 ; fold < foldFit_.size() ; fold++)
+   {
+      Expression expression = structure;
+      tuneConstants(expression, foldFit_[fold]);
+      if (!expression.evaluate(foldFit_[fold].inputs, fitPredictions) ||
+          !expression.evaluate(foldHeld_[fold].inputs, heldPredictions))
+      {
+         return false;
+      }
+      const Scaling scaling = fitScaling(fitPredictions, foldFit_[fold].targets);
+      for (std::size_t i = 0 ; i < heldPredictions.size() ; i++)
+      {
+         const double error = foldHeld_[fold].targets[i] - (scaling.intercept + scaling.slope * heldPredictions[i]);
+         squared.push_back(error * error);
+      }
+   }
+   const double count = static_cast<double>(squared.size());
+   mse = 0.0;
+   for (double value : squared) mse += value;
+   mse /= count;
+   double variance = 0.0;
+   for (double value : squared) variance += (value - mse) * (value - mse);
+   variance /= count > 1.0 ? count - 1.0 : 1.0;
+   standardError = std::sqrt(variance / count);
+   return std::isfinite(mse);
 }
 
 std::string SymbolicRegression::scaledFormula(const Fit& fit) const
@@ -325,7 +463,24 @@ void SymbolicRegression::validatePopulation(const Population& population) const
 
 double SymbolicRegression::evaluateFitness(const BaseString& genes)
 {
-   return describe(genes).fitness;
+   const Fit fit = describe(genes);
+   if (fit.valid)
+   {
+      // Keep the best (lowest training error) formula of each size for the
+      // final cross-validated choice.
+      auto found = archive_.find(fit.size);
+      if (found == archive_.end() || fit.trainRmse < found->second.trainRmse)
+      {
+         Archived& slot = archive_[fit.size];
+         slot.trainRmse = fit.trainRmse;
+         slot.genes.resize(genes.length());
+         for (int i = 0 ; i < genes.length() ; i++)
+         {
+            slot.genes[i] = genes.valueAt(i);
+         }
+      }
+   }
+   return fit.fitness;
 }
 
 void SymbolicRegression::printCandidate(const BaseString& genes, std::ostream& out) const
@@ -350,7 +505,7 @@ void SymbolicRegression::writeVisualizationJson(const BaseString& genes, std::os
 {
    const Fit fit = describe(genes);
    Expression expression = Expression::compile(genes, instructions_);
-   tuneConstants(expression);
+   tuneConstants(expression, train_);
    std::vector<double> predictions;
    const bool defined = fit.valid && expression.evaluate(dataset_.inputs, predictions);
 

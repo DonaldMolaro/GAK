@@ -541,7 +541,19 @@
       elements.worstValue.textContent = formatFitness(worst);
       renderSettings(report.settings, frame.visualization);
       drawFitnessChart(generations);
-      renderVisualization(frame.visualization, frame.best_candidate_genes || []);
+      // Symbolic regression reports the formula chosen by cross-validation
+      // separately from the GA's per-generation best; show it on the last
+      // frame, since it is the run's answer.
+      const selected = report.result.selected;
+      const isLastFrame = state.generationIndex === generations.length - 1;
+      if (selected && selected.visualization && isLastFrame) {
+        renderVisualization(Object.assign({}, selected.visualization, {
+          selection_note: `Selected by ${selected.cv_folds}-fold cross-validation from the best formula ` +
+            `of each of ${selected.archived_sizes} sizes (cv R² ${Number(selected.cv_r2).toFixed(4)})`
+        }), frame.best_candidate_genes || []);
+      } else {
+        renderVisualization(frame.visualization, frame.best_candidate_genes || []);
+      }
     }
 
     function formatFitness(value) {
@@ -679,6 +691,14 @@
       caption.style.margin = "0 0 8px";
       const trainR2 = Number(visualization.train_r2 || 0).toFixed(4);
       const testR2 = Number(visualization.test_r2 || 0).toFixed(4);
+      if (visualization.selection_note) {
+        const note = document.createElement("div");
+        note.style.fontFamily = "Georgia, serif";
+        note.style.fontWeight = "bold";
+        note.style.margin = "0 0 4px";
+        note.textContent = visualization.selection_note;
+        wrapper.appendChild(note);
+      }
       caption.textContent = `${visualization.target} ≈ ${visualization.formula}   ` +
         `(nodes ${visualization.nodes}, train R² ${trainR2}, test R² ${testR2})`;
       wrapper.appendChild(caption);

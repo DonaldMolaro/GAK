@@ -60,6 +60,11 @@ expect 1 "Invalid value for --tournament: '0'" "tournament size must be positive
 expect 1 "Invalid value for --holdout: '1'" "holdout must be below 1" -- $GA R --data data/quadratic.csv --holdout 1
 expect 1 "Invalid value for --restarts: '0'" "restarts must be positive" -- $GA R --data data/quadratic.csv --restarts 0
 expect 1 "Invalid value for --tuning: '-1'" "tuning must be non-negative" -- $GA R --data data/quadratic.csv --tuning -1
+expect 1 "Invalid value for --folds: '-2'" "folds must be non-negative" -- $GA R --data data/quadratic.csv --folds -2
+expect 1 "Invalid value for --cv-se: 'x'" "cv-se must be numeric" -- $GA R --data data/quadratic.csv --cv-se x
+expect 1 "Invalid value for --cv-se: '-1'" "cv-se must be non-negative" -- $GA R --data data/quadratic.csv --cv-se -1
+expect 1 "GA: Too few training rows for the requested cross-validation folds" "too many folds are reported" -- \
+  $GA R --data data/pendulum.csv --folds 40
 
 # --- configuration errors are reported, not crashes ---------------------
 expect 1 "GA: Deletion mode replaces no individuals" "a population too small for its deletion mode" -- $GA D --population 1
@@ -96,6 +101,13 @@ expect 1 "bad.csv:3: column 'y' has a non-numeric value 'oops'" "a malformed CSV
 expect 0 "period_s ~= " "mode R prints a fitted formula" -- $GA R --data data/pendulum.csv $QUICK
 expect 0 "Restart 2 (seed " "mode R reports each restart" -- $GA R --data data/pendulum.csv $QUICK --restarts 2
 expect 0 "Best restart seed:" "mode R reports the chosen restart" -- $GA R --data data/pendulum.csv $QUICK --restarts 2
+expect 0 "Selected by 5-fold cross-validation" "mode R reports the cross-validated choice" -- \
+  $GA R --data data/pendulum.csv $QUICK --restarts 1
+expect 0 "cv folds          : 3" "--folds is applied" -- $GA R --data data/pendulum.csv $QUICK --restarts 1 --folds 3
+expect 0 "Selected by 3-fold cross-validation" "--folds changes the selection" -- \
+  $GA R --data data/pendulum.csv $QUICK --restarts 1 --folds 3
+expect 0 "cv folds          : 0" "--folds 0 turns selection off" -- $GA R --data data/pendulum.csv $QUICK --restarts 1 --folds 0
+expect 0 "Selected by 5-fold" "--cv-se is accepted" -- $GA R --data data/pendulum.csv $QUICK --restarts 1 --cv-se 0.5
 expect 0 "restarts          : 1" "--restarts is applied" -- $GA R --data data/pendulum.csv $QUICK --restarts 1
 expect 0 "test rows         : 0" "--holdout 0 keeps every row for training" -- \
   $GA R --data data/pendulum.csv $QUICK --restarts 1 --holdout 0
@@ -109,6 +121,8 @@ expect 0 "" "mode R writes reports" -- \
 checks=$((checks + 1))
 grep -qF '"type": "regression"' "$WORK/r.json" || fail "the JSON report should contain a regression visualization"
 checks=$((checks + 1))
+grep -qF '"selected": { "archived_sizes": ' "$WORK/r.json" || fail "the JSON report should record the selected formula"
+checks=$((checks + 1))
 head -n 1 "$WORK/r.csv" | grep -qx "generation,evaluations,best_fitness,worst_fitness" ||
   fail "the CSV report should start with its header"
 
@@ -116,6 +130,10 @@ expect 1 "Failed to open JSON report path" "an unwritable report path is reporte
   $GA K --seed 1 --population 12 --trials 24 --report-json "$WORK/no/such/dir/r.json"
 expect 1 "Failed to open CSV report path" "an unwritable CSV path is reported" -- \
   $GA K --seed 1 --population 12 --trials 24 --report-csv "$WORK/no/such/dir/r.csv"
+
+$GA R --data data/pendulum.csv $QUICK --restarts 1 --folds 0 > "$WORK/nofolds.txt" 2>&1
+checks=$((checks + 1))
+! grep -qF "Selected by" "$WORK/nofolds.txt" || fail "--folds 0 should not print a cross-validated selection"
 
 # Fixed seeds reproduce mode R exactly, restarts included.
 $GA R --data data/sine_trend.csv $QUICK --restarts 2 > "$WORK/first.txt" 2>&1

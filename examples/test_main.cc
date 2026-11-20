@@ -24,6 +24,7 @@
 #include "dataset.hh"
 #include "expression.hh"
 #include "regression.hh"
+#include "random.hh"
 
 class PopulationTestRig
 {
@@ -1303,6 +1304,85 @@ void test_regression_tunes_constants()
               "Constant tuning should be deterministic");
 }
 
+double linearTarget(double x) { return 2.0 * x + 1.0; }
+
+void test_regression_archive_and_cross_validated_selection()
+{
+  InstructionSet set(1);
+  const int x = geneFor(set, Operation::Variable);
+  const int square = geneFor(set, Operation::Square);
+  const int two = geneFor(set, Operation::Constant, 2.0);
+  const int multiply = geneFor(set, Operation::Multiply);
+  const int sinGene = geneFor(set, Operation::Sin);
+  const int add = geneFor(set, Operation::Add);
+  SymbolicRegression::Config config;
+  config.constantTuningBudget = 0;
+
+  // Nothing evaluated yet: nothing to select.
+  SymbolicRegression empty(makeDataset(linearTarget, 40, -3.0, 3.0), config);
+  std::vector<int> genes;
+  SymbolicRegression::Fit fit;
+  expect_true(empty.crossValidationFolds() == 5 && !empty.selectByCrossValidation(genes, fit),
+              "Selection needs at least one evaluated formula");
+
+  // The archive keeps the best formula of each size.
+  SymbolicRegression line(makeDataset(linearTarget, 40, -3.0, 3.0), config);
+  line.evaluateFitness(program(set, {x, square}));       // size 2, a poor fit
+  line.evaluateFitness(program(set, {x}));               // size 1, exact
+  line.evaluateFitness(program(set, {two, x, multiply})); // size 3, also exact
+  line.evaluateFitness(program(set, {x, sinGene}));       // size 2, better than x^2 on a line
+  expect_true(line.archivedSizeCount() == 3, "The archive should hold one formula per size");
+
+  // Equally good formulas: the smallest wins.
+  expect_true(line.selectByCrossValidation(genes, fit) && fit.size == 1 && fit.formula == "x",
+              "Cross-validation should prefer the smallest of equally good formulas");
+  expect_true(fit.crossValidatedR2 > 0.999999 && fit.crossValidatedRmse < 1e-6,
+              "The selected exact formula should have a perfect cross-validated score");
+
+  // A clearly better, larger formula wins over a simpler one.
+  SymbolicRegression curve(makeDataset(quadraticTarget, 40, -3.0, 3.0), config);
+  curve.evaluateFitness(program(set, {x}));
+  curve.evaluateFitness(program(set, {x, square}));
+  expect_true(curve.selectByCrossValidation(genes, fit) && fit.size == 2 && fit.formula == "x^2",
+              "Cross-validation should pick a larger formula that predicts clearly better");
+
+  // A wiggle that fits training noise loses to the line it decorates. The
+  // targets are a line plus deterministic noise, and sin(x*5) tracks none of
+  // it on held-out folds.
+  Dataset noisy = makeDataset(linearTarget, 60, -3.0, 3.0);
+  std::mt19937 noiseGenerator(5);
+  for (double& target : noisy.targets)
+    {
+      target += gak::uniformReal(noiseGenerator, -2.0, 2.0);
+    }
+  SymbolicRegression wiggly(noisy, config);
+  const int five = geneFor(set, Operation::Constant, 5.0);
+  wiggly.evaluateFitness(program(set, {x}));
+  wiggly.evaluateFitness(program(set, {x, x, five, multiply, sinGene, add}));
+  expect_true(wiggly.selectByCrossValidation(genes, fit) && fit.size == 1,
+              "Cross-validation should reject a wiggle that does not predict held-out rows");
+
+  // Disabled, and misconfigured.
+  SymbolicRegression::Config off = config;
+  off.crossValidationFolds = 0;
+  SymbolicRegression disabled(makeDataset(linearTarget, 40, -3.0, 3.0), off);
+  disabled.evaluateFitness(program(set, {x}));
+  expect_true(disabled.crossValidationFolds() == 0 && !disabled.selectByCrossValidation(genes, fit),
+              "Zero folds should disable selection");
+  SymbolicRegression::Config negative = config;
+  negative.crossValidationFolds = -1;
+  expect_throws<GAFatalException>([&]() { SymbolicRegression bad(makeDataset(linearTarget, 40, -3.0, 3.0), negative); },
+                                  "Negative fold counts should be rejected");
+  SymbolicRegression::Config tooMany = config;
+  tooMany.crossValidationFolds = 20;
+  expect_throws<GAFatalException>([&]() { SymbolicRegression bad(makeDataset(linearTarget, 20, -3.0, 3.0), tooMany); },
+                                  "More folds than the training rows support should be rejected");
+  SymbolicRegression::Config badMargin = config;
+  badMargin.selectionStandardErrors = -0.5;
+  expect_throws<GAFatalException>([&]() { SymbolicRegression bad(makeDataset(linearTarget, 40, -3.0, 3.0), badMargin); },
+                                  "A negative standard-error margin should be rejected");
+}
+
 void test_regression_run_recovers_formula()
 {
   SymbolicRegression regression(makeDataset(quadraticTarget, 40, -3.0, 3.0), SymbolicRegression::Config());
@@ -1341,6 +1421,9 @@ void test_regression_output_and_visualization()
 {
   SymbolicRegression::Config config;
   config.constantTuningBudget = 0;
+  // These checks are about output, not selection; the 12-row two-input
+  // dataset below is too small for 5-fold cross-validation.
+  config.crossValidationFolds = 0;
   Dataset data = makeDataset(quadraticTarget, 20, -2.0, 2.0);
   data.targetName = "y \"quoted\"\tname";  // exercises JSON string escaping
   SymbolicRegression regression(data, config);
@@ -1634,6 +1717,7 @@ int main()
   test_regression_operators_respect_length_limits();
   test_regression_run_recovers_formula();
   test_regression_tunes_constants();
+  test_regression_archive_and_cross_validated_selection();
   test_regression_output_and_visualization();
   test_regression_formula_variants_and_holdout();
   test_regression_configuration_errors();

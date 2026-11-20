@@ -1877,6 +1877,30 @@ void test_out_of_range_crossover_rate_throws()
                                   "Chromosome::mate should reject crossover rates above 1");
 }
 
+void test_json_report_accepts_extra_result_members()
+{
+  InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 4, 8, 1, 0.0, 0.0,
+                                                    Population::ReproductionMode::AllowDuplicates,
+                                                    Population::ParentSelectionMode::RouletteWheel,
+                                                    Population::DeletionMode::DeleteAll,
+                                                    Population::FitnessMode::Evaluation,
+                                                    Population::VariableLengthMode::Fixed, 2));
+  Population::RunResult result = pop.execute(true);
+  std::ostringstream plain;
+  PopulationReporter::writeJson(plain, pop, result);
+  std::ostringstream extended;
+  PopulationReporter::writeJson(extended, pop, result, "\"selected\": { \"answer\": 42 }");
+  const std::string text = extended.str();
+  const std::size_t reports = text.find("\"generation_reports\"");
+  const std::size_t extra = text.find("\"selected\": { \"answer\": 42 }");
+  expect_true(plain.str().find("selected") == std::string::npos,
+              "Without extra members the JSON report should be unchanged");
+  expect_true(extra != std::string::npos && extra > reports &&
+              text.find("],\n    \"selected\"") != std::string::npos &&
+              text.size() >= 11 && text.compare(text.size() - 11, 11, "42 }\n  }\n}\n") == 0,
+              "Extra members should be appended inside the result object after the generation reports");
+}
+
 void test_reporters_restore_stream_state()
 {
   InspectablePopulation pop(make_population_options(Population::OperationMode::Maximize, 6, 12, 1, 0.0, 0.0,
@@ -2190,6 +2214,7 @@ int main()
   test_non_finite_fitness_throws();
   test_out_of_range_crossover_rate_throws();
   test_reporters_restore_stream_state();
+  test_json_report_accepts_extra_result_members();
   test_verbose_report_prints_generation_snapshot();
   test_portable_random_golden_values();
   test_tournament_selection();

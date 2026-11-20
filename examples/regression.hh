@@ -8,9 +8,18 @@
 // relationship. Fitness (minimized) is the normalized training error
 // MSE / variance(y) -- 0 is a perfect fit, 1 is no better than predicting the
 // mean -- plus a small penalty per formula node to discourage formulas that
-// fit the noise. A held-out test split reports how well the formula
-// generalizes.
+// fit the noise.
+//
+// The GA searches on the training rows. Because training error always rewards
+// extra terms that fit noise, the final formula is chosen differently: the
+// best formula of each size seen during the search is archived, each is
+// scored by k-fold cross-validation on the training rows (refitting its
+// scaling and constants on k-1 folds and predicting the held-out fold), and
+// the smallest formula within one standard error of the best cross-validated
+// error wins. A held-out test split, used for nothing else, reports how well
+// the chosen formula generalizes.
 
+#include <map>
 #include <memory>
 #include <string>
 #include <utility>
@@ -26,7 +35,16 @@ class SymbolicRegression : public PopulationProblem
 public:
    struct Config
    {
-      double holdoutFraction = 0.25; // share of rows kept out of fitting
+      double holdoutFraction = 0.25; // share of all rows kept for the test score
+      // Folds for choosing the final formula by cross-validation on the
+      // training rows (0 or 1 disables selection: the GA's best formula is
+      // reported).
+      int crossValidationFolds = 5;
+      // One-standard-error rule: choose the smallest formula whose
+      // cross-validated error is within this many standard errors of the
+      // best. Error estimates from small data are noisy, so smaller
+      // differences are not evidence that a larger formula is better.
+      double selectionStandardErrors = 1.0;
       double parsimony = 0.002;      // fitness penalty per formula node
       int minimumInitialLength = 4;  // genes in a random initial program
       int maximumInitialLength = 24;
@@ -49,6 +67,9 @@ public:
       double testR2 = 0.0;
       double trainRmse = 0.0;
       double testRmse = 0.0;
+      // Set only by selectByCrossValidation.
+      double crossValidatedR2 = 0.0;
+      double crossValidatedRmse = 0.0;
       double fitness = 0.0;
    };
 
@@ -58,7 +79,18 @@ public:
    const Dataset& dataset() const { return dataset_; }
    const Config& config() const { return config_; }
    int trainRowCount() const { return static_cast<int>(trainRows_.size()); }
+   int crossValidationFolds() const { return static_cast<int>(foldFit_.size()); }
    int testRowCount() const { return static_cast<int>(testRows_.size()); }
+
+   // The archive: for each formula size, the genes of the formula with the
+   // lowest training error evaluated so far (across every run that used this
+   // problem object).
+   int archivedSizeCount() const { return static_cast<int>(archive_.size()); }
+   // Choose the final formula from the archive by cross-validated error.
+   // Returns false when cross-validation is disabled or nothing has been
+   // evaluated.
+   bool selectByCrossValidation(std::vector<int>& genes, Fit& fit) const;
+   BaseString genesFromValues(const std::vector<int>& values) const;
 
    Fit describe(const BaseString& genes) const;
    // The scaled formula as text: "a + b*(f)", simplified when b is 1 or a is 0.
@@ -85,17 +117,32 @@ private:
    };
 
    static Split makeSplit(const Dataset& dataset, const std::vector<int>& rows);
-   // Scaled training MSE of `expression`, or +infinity if it is undefined.
-   double trainingError(const Expression& expression) const;
-   void tuneConstants(Expression& expression) const;
+   // Scaled MSE of `expression` on `rows`, or +infinity if it is undefined.
+   double scaledError(const Expression& expression, const Split& rows) const;
+   // Tune the formula's constants to minimize scaledError on `rows`.
+   void tuneConstants(Expression& expression, const Split& rows) const;
    std::unique_ptr<Chromosome> truncated(std::unique_ptr<Chromosome> chromosome,
                                          const Population& population) const;
 
    Dataset dataset_;
    Config config_;
    InstructionSet instructions_;
+   struct Archived
+   {
+      double trainRmse = 0.0;
+      std::vector<int> genes;
+   };
+   void heldOutScore(const Expression& expression, double intercept, double slope,
+                     const Split& split, double& r2, double& rmse) const;
+   // Out-of-fold mean squared error of a formula structure, and its
+   // standard error over the training rows.
+   bool crossValidationStats(const BaseString& genes, double& mse, double& standardError) const;
+
    std::vector<int> trainRows_;
    std::vector<int> testRows_;
    Split train_;
+   std::vector<Split> foldFit_;  // per fold: the training rows outside it
+   std::vector<Split> foldHeld_; // per fold: the training rows inside it
    Split test_;
+   std::map<int, Archived> archive_;
 };
