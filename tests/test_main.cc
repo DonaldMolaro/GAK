@@ -2094,6 +2094,57 @@ public:
   void printCandidate(const BaseString&, std::ostream&) const override {}
 };
 
+// Summarizes a generation as the number of members whose first gene is set.
+class SummarizingProblem : public GeneValueProblem
+{
+public:
+  std::string summarizePopulation(const std::vector<const BaseString*>& members) const override
+  {
+    int set = 0;
+    for (const BaseString* genes : members) set += genes->valueAt(0) != 0 ? 1 : 0;
+    return "{ \"members\": " + std::to_string(members.size()) + ", \"set\": " + std::to_string(set) + " }";
+  }
+};
+
+void test_population_summary_hook()
+{
+  Population::Settings settings = make_population_options(Population::OperationMode::Maximize, 6, 18, 1, 0.2, 0.5,
+                                                          Population::ReproductionMode::AllowDuplicates,
+                                                          Population::ParentSelectionMode::RouletteWheel,
+                                                          Population::DeletionMode::DeleteHalf,
+                                                          Population::FitnessMode::Evaluation,
+                                                          Population::VariableLengthMode::Fixed, 8);
+  settings.useFixedRandomSeed = true;
+  settings.randomSeed = 4;
+  SummarizingProblem summarizing;
+  Population pop(settings, summarizing);
+  Population::RunResult result = pop.execute(true);
+  bool everyReport = !result.generationReports.empty();
+  for (const Population::GenerationReport& report : result.generationReports)
+    {
+      everyReport = everyReport && report.populationSummary.find("\"members\": 6") != std::string::npos;
+    }
+  expect_true(everyReport, "Every generation report should carry the problem's population summary");
+  std::ostringstream json;
+  PopulationReporter::writeJson(json, pop, result);
+  expect_true(json.str().find("\"population_summary\": { \"members\": 6, \"set\": ") != std::string::npos,
+              "JSON reports should include the population summary");
+
+  // Problems that do not summarize leave reports unchanged, and the hook
+  // does not alter a seeded run.
+  GeneValueProblem plain;
+  Population other(settings, plain);
+  Population::RunResult unsummarized = other.execute(true);
+  std::ostringstream plainJson;
+  PopulationReporter::writeJson(plainJson, other, unsummarized);
+  expect_true(plainJson.str().find("population_summary") == std::string::npos &&
+              unsummarized.generationReports.back().populationSummary.empty(),
+              "Without a summary the report should not mention one");
+  expect_true(unsummarized.finalSummary.mostFit == result.finalSummary.mostFit &&
+              unsummarized.generationsCompleted == result.generationsCompleted,
+              "Summarizing the population should not change a seeded run");
+}
+
 void test_generation_reports_capture_population_spread()
 {
   for (Population::OperationMode mode : {Population::OperationMode::Maximize, Population::OperationMode::Minimize})
@@ -2304,6 +2355,7 @@ int main()
   test_portable_random_golden_values();
   test_tournament_selection();
   test_generation_reports_capture_population_spread();
+  test_population_summary_hook();
   test_population_stops_when_solution_found_mid_run();
   test_report_labels_cover_every_mode();
   test_population_public_helpers_and_validation();

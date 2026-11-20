@@ -118,6 +118,9 @@ public:
    // scores plus a coarse curve (one input) or one prediction per row (several
    // inputs), without repeating the data points.
    void writeSampleJson(const BaseString& genes, std::ostream& out) const override;
+   // For each input, how many members of the generation use it:
+   // { "members": N, "input_usage": [count per input] }.
+   std::string summarizePopulation(const std::vector<const BaseString*>& members) const override;
    std::unique_ptr<Chromosome> initializeCandidate(Population& population) override;
    std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
       mateCandidates(Population& population, Chromosome& mother, Chromosome& father) override;

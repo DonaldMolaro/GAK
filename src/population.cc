@@ -93,6 +93,11 @@ void Population::writeSampleJson(const BaseString& genes, std::ostream& out) con
    problem_.writeSampleJson(genes, out);
 }
 
+std::string PopulationProblem::summarizePopulation(const std::vector<const BaseString*>&) const
+{
+   return std::string();
+}
+
 void PopulationProblem::writeSampleJson(const BaseString& genes, std::ostream& out) const
 {
    writeVisualizationJson(genes, out);
@@ -254,6 +259,13 @@ Population::GenerationReport Population::buildGenerationReport(int generation, i
       sample.genes = genesAt(indexOfRank(rank));
       report.samples.push_back(std::move(sample));
    }
+   std::vector<const BaseString*> members;
+   members.reserve(populationTable.size());
+   for (const std::unique_ptr<Chromosome>& member : populationTable)
+   {
+      members.push_back(&member->genes());
+   }
+   report.populationSummary = problem_.summarizePopulation(members);
    return report;
 }
 

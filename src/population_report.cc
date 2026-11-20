@@ -304,8 +304,12 @@ void PopulationReporter::writeJson(std::ostream& out,
          population.writeSampleJson(buildSnapshotGenes(population, sample.genes), out);
          out << " }";
       }
-      out << (report.samples.empty() ? "]\n" : "\n        ]\n");
-      out << "      }";
+      out << (report.samples.empty() ? "]" : "\n        ]");
+      if (!report.populationSummary.empty())
+      {
+         out << ",\n        \"population_summary\": " << report.populationSummary;
+      }
+      out << "\n      }";
       if (i + 1 < result.generationReports.size())
       {
          out << ',';

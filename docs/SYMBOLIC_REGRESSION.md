@@ -67,8 +67,21 @@ search is limited to one or two. With several inputs:
   coefficient to each term"), so sums like `m·v²/2 + 9.81·m·h` need only the
   right terms.
 - **The default budget grows** with the number of inputs (`--trials`).
-- **The viewer** plots predicted against measured values; points on the
-  diagonal are predicted exactly.
+- **The viewer** plots predicted against measured values (points on the
+  diagonal are predicted exactly) and adds two views that show the search
+  itself:
+  - **Residuals against each input**: one small plot per input of measured
+    minus predicted, with a line for the average. Structure the formula has
+    not found yet shows as a pattern in its input's plot (on Friedman #1, a
+    U-shape against `x3` until the `(x3 − 0.5)²` term is found) and flattens
+    once it is. An input the formula leaves out is labelled "not used". The
+    scales are the same in every frame.
+  - **Share of the population using each input**: generations across,
+    inputs down, darker where more of the population uses the input. It
+    shows feature selection as it happens: in generation 0 every input is
+    used by about a tenth of the population; inputs that matter darken and
+    irrelevant ones fade. The JSON records the counts per generation as
+    `population_summary.input_usage`.
 
 ## Watching a run
 

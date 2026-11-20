@@ -813,6 +813,27 @@ void SymbolicRegression::writeSampleJson(const BaseString& genes, std::ostream& 
    out << " }" << std::defaultfloat;
 }
 
+std::string SymbolicRegression::summarizePopulation(const std::vector<const BaseString*>& members) const
+{
+   // Decoding a formula is cheap (no evaluation), so every member is counted.
+   std::vector<int> usage(dataset_.inputCount(), 0);
+   for (const BaseString* genes : members)
+   {
+      for (int variable : Expression::compile(*genes, instructions_).variablesUsed())
+      {
+         ++usage[variable];
+      }
+   }
+   std::ostringstream out;
+   out << "{ \"members\": " << members.size() << ", \"input_usage\": [";
+   for (std::size_t i = 0 ; i < usage.size() ; i++)
+   {
+      out << (i == 0 ? "" : ", ") << usage[i];
+   }
+   out << "] }";
+   return out.str();
+}
+
 std::unique_ptr<Chromosome> SymbolicRegression::initializeCandidate(Population& population)
 {
    std::mt19937& generator = population.randomEngine();
