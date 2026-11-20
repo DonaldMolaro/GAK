@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <cmath>
@@ -484,12 +485,15 @@ Population::Settings make_constrained_sudoku_options()
 
 const int kDefaultRegressionRestarts = 4;
 
-Population::Settings make_regression_options(int alphabetSize)
+Population::Settings make_regression_options(int alphabetSize, int inputCount)
 {
   Population::Settings options;
   options.operation = Population::OperationMode::Minimize;
   options.numberOfIndividuals = 400;
-  options.numberOfTrials = 15000; // per restart (4 restarts by default)
+  // Per restart (4 restarts by default). More inputs mean a larger search
+  // space: 15000 trials for each pair of inputs, so 1-2 inputs get 15000 and
+  // 10 inputs get 75000.
+  options.numberOfTrials = 15000 * std::max(1, (inputCount + 1) / 2);
   options.chromosomeLength = SymbolicRegression::Config().maximumInitialLength;
   options.bitMutationRate = 0.04;
   options.crossOverRate = 0.8;
@@ -1127,7 +1131,8 @@ int runGa(int argc, char *argv[])
         SymbolicRegression regression(loadCsvDataset(cli.dataPath, cli.targetColumn), config);
         printRegressionInput(regression);
         return runRegression(regression,
-                             applyOverrides(make_regression_options(regression.alphabetSize()), cli),
+                             applyOverrides(make_regression_options(regression.alphabetSize(),
+                                                                    regression.dataset().inputCount()), cli),
                              cli, cli.restartsProvided ? cli.restarts : kDefaultRegressionRestarts);
       }
     default:

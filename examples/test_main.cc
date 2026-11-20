@@ -1383,6 +1383,101 @@ void test_regression_archive_and_cross_validated_selection()
                                   "A negative standard-error margin should be rejected");
 }
 
+void test_expression_additive_terms()
+{
+  InstructionSet set(2);
+  const int x1 = 0;  // gene v is input variable v (first copy)
+  const int x2 = 1;
+  const int multiply = geneFor(set, Operation::Multiply);
+  const int add = geneFor(set, Operation::Add);
+  const int subtract = geneFor(set, Operation::Subtract);
+  const int negate = geneFor(set, Operation::Negate);
+  const int sinGene = geneFor(set, Operation::Sin);
+  const int three = geneFor(set, Operation::Constant, 3.0);
+  const std::vector<std::string> names = {"x1", "x2"};
+
+  // x1*x2 + sin(x1) - 3
+  Expression expression = Expression::compile(
+    program(set, {x1, x2, multiply, x1, sinGene, add, three, subtract}), set);
+  const std::vector<int> terms = expression.additiveTerms(8);
+  expect_true(terms.size() == 3 &&
+              expression.nodeText(names, terms[0]) == "x1*x2" &&
+              expression.nodeText(names, terms[1]) == "sin(x1)" &&
+              expression.nodeText(names, terms[2]) == "3",
+              "additiveTerms should split a formula at its top-level + and -");
+  expect_true(expression.usesVariable(terms[0]) && !expression.usesVariable(terms[2]),
+              "usesVariable should tell input-dependent terms from constants");
+  expect_true(expression.variablesUsed() == std::vector<int>({0, 1}),
+              "variablesUsed should list each input once, in order");
+  expect_true(expression.additiveTerms(2).size() == 1,
+              "Too many terms should fall back to the whole formula as one term");
+
+  std::vector<std::vector<double> > values;
+  expect_true(expression.evaluateNodes({{2.0, 3.0}, {0.0, 1.0}}, terms, values) &&
+              values.size() == 3 && values[0][0] == 6.0 && values[0][1] == 0.0 &&
+              values[2][0] == 3.0,
+              "evaluateNodes should return each requested node's values");
+
+  // Negation is looked through: -(x1) is the term x1.
+  Expression negated = Expression::compile(program(set, {x1, negate}), set);
+  expect_true(negated.additiveTerms(8).size() == 1 &&
+              negated.nodeText(names, negated.additiveTerms(8)[0]) == "x1",
+              "additiveTerms should look through negation");
+}
+
+void test_regression_fits_each_additive_term()
+{
+  // Five inputs, two irrelevant: y = 2*x1*x3 - x4^2 exactly.
+  Dataset data;
+  data.source = "five";
+  data.inputNames = {"x1", "x2", "x3", "x4", "x5"};
+  data.targetName = "y";
+  std::mt19937 generator(9);
+  for (int row = 0 ; row < 60 ; row++)
+    {
+      std::vector<double> inputs(5);
+      for (double& value : inputs) value = gak::uniformReal(generator, -2.0, 2.0);
+      data.inputs.push_back(inputs);
+      data.targets.push_back(2.0 * inputs[0] * inputs[2] - inputs[3] * inputs[3]);
+    }
+  SymbolicRegression::Config config;
+  config.constantTuningBudget = 0;
+  SymbolicRegression regression(data, config);
+  InstructionSet set(5);
+  const int multiply = geneFor(set, Operation::Multiply);
+  const int subtract = geneFor(set, Operation::Subtract);
+  const int add = geneFor(set, Operation::Add);
+  const int square = geneFor(set, Operation::Square);
+  const int five = geneFor(set, Operation::Constant, 5.0);
+
+  // x1*x3 - x4^2 has equal weights; per-term fitting supplies 2 and -1.
+  SymbolicRegression::Fit fit = regression.describe(program(set, {0, 2, multiply, 3, square, subtract}));
+  expect_true(fit.valid && fit.trainR2 > 0.999999 && fit.testR2 > 0.999999 &&
+              fit.weights.size() == 2 &&
+              std::fabs(fit.weights[0] - 2.0) < 1e-6 && std::fabs(fit.weights[1] + 1.0) < 1e-6,
+              "Each additive term should get its own least-squares coefficient");
+  expect_true(regression.scaledFormula(fit) == "2*(x1*x3) - (x4^2)",
+              "A multi-term fit should print each term with its coefficient");
+  expect_true(fit.inputsUsed == std::vector<std::string>({"x1", "x3", "x4"}),
+              "The fit should report which inputs the formula uses");
+  expect_true(std::fabs(fit.fitness - config.parsimony * (fit.size + config.termPenaltyNodes)) < 1e-9,
+              "Each term beyond the first should be charged the term penalty");
+
+  // A constant term only moves the intercept.
+  SymbolicRegression::Fit shifted = regression.describe(program(set, {0, 2, multiply, five, add}));
+  expect_true(shifted.valid && shifted.weights.size() == 1 && shifted.terms[0] == "x1*x3",
+              "A variable-free term should merge into the intercept");
+
+  std::ostringstream printed;
+  regression.printCandidate(program(set, {0, 2, multiply, 3, square, subtract}), printed);
+  expect_contains(printed.str(), "| uses 3 of 5 inputs: x1 x3 x4 ::",
+                  "printCandidate should list the inputs a multi-input formula uses");
+  std::ostringstream json;
+  regression.writeVisualizationJson(program(set, {0, 2, multiply, 3, square, subtract}), json);
+  expect_contains(json.str(), "\"inputs_used\": [\"x1\", \"x3\", \"x4\"]",
+                  "The visualization should record the inputs used");
+}
+
 void test_regression_sample_json_is_compact()
 {
   SymbolicRegression::Config config;
@@ -1529,8 +1624,8 @@ void test_regression_formula_variants_and_holdout()
   expect_true(lineRegression.scaledFormula(fit) == "-(x)",
               "A pure negative slope should print without an intercept");
   fit = lineRegression.describe(program(set, {x, negate}));
-  expect_true(lineRegression.scaledFormula(fit) == "(-x)",
-              "A unit slope should print without a factor");
+  expect_true(lineRegression.scaledFormula(fit) == "-(x)",
+              "A negated term should fold its sign into the fitted coefficient");
 
   // A constant formula carries no shape: it falls back to the mean.
   SymbolicRegression::Fit constant = lineRegression.describe(program(set, {two}));
@@ -1743,6 +1838,8 @@ int main()
   test_regression_tunes_constants();
   test_regression_archive_and_cross_validated_selection();
   test_regression_sample_json_is_compact();
+  test_expression_additive_terms();
+  test_regression_fits_each_additive_term();
   test_regression_output_and_visualization();
   test_regression_formula_variants_and_holdout();
   test_regression_configuration_errors();

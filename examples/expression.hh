@@ -70,6 +70,21 @@ public:
    // row (division by ~0, log or sqrt of an out-of-domain value, overflow).
    bool evaluate(const std::vector<std::vector<double> >& inputs,
                  std::vector<double>& predictions) const;
+   // Evaluate on every row and return the values of the given nodes,
+   // values[i][row] for nodes[i]. Same failure rule as evaluate().
+   bool evaluateNodes(const std::vector<std::vector<double> >& inputs,
+                      const std::vector<int>& nodes,
+                      std::vector<std::vector<double> >& values) const;
+
+   // The top-level additive terms: the nodes reached from the root through
+   // +, - and negation, e.g. x*y + sin(x) - 3 gives x*y, sin(x) and 3. Their
+   // signs are dropped (each term gets its own fitted coefficient). Returns
+   // just the root when there would be more than `maxTerms` terms.
+   std::vector<int> additiveTerms(int maxTerms) const;
+   // Whether the subtree at `node` depends on any input variable.
+   bool usesVariable(int node) const;
+   // The input variables the formula uses, in ascending order.
+   std::vector<int> variablesUsed() const;
 
    // Indices of constant nodes, and write access to their values (used to
    // tune constants numerically after the GA has chosen the structure).
@@ -80,7 +95,14 @@ public:
    // Infix text using the given variable names; variable-free subtrees are
    // folded to a single number.
    std::string toString(const std::vector<std::string>& variableNames) const;
+   // The same text for the subtree at `node`.
+   std::string nodeText(const std::vector<std::string>& variableNames, int node) const;
 
 private:
+   // Evaluate every node on every row into a per-thread buffer laid out
+   // node-major (buffer[node * rows + row]); nullptr if undefined anywhere.
+   const double* evaluateAll(const std::vector<std::vector<double> >& inputs) const;
+   std::vector<std::string> allTexts(const std::vector<std::string>& variableNames) const;
+
    std::vector<ExpressionNode> nodes_;
 };

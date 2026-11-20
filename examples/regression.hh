@@ -3,9 +3,10 @@
 // Symbolic regression: discover a formula y = f(inputs) that fits measured
 // data, using postfix-encoded formulas (see expression.hh).
 //
-// Each candidate formula f is linearly scaled, y ~= a + b*f, with a and b
-// solved by least squares, so the GA only has to find the SHAPE of the
-// relationship. Fitness (minimized) is the normalized training error
+// Each candidate formula is split into its top-level additive terms and
+// fitted as y ~= a + b1*term1 + b2*term2 + ... by least squares, so the GA
+// only has to find the right TERMS; their weights come for free (with one
+// term this is classic linear scaling, a + b*f). Fitness (minimized) is the normalized training error
 // MSE / variance(y) -- 0 is a perfect fit, 1 is no better than predicting the
 // mean -- plus a small penalty per formula node to discourage formulas that
 // fit the noise.
@@ -46,6 +47,14 @@ public:
       // differences are not evidence that a larger formula is better.
       double selectionStandardErrors = 1.0;
       double parsimony = 0.002;      // fitness penalty per formula node
+      // Each additive term beyond the first gets its own fitted coefficient,
+      // which can fit noise like extra formula nodes can; it is charged as
+      // this many nodes.
+      double termPenaltyNodes = 6.0;
+      // Copies of each input variable in the gene alphabet. Fewer copies for
+      // many inputs (so operators are not crowded out) was measured and did
+      // not help on 3-10 input data.
+      int variableCopies = 3;
       int minimumInitialLength = 4;  // genes in a random initial program
       int maximumInitialLength = 24;
       int maximumLength = 64;        // offspring are truncated to this
@@ -61,7 +70,12 @@ public:
       bool valid = false;
       std::string formula;          // unscaled f, in infix
       double intercept = 0.0;       // a
-      double slope = 0.0;           // b
+      // One fitted coefficient per additive term of f (terms[i] is its text):
+      // y ~= intercept + sum weights[i] * term i.
+      std::vector<double> weights;
+      std::vector<std::string> terms;
+      double slope = 0.0;           // weights[0] when f is a single term, else 0
+      std::vector<std::string> inputsUsed; // input columns the formula reads
       int size = 0;                 // formula nodes
       double trainR2 = 0.0;
       double testR2 = 0.0;
@@ -136,8 +150,12 @@ private:
       double trainRmse = 0.0;
       std::vector<int> genes;
    };
-   void heldOutScore(const Expression& expression, double intercept, double slope,
+   void heldOutScore(const Expression& expression, const Fit& fit,
                      const Split& split, double& r2, double& rmse) const;
+   // Predictions of a fitted formula on `inputs`; false if it is undefined.
+   bool predictRows(const Expression& expression, const Fit& fit,
+                    const std::vector<std::vector<double> >& inputs,
+                    std::vector<double>& predictions) const;
    // Out-of-fold mean squared error of a formula structure, and its
    // standard error over the training rows.
    bool crossValidationStats(const BaseString& genes, double& mse, double& standardError) const;

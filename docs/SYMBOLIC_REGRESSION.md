@@ -32,7 +32,7 @@ the held-out rows.
 | `--tuning N` | Constant-tuning evaluations per formula (default `40`; `0` turns tuning off). |
 | `--folds N` | Cross-validation folds for choosing the final formula (default `5`; `0` reports the GA's best training fit instead). |
 | `--cv-se R` | Choose the smallest formula within R standard errors of the best cross-validated error (default `1`; lower favours richer formulas). |
-| `--trials N` | Evaluation budget **per restart** (default `15000`). |
+| `--trials N` | Evaluation budget **per restart** (default 15,000 for each pair of inputs: 15,000 for one or two inputs, 45,000 for five, 75,000 for ten). |
 | `--seed N`, `--population N`, `--mutation R`, `--crossover R`, `--selection S`, `--tournament N` | As for every mode. |
 | `--report-json P`, `--report-csv P` | Reports; the JSON includes a `regression` visualization for `viewer.html`. |
 | `--samples N` | Population members recorded per generation in reports, at evenly spaced fitness ranks (default `6`; `0` for none). |
@@ -54,6 +54,21 @@ below), printed after the GA's own best formulas. Each result line shows:
   the training score means the formula is fitting the noise.
 
 The number after `::` is the fitness being minimized (lower is better).
+
+## Several inputs
+
+Every numeric column except the target is an input, and nothing in the
+search is limited to one or two. With several inputs:
+
+- **Which inputs a formula uses** is reported with it (`uses 3 of 5 inputs:
+  x1 x3 x4`, and `inputs_used` in the JSON). An input a good formula leaves
+  out is one the search found irrelevant.
+- **Each additive term gets its own coefficient** (see "Fitting a
+  coefficient to each term"), so sums like `m·v²/2 + 9.81·m·h` need only the
+  right terms.
+- **The default budget grows** with the number of inputs (`--trials`).
+- **The viewer** plots predicted against measured values; points on the
+  diagonal are predicted exactly.
 
 ## Watching a run
 
@@ -141,24 +156,38 @@ A single validation split was tried first and rejected: on small files it
 leaves too few rows (9 for `pendulum`), and its noisy error estimate chose
 badly in both directions.
 
-### Linear scaling
+### Fitting a coefficient to each term
 
-For each candidate `f`, the intercept `a` and slope `b` minimizing the squared
-error of `a + b*f` are solved in closed form (least squares). The GA therefore
-only has to find the **shape** of the relationship; scale and offset come for
-free. This is the standard technique (Keijzer, 2003) that makes symbolic
-regression practical on real data, and it is why the evolved constants can
-stay small.
+A candidate formula is split at its top-level `+` and `−` into additive
+terms (for `x1·x2 + sin(x1) − 3`, the terms `x1·x2` and `sin(x1)`; the
+constant only moves the intercept). Then
+
+```
+y ≈ a + b1·term1 + b2·term2 + …
+```
+
+is solved by least squares, giving each term its own coefficient (up to 8
+terms; a formula with more is fitted as one term). With a single term this is
+classic linear scaling, `a + b·f` (Keijzer, 2003). The GA therefore only has
+to find the right **terms**; their weights come for free. This matters most
+with several inputs, where laws are often sums of terms with different
+weights (`2·x1·x3 − x4²`, or Friedman #1's `10·sin(π·x1·x2) + 20(x3 − 0.5)² +
+10·x4 + 5·x5`): with one shared coefficient the search would have to build
+each weight out of table constants. Constant tuning, cross-validation and the
+reported test score all use the same per-term fit.
 
 ### Fitness
 
 ```
-fitness = MSE_train / variance(y_train) + 0.002 * nodes
+fitness = MSE_train / variance(y_train) + 0.002 * (nodes + 6 * (terms − 1))
 ```
 
-The first term is the normalized error: 0 is a perfect fit and 1 is no better
+The first part is the normalized error: 0 is a perfect fit and 1 is no better
 than predicting the mean, independent of the units of `y`. The second is a
-parsimony penalty that stops formulas growing to fit noise.
+parsimony penalty that stops formulas growing to fit noise. Each term beyond
+the first is charged as 6 extra nodes, because its fitted coefficient can
+fit noise just as extra nodes can; without that charge, noisy straight lines
+picked up separately weighted wiggle terms.
 
 ### Train/test split
 
@@ -168,7 +197,8 @@ and are directly comparable.
 
 ### GA settings
 
-4 restarts of 400 individuals and 15,000 evaluations each, rank-based
+4 restarts of 400 individuals and 15,000 evaluations each (more with more
+inputs; see `--trials`), rank-based
 roulette selection (`LinearNormalized`), half the population replaced each
 generation, duplicates rejected, crossover 0.8, mutation 0.04 per gene,
 constant tuning with 40 evaluations. A run takes about 0.8 seconds on the
@@ -189,16 +219,48 @@ The datasets carry heavy noise (about 30% of each signal's spread; see
   could (within 0.15 of that "oracle" curve error, in units of the noise).
   This needs the known truth, so it is only available for test data.
 
-| Dataset | Median test R², GA's best | Median test R², selected (default) | Structure recovered, GA's best | Structure recovered, selected |
+### One or two inputs
+
+| Dataset | Structure recovered | Median test R² |
+|---|---|---|
+| `linear_noisy` | 7 / 10 | 0.960 |
+| `quadratic` | 10 / 10 | 0.863 |
+| `sine_trend` | 10 / 10 | 0.902 |
+| `exponential_decay` | 10 / 10 | 0.788 |
+| `pendulum` | 5 / 10 | 0.933 |
+| `rational` | 8 / 10 | 0.882 |
+| `two_input` | 8 / 10 | 0.906 |
+| **Total** | **58 / 70** | |
+
+Fitting a coefficient to each additive term raised this from 49 / 70 (one
+shared coefficient, everything else the same): `rational` went from 6 to 8,
+`two_input` from 7 to 8 and `pendulum` from 2 to 5. Without the term penalty
+it reached 52 / 70 but `linear_noisy` fell to 1 / 10, which is why each extra
+term is charged.
+
+### Three to ten inputs
+
+| Dataset | Inputs | Structure recovered | Median test R² (true formula) | Time per run |
 |---|---|---|---|---|
-| `linear_noisy` | 0.945 | **0.960** | 3 / 10 | 6 / 10 |
-| `quadratic` | 0.863 | 0.863 | 10 / 10 | 10 / 10 |
-| `sine_trend` | 0.902 | 0.902 | 8 / 10 | 9 / 10 |
-| `exponential_decay` | 0.788 | 0.788 | 10 / 10 | 9 / 10 |
-| `pendulum` | 0.921 | **0.933** | 9 / 10 | 2 / 10 |
-| `rational` | 0.882 | 0.882 | 6 / 10 | 6 / 10 |
-| `two_input` | 0.918 | 0.918 | 7 / 10 | 7 / 10 |
-| **Total** | | | **53 / 70** | **49 / 70** |
+| `gravitation` | 3 | 2 / 10 | 0.979 (0.986) | 1.7 s |
+| `ideal_gas` | 3 | 10 / 10 | 0.983 (0.991) | 1.0 s |
+| `mechanical_energy` | 3 | 10 / 10 | 0.992 (0.990) | 1.9 s |
+| `five_inputs` | 5 | 5 / 10 | 0.865 (0.907) | 1.5 s |
+| `friedman1` | 10 | 4 / 10 | 0.967 (0.964) | 21.9 s |
+| **Total** | | **31 / 50** | | |
+
+With one shared coefficient and the one-and-two-input budget, the same sets
+scored 20 / 50 (Friedman #1: 0 / 10, test R² 0.63). Per-term coefficients and
+the larger budget each contributed; on Friedman #1 the search typically finds
+`9.9·sin(3.13·x1·x2)` (π rediscovered), `9.9·x4` and `4.7·x5`, and
+approximates `20(x3 − 0.5)²`, reaching the true formula's test score. Giving
+each input fewer copies in the gene alphabet was also tried and did not help
+(19–23 / 50).
+
+### Selection rules compared
+
+The rest of this section compares selection rules on the one- and two-input
+sets (measured before per-term coefficients were added).
 
 Selection never lowers the median test score, and raises it on the two
 datasets where it changes the answer. The two measures disagree on
@@ -241,7 +303,6 @@ outliers, so the best-scoring formula is not the true line.
 - **Cost.** Constant tuning makes each evaluation several times more
   expensive. `--tuning 0` restores the old speed; caching fitness for
   repeated formulas would recover some of the cost.
-- **Many inputs.** The encoding already handles any number of input columns.
-  Cost grows with rows × formula size per evaluation, and the search space
-  grows with the alphabet, so higher-dimensional data will need cheaper
-  evaluation and feature-selection-aware reporting.
+- **Many inputs.** Tested on 3 to 10 inputs. Hundreds of inputs would need
+  the inputs screened before the search (the alphabet and the search space
+  grow with every input), which this does not do.

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -202,10 +203,108 @@ bool Expression::evaluate(const std::vector<std::vector<double> >& inputs,
                           std::vector<double>& predictions) const
 {
    const std::size_t rows = inputs.size();
-   predictions.assign(rows, 0.0);
-   if (nodes_.empty())
+   const double* values = evaluateAll(inputs);
+   if (values == nullptr)
+   {
+      predictions.assign(rows, 0.0);
+      return false;
+   }
+   const double* result = &values[(nodes_.size() - 1) * rows];
+   predictions.assign(result, result + rows);
+   return true;
+}
+
+bool Expression::evaluateNodes(const std::vector<std::vector<double> >& inputs,
+                               const std::vector<int>& nodes,
+                               std::vector<std::vector<double> >& values) const
+{
+   const std::size_t rows = inputs.size();
+   const double* all = evaluateAll(inputs);
+   values.resize(nodes.size());
+   if (all == nullptr)
    {
       return false;
+   }
+   for (std::size_t i = 0 ; i < nodes.size() ; i++)
+   {
+      const double* start = &all[static_cast<std::size_t>(nodes[i]) * rows];
+      values[i].assign(start, start + rows);
+   }
+   return true;
+}
+
+std::vector<int> Expression::additiveTerms(int maxTerms) const
+{
+   std::vector<int> terms;
+   if (nodes_.empty())
+   {
+      return terms;
+   }
+   std::vector<int> pending(1, static_cast<int>(nodes_.size()) - 1);
+   while (!pending.empty())
+   {
+      const int index = pending.back();
+      pending.pop_back();
+      const ExpressionNode& node = nodes_[index];
+      if (node.operation == Operation::Add || node.operation == Operation::Subtract)
+      {
+         pending.push_back(node.right);
+         pending.push_back(node.left);
+      }
+      else if (node.operation == Operation::Negate)
+      {
+         pending.push_back(node.left);
+      }
+      else
+      {
+         terms.push_back(index);
+      }
+   }
+   if (static_cast<int>(terms.size()) > maxTerms)
+   {
+      terms.assign(1, static_cast<int>(nodes_.size()) - 1);
+   }
+   return terms;
+}
+
+bool Expression::usesVariable(int node) const
+{
+   std::vector<int> pending(1, node);
+   while (!pending.empty())
+   {
+      const ExpressionNode& current = nodes_[pending.back()];
+      pending.pop_back();
+      if (current.operation == Operation::Variable)
+      {
+         return true;
+      }
+      if (current.left >= 0) pending.push_back(current.left);
+      if (current.right >= 0) pending.push_back(current.right);
+   }
+   return false;
+}
+
+std::vector<int> Expression::variablesUsed() const
+{
+   std::vector<int> variables;
+   for (const ExpressionNode& node : nodes_)
+   {
+      if (node.operation == Operation::Variable &&
+          std::find(variables.begin(), variables.end(), node.variable) == variables.end())
+      {
+         variables.push_back(node.variable);
+      }
+   }
+   std::sort(variables.begin(), variables.end());
+   return variables;
+}
+
+const double* Expression::evaluateAll(const std::vector<std::vector<double> >& inputs) const
+{
+   const std::size_t rows = inputs.size();
+   if (nodes_.empty())
+   {
+      return nullptr;
    }
 
    // Node-major evaluation: one pass over all rows per node, in a reused
@@ -240,7 +339,7 @@ bool Expression::evaluate(const std::vector<std::vector<double> >& inputs,
       case Operation::Divide:
          for (; row < rows ; row++)
          {
-            if (std::fabs(right[row]) < kDivisionEpsilon) return false;
+            if (std::fabs(right[row]) < kDivisionEpsilon) return nullptr;
             out[row] = left[row] / right[row];
          }
          break;
@@ -249,21 +348,21 @@ bool Expression::evaluate(const std::vector<std::vector<double> >& inputs,
       case Operation::Exp:
          for (; row < rows ; row++)
          {
-            if (left[row] > 700.0) return false;
+            if (left[row] > 700.0) return nullptr;
             out[row] = std::exp(left[row]);
          }
          break;
       case Operation::Log:
          for (; row < rows ; row++)
          {
-            if (left[row] <= 0.0) return false;
+            if (left[row] <= 0.0) return nullptr;
             out[row] = std::log(left[row]);
          }
          break;
       case Operation::Sqrt:
          for (; row < rows ; row++)
          {
-            if (left[row] < 0.0) return false;
+            if (left[row] < 0.0) return nullptr;
             out[row] = std::sqrt(left[row]);
          }
          break;
@@ -274,12 +373,10 @@ bool Expression::evaluate(const std::vector<std::vector<double> >& inputs,
       }
       for (row = 0 ; row < rows ; row++)
       {
-         if (!(std::fabs(out[row]) <= kMaximumMagnitude)) return false; // also rejects NaN
+         if (!(std::fabs(out[row]) <= kMaximumMagnitude)) return nullptr; // also rejects NaN
       }
    }
-   const double* result = &values[(nodes_.size() - 1) * rows];
-   predictions.assign(result, result + rows);
-   return true;
+   return values.data();
 }
 
 std::vector<int> Expression::constantNodes() const
@@ -301,6 +398,16 @@ std::string Expression::toString(const std::vector<std::string>& variableNames) 
    {
       return "0";
    }
+   return allTexts(variableNames).back();
+}
+
+std::string Expression::nodeText(const std::vector<std::string>& variableNames, int node) const
+{
+   return allTexts(variableNames)[node];
+}
+
+std::vector<std::string> Expression::allTexts(const std::vector<std::string>& variableNames) const
+{
 
    // Which subtrees depend on an input variable; the rest fold to numbers.
    std::vector<char> variable(nodes_.size(), 0);
@@ -405,5 +512,5 @@ std::string Expression::toString(const std::vector<std::string>& variableNames) 
          break;
       }
    }
-   return text.back();
+   return text;
 }
