@@ -1479,6 +1479,126 @@ void test_regression_fits_each_additive_term()
                   "The visualization should record the inputs used");
 }
 
+Dataset columnsDataset(const std::vector<std::string>& names,
+                       const std::vector<std::vector<double> >& inputs,
+                       const std::vector<double>& targets)
+{
+  Dataset data;
+  data.source = "columns";
+  data.inputNames = names;
+  data.targetName = "y";
+  data.inputs = inputs;
+  data.targets = targets;
+  return data;
+}
+
+void test_regression_scale_robustness()
+{
+  SymbolicRegression::Config config;
+  config.constantTuningBudget = 0;
+  std::mt19937 generator(3);
+
+  // Terms a thousand times apart in scale each get their own coefficient:
+  // y = a + b, fitted on the terms a and B = 1000*b. (The shared ridge
+  // shrinks terms much further apart; see LIMITATIONS.md.)
+  std::vector<std::vector<double> > inputs;
+  std::vector<double> targets;
+  for (int row = 0 ; row < 60 ; row++)
+    {
+      const double a = gak::uniformReal(generator, 0.0, 1.0);
+      const double b = gak::uniformReal(generator, 0.0, 1.0);
+      inputs.push_back({a, 1e3 * b});
+      targets.push_back(a + b);
+    }
+  SymbolicRegression mixed(columnsDataset({"a", "B"}, inputs, targets), config);
+  InstructionSet two(2);
+  SymbolicRegression::Fit fit = mixed.describe(program(two, {0, 1, geneFor(two, Operation::Add)}));
+  expect_true(fit.trainR2 > 0.9999 && std::fabs(fit.weights[0] - 1.0) < 1e-3 &&
+              std::fabs(fit.weights[1] - 1e-3) < 1e-6,
+              "Terms of very different scales should each get their correct coefficient");
+
+  // Very small inputs and targets are not mistaken for constants.
+  inputs.clear();
+  targets.clear();
+  for (int row = 0 ; row < 40 ; row++)
+    {
+      inputs.push_back({row * 1e-8});
+      targets.push_back(1e-7 * row * 1e-8 + 2e-9);
+    }
+  SymbolicRegression tiny(columnsDataset({"x"}, inputs, targets), config);
+  InstructionSet one(1);
+  const int x = geneFor(one, Operation::Variable);
+  fit = tiny.describe(program(one, {x}));
+  expect_true(fit.valid && fit.trainR2 > 0.999999 && fit.weights.size() == 1 && fit.weights[0] != 0.0,
+              "A small-valued input should get a coefficient, and a small-valued target should be accepted");
+
+  // On exact data, rounding-level differences in cross-validated error must
+  // not make a duplicated term (x + x) win over x.
+  tiny.evaluateFitness(program(one, {x}));
+  tiny.evaluateFitness(program(one, {x, x, geneFor(one, Operation::Add)}));
+  std::vector<int> genes;
+  expect_true(tiny.selectByCrossValidation(genes, fit) && fit.size == 1,
+              "Cross-validation should prefer x over x + x on exact data");
+
+  // Values beyond the evaluator's overflow limit are rejected up front.
+  inputs.assign(10, std::vector<double>(1, 0.0));
+  targets.assign(10, 0.0);
+  for (int row = 0 ; row < 10 ; row++) { inputs[row][0] = 2e12 + row; targets[row] = row; }
+  expect_throws<GAFatalException>([&]() { SymbolicRegression huge(columnsDataset({"t"}, inputs, targets), config); },
+                                  "Inputs above 1e12 should be rejected with a request to rescale");
+}
+
+void test_regression_reporting_edges()
+{
+  SymbolicRegression::Config config;
+  config.constantTuningBudget = 0;
+  InstructionSet one(1);
+  const int x = geneFor(one, Operation::Variable);
+
+  // Visualizations plot at most 1000 rows; fitting uses them all.
+  std::vector<std::vector<double> > inputs;
+  std::vector<double> targets;
+  for (int row = 0 ; row < 2500 ; row++)
+    {
+      inputs.push_back({row * 0.001});
+      targets.push_back(2.0 * row * 0.001 + 1.0);
+    }
+  SymbolicRegression large(columnsDataset({"x"}, inputs, targets), config);
+  std::ostringstream json;
+  large.writeVisualizationJson(program(one, {x}), json);
+  int points = 0;
+  for (std::size_t at = json.str().find("\"set\": ") ; at != std::string::npos ; at = json.str().find("\"set\": ", at + 1))
+    {
+      ++points;
+    }
+  expect_true(points == 1000 && json.str().find("\"rows_total\": 2500") != std::string::npos,
+              "Visualizations should plot at most 1000 rows and record the total");
+  expect_contains(json.str(), "\"intercept\": 1", "Visualizations should carry the exact intercept");
+
+  // Test R^2 is undefined (n/a, null) when the test rows have no variance.
+  SymbolicRegression::Config noFolds = config;
+  noFolds.crossValidationFolds = 0;
+  SymbolicRegression fewRows(columnsDataset({"x"}, {{1}, {2}, {3}, {4}, {5}}, {2.0, 4.1, 5.9, 8.0, 10.1}), noFolds);
+  std::ostringstream printed;
+  fewRows.printCandidate(program(one, {x}), printed);
+  std::ostringstream fewJson;
+  fewRows.writeVisualizationJson(program(one, {x}), fewJson);
+  expect_true(fewRows.testRowCount() == 1 && printed.str().find("test R2=n/a") != std::string::npos &&
+              fewJson.str().find("\"test_r2\": null") != std::string::npos,
+              "Test R^2 should be reported as undefined when the test rows have no variance");
+
+  // Column names that are not valid UTF-8 still give valid JSON.
+  Dataset latin = makeDataset(quadraticTarget, 20, -1.0, 1.0);
+  latin.targetName = "temp\xe9rature";
+  latin.inputNames = {"caf\xc3\xa9"};
+  SymbolicRegression named(latin, config);
+  std::ostringstream namedJson;
+  named.writeVisualizationJson(program(one, {x}), namedJson);
+  expect_true(namedJson.str().find("\"temp\\ufffdrature\"") != std::string::npos &&
+              namedJson.str().find("\"caf\xc3\xa9\"") != std::string::npos,
+              "Invalid UTF-8 should become U+FFFD while valid UTF-8 passes through");
+}
+
 void test_regression_effects_and_term_shares()
 {
   // y = 3*a + 2*b*b exactly; c is irrelevant.
@@ -1822,6 +1942,13 @@ void test_dataset_file_and_format_edges()
   expect_true(failsWith([]() { std::istringstream in("x,y\n1,inf\n3,4\n5,6\n"); loadCsvDataset(in, "i.csv"); },
                         "non-numeric value 'inf'"),
               "CSV loader should reject non-finite values");
+  expect_true(failsWith([]() { std::istringstream in("x,y,x\n1,2,3\n4,5,6\n7,8,9\n"); loadCsvDataset(in, "d.csv"); },
+                        "column name 'x' appears more than once"),
+              "CSV loader should reject duplicate column names");
+  std::istringstream bom("\xEF\xBB\xBFx,y\n1,2\n3,4\n5,6\n");
+  Dataset withBom = loadCsvDataset(bom, "bom.csv", "y");
+  expect_true(withBom.inputNames[0] == "x" && withBom.targetName == "y",
+              "CSV loader should drop a UTF-8 byte-order mark from the first column name");
 }
 
 void test_expression_construction_errors()
@@ -1933,6 +2060,8 @@ int main()
   test_regression_fits_each_additive_term();
   test_regression_counts_input_usage();
   test_regression_effects_and_term_shares();
+  test_regression_scale_robustness();
+  test_regression_reporting_edges();
   test_regression_output_and_visualization();
   test_regression_formula_variants_and_holdout();
   test_regression_configuration_errors();

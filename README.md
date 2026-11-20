@@ -77,7 +77,9 @@ make coverage
 ```
 
 The combined production-code coverage report is written to
-[coverage/coverage.txt](coverage/coverage.txt).
+[coverage/coverage.txt](coverage/coverage.txt). `make coverage` needs LLVM's
+`llvm-profdata` and `llvm-cov`; without them, `make coverage-gcc` measures
+line coverage with GCC's `gcov` instead.
 
 For a more detailed developer workflow, see
 [docs/TESTING_AND_COVERAGE.md](docs/TESTING_AND_COVERAGE.md).
@@ -101,7 +103,7 @@ Available modes:
 
 - `D`
   Dome function minimization with binary fixed-length chromosomes
-- `F6`
+- `6`
   F6 optimization benchmark with binary fixed-length chromosomes
 - `A`
   Alphabet ordering with symbolic fixed-length chromosomes
@@ -131,7 +133,7 @@ Available modes:
 The example runner is meant to be both a demo and a set of working reference
 problems. These are the most useful things to know before you run a mode.
 
-- `D` and `F6`
+- `D` and `6` (F6)
   Continuous-function minimization examples encoded as binary chromosomes.
   These are good first runs if you want to see the classic GA flow on a small,
   generic search space. Expect fitness values to improve toward smaller numbers.
@@ -193,9 +195,10 @@ problems. These are the most useful things to know before you run a mode.
 
 - `R`
   Symbolic regression. Formulas are postfix programs over a symbolic gene
-  alphabet (variables, constants, operators), scored with least-squares
-  linear scaling and a length penalty, with a held-out test split to show
-  generalization. Needs `--data` with a CSV; test datasets with known answers
+  alphabet (variables, constants, operators). Each formula's additive terms
+  get their own least-squares coefficient, the score adds a length penalty,
+  the final formula is chosen by cross-validation, and a held-out test split
+  shows how well it generalizes. Needs `--data` with a CSV; test datasets with known answers
   are in `examples/data/`. See
   [docs/SYMBOLIC_REGRESSION.md](docs/SYMBOLIC_REGRESSION.md).
 
@@ -307,16 +310,20 @@ implement `PopulationProblem::hasReachedSolution(...)`.
 
 Current examples that do this include:
 
+- `Dome`
 - `Spell`
 - `Alpha`
 - `NQueens`
+- `LatinSquare`
 - `GraphColoring`
 - `Timetable`
 - `Sudoku`
 - `SudokuConstrained`
 
 When a solution is found, the engine stops early and reports it in
-`Population::RunResult`.
+`Population::RunResult` (`solutionFound` and `stoppedEarly`). A run that
+stops because duplicate rejection kept every child out for 50 generations
+sets `stalled` instead.
 
 ## Recommended examples to study
 
@@ -365,3 +372,9 @@ Removed:
   Built-in generic crossover behavior
 - [docs/TESTING_AND_COVERAGE.md](docs/TESTING_AND_COVERAGE.md)
   Test and coverage workflow
+- [docs/SYMBOLIC_REGRESSION.md](docs/SYMBOLIC_REGRESSION.md)
+  Discovering formulas from measured data (mode `R`): method, options and results
+- [docs/LIMITATIONS.md](docs/LIMITATIONS.md)
+  Known limitations and the hard limits built into the code
+- [docs/WHITE_PAPER.md](docs/WHITE_PAPER.md)
+  Design rationale, architecture and roadmap

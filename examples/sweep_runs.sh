@@ -71,7 +71,9 @@ json_number() {
 json_bool() {
   key="$1"
   file="$2"
-  sed -n "s/^[[:space:]]*\"$key\": \\(true\\|false\\),\$/\\1/p" "$file" | head -n 1
+  # -E (extended regex) for the alternation: "\|" in a basic regex is a GNU
+  # extension that BSD/macOS sed does not support.
+  sed -nE "s/^[[:space:]]*\"$key\": (true|false),\$/\\1/p" "$file" | head -n 1
 }
 
 json_array_first() {

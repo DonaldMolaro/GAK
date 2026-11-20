@@ -14,9 +14,10 @@ const Operation kUnary[] = {Operation::Sin, Operation::Cos, Operation::Exp, Oper
                             Operation::Sqrt, Operation::Square, Operation::Negate};
 const Operation kBinary[] = {Operation::Add, Operation::Subtract, Operation::Multiply, Operation::Divide};
 
-// Values with magnitude above this are treated as overflow: they are finite
-// but would make the least-squares scaling numerically meaningless.
-constexpr double kMaximumMagnitude = 1e12;
+// Values with magnitude above Expression::kMaximumMagnitude are treated as
+// overflow: they are finite but would make the least-squares fit
+// numerically meaningless.
+constexpr double kMaximumMagnitude = Expression::kMaximumMagnitude;
 constexpr double kDivisionEpsilon = 1e-12;
 
 int arity(Operation operation)
@@ -133,6 +134,8 @@ InstructionSet::InstructionSet(int inputCount, int variableCopies)
       instructions_.push_back(Instruction{operation});
    }
 }
+
+constexpr double Expression::kMaximumMagnitude;
 
 Expression Expression::compile(const BaseString& genes, const InstructionSet& instructions)
 {

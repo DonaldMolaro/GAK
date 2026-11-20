@@ -32,7 +32,7 @@ Mental model:
 Examples:
 
 - `D`
-- `F6`
+- `6` (F6)
 
 Mental model:
 

@@ -11,7 +11,7 @@ cd examples
 ```
 
 ```
-Selected by 5-fold cross-validation (from the best formula of each of 35 sizes; cv R2=0.9398 RMSE=31.8478):
+Selected by 5-fold cross-validation (from the best formula of each of 33 sizes; cv R2=0.9398 RMSE=31.8478):
 counts ~= -3.863 + 497.7*(exp(time_s*(-0.3079))) | nodes=4 train R2=0.9526 RMSE=28.2623 | test R2=0.7880 RMSE=34.8576 ::0.055440
 ```
 
@@ -46,8 +46,12 @@ Test datasets with known answers are in [examples/data](../examples/data/README.
 The run ends with the **selected** formula (see "Choosing the final formula"
 below), printed after the GA's own best formulas. Each result line shows:
 
-- the formula, as `a + b*(f)`: `f` is what the GA evolved, and `a` and `b`
-  are fitted afterwards (see linear scaling below);
+- the formula, as `a + b1*(term1) + b2*(term2) + …`: the terms are what
+  the GA evolved, and the intercept `a` and one coefficient per term are
+  fitted afterwards by least squares (see "Fitting a coefficient to each
+  term" below); with a single term this reads `a + b*(f)`;
+- with several inputs, which inputs the formula uses
+  (`uses 3 of 5 inputs: x1 x3 x4`);
 - `nodes`: the size of `f`, which is what the length penalty charges for;
 - `train R2` / `RMSE`: fit on the rows the GA saw;
 - `test R2` / `RMSE`: fit on the held-out rows. A test score much worse than
@@ -87,8 +91,9 @@ search is limited to one or two. With several inputs:
     watch the pieces of the law arrive (`x1·x2`, then `x4`, then `x5`).
   - **Share of the population using each input**: generations across,
     inputs down, darker where more of the population uses the input. It
-    shows feature selection as it happens: in generation 0 every input is
-    used by about a tenth of the population; inputs that matter darken and
+    shows feature selection as it happens: in generation 0 the inputs are
+    used about evenly (roughly 7–18% of the population each, fewer the more
+    inputs there are); inputs that matter darken and
     irrelevant ones fade. The JSON records the counts per generation as
     `population_summary.input_usage`, and each frame's `effects` and `terms`.
 
@@ -99,14 +104,23 @@ Load a `--report-json` report into [examples/viewer.html](../examples/viewer.htm
 - **Generation 0 is the random starting population.** Expect chaos there:
   in a typical run the median formula is no better than the mean (fitness
   ≈ 1), most formulas never use the input, and the worst are undefined. The
-  *best* of 400 random formulas still often looks reasonable, because linear
-  scaling fits `a + b·f` to any shape and a plain `x` is common.
+  *best* of 400 random formulas still often looks reasonable, because the
+  fitted coefficients scale any shape to the data and a plain `x` is common.
 - **The fitness chart** shows the best formula, the population median, and a
   band for the middle 50%. Progress comes in jumps; the band collapsing onto
   the best line shows the population converging.
 - **Sampled members** (best, 20%, 40%, …, worst by rank) are drawn as faint
   curves behind the best formula and listed under the plot.
-- **The last frame** shows the formula chosen by cross-validation.
+- **The last frame** shows the formula chosen by cross-validation. The JSON
+  report records it as `result.selected`, with `cv_folds`, `cv_r2`,
+  `cv_rmse`, `archived_sizes` (how many formula sizes were compared) and its
+  `visualization`.
+- **Each `visualization`** carries the formula text, `train_r2`, `test_r2`
+  (`null` when the test rows are all the same value, which also prints as
+  `test R2=n/a`), the exact `intercept` and `term_weights` (the formula text
+  rounds them to 4 significant digits), and the plotted `points`. Plots use
+  at most 1,000 evenly spaced rows; `rows_total` gives the full count, and
+  the fit and the R² values always use every row.
 
 ## How it works
 
@@ -223,8 +237,9 @@ and are directly comparable.
 inputs; see `--trials`), rank-based
 roulette selection (`LinearNormalized`), half the population replaced each
 generation, duplicates rejected, crossover 0.8, mutation 0.04 per gene,
-constant tuning with 40 evaluations. A run takes about 0.8 seconds on the
-bundled datasets.
+constant tuning with 40 evaluations. A run takes about a second on the one-
+and two-input datasets and up to about 25 seconds on the ten-input one (see
+the results tables).
 
 Tournament selection (`--tournament N`) is available but was not better here:
 with constant tuning it lowered the recovery rate.
@@ -246,13 +261,13 @@ The datasets carry heavy noise (about 30% of each signal's spread; see
 | Dataset | Structure recovered | Median test R² |
 |---|---|---|
 | `linear_noisy` | 7 / 10 | 0.960 |
-| `quadratic` | 10 / 10 | 0.863 |
+| `quadratic` | 9 / 10 | 0.863 |
 | `sine_trend` | 10 / 10 | 0.902 |
 | `exponential_decay` | 10 / 10 | 0.788 |
 | `pendulum` | 5 / 10 | 0.933 |
 | `rational` | 8 / 10 | 0.882 |
 | `two_input` | 8 / 10 | 0.906 |
-| **Total** | **58 / 70** | |
+| **Total** | **57 / 70** | |
 
 Fitting a coefficient to each additive term raised this from 49 / 70 (one
 shared coefficient, everything else the same): `rational` went from 6 to 8,
@@ -264,12 +279,16 @@ term is charged.
 
 | Dataset | Inputs | Structure recovered | Median test R² (true formula) | Time per run |
 |---|---|---|---|---|
-| `gravitation` | 3 | 2 / 10 | 0.979 (0.986) | 1.7 s |
+| `gravitation` | 3 | 0 / 10 | 0.977 (0.986) | 2.0 s |
 | `ideal_gas` | 3 | 10 / 10 | 0.983 (0.991) | 1.0 s |
 | `mechanical_energy` | 3 | 10 / 10 | 0.992 (0.990) | 1.9 s |
 | `five_inputs` | 5 | 5 / 10 | 0.865 (0.907) | 1.5 s |
 | `friedman1` | 10 | 4 / 10 | 0.967 (0.964) | 21.9 s |
-| **Total** | | **31 / 50** | | |
+| **Total** | | **29 / 50** | | |
+
+These counts move by a few between seed ranges and builds. Gravitation's
+median curve error (0.78) sits right at its threshold (0.76), so it swings
+between 0 and 3 of 10; Friedman #1 recovered 20 of 60 seeds (11 to 70).
 
 With one shared coefficient and the one-and-two-input budget, the same sets
 scored 20 / 50 (Friedman #1: 0 / 10, test R² 0.63). Per-term coefficients and

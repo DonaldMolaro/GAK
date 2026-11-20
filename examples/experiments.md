@@ -23,19 +23,11 @@ What you get:
   - `best_fitness`
   - `worst_fitness`
 
-For reports that include visualization payloads, you can also open:
-
-```sh
-open examples/viewer.html
-```
-
-Then load the generated JSON file into the viewer. The first custom visual
-views are:
-
-- traveling salesman route snapshots
-- constraint-aware Sudoku board snapshots
-
-Other problems currently fall back to a generic gene viewer.
+To browse a report visually, open `viewer.html` (in this `examples/`
+directory) in a web browser and load the JSON file into it, or paste the
+JSON into its text box. Custom views exist for traveling salesman, N-Queens,
+Latin square, knapsack, graph coloring, timetable, both Sudoku modes and
+symbolic regression; other problems use a generic gene view.
 
 ## Multi-Seed Sweeps
 

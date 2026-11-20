@@ -313,8 +313,9 @@
         and scrub through the best candidate found at each generation.
       </p>
       <p class="muted">
-        Custom visual rendering is currently supported for traveling salesman and
-        constraint-aware Sudoku. Other problems fall back to a generic gene view.
+        Custom views exist for traveling salesman, N-Queens, Latin square, knapsack,
+        graph coloring, timetable, both Sudoku modes and symbolic regression; other
+        problems fall back to a generic gene view.
       </p>
     </section>
 
@@ -346,7 +347,7 @@
           <div><strong>Best use:</strong> compare improvements over time, not just final output.</div>
           <div><strong>Inputs:</strong> JSON reports generated with <code>--report-json</code>.</div>
           <div><strong>Key data:</strong> settings, seed, generation summaries, visualization payloads.</div>
-          <div><strong>Good first demos:</strong> <code>T</code> for route plots and <code>C</code> for Sudoku board evolution.</div>
+          <div><strong>Good first demos:</strong> <code>T</code> for route plots, <code>C</code> for Sudoku board evolution, and <code>R --data data/friedman1.csv</code> for symbolic regression with ten inputs.</div>
         </div>
       </div>
     </section>
@@ -586,10 +587,26 @@
       const data = {
         residual_scale: residualScale > 0 ? residualScale : 1,
         input_usage_by_frame: usage.every(entry => entry && Array.isArray(entry.input_usage)) ? usage : null,
-        terms_by_frame: terms.every(Array.isArray) ? terms : null
+        // A frame whose best formula was undefined has no terms; treat it as
+        // empty rather than hiding the timeline for the whole run.
+        terms_by_frame: terms.some(Array.isArray) ? terms.map(entry => entry || []) : null
       };
       state.runContext = { report, data };
       return Object.assign({}, data, { frame_index: state.generationIndex });
+    }
+
+    // Minimum and maximum without spreading the array into arguments, which
+    // overflows the call stack for very large arrays.
+    function arrayMin(values) {
+      let result = Infinity;
+      for (const value of values) if (value < result) result = value;
+      return result;
+    }
+
+    function arrayMax(values) {
+      let result = -Infinity;
+      for (const value of values) if (value > result) result = value;
+      return result;
     }
 
     function formatFitness(value) {
@@ -677,10 +694,10 @@
       const padding = 48;
       const xs = cities.map(city => city.x);
       const ys = cities.map(city => city.y);
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
-      const minY = Math.min(...ys);
-      const maxY = Math.max(...ys);
+      const minX = arrayMin(xs);
+      const maxX = arrayMax(xs);
+      const minY = arrayMin(ys);
+      const maxY = arrayMax(ys);
       const scaleX = (canvas.width - padding * 2) / Math.max(1, maxX - minX);
       const scaleY = (canvas.height - padding * 2) / Math.max(1, maxY - minY);
 
@@ -726,7 +743,9 @@
       caption.style.fontFamily = "Georgia, serif";
       caption.style.margin = "0 0 8px";
       const trainR2 = Number(visualization.train_r2 || 0).toFixed(4);
-      const testR2 = Number(visualization.test_r2 || 0).toFixed(4);
+      // test_r2 is null when the test rows have no variance.
+      const testR2 = visualization.test_r2 === null || visualization.test_r2 === undefined
+        ? "n/a" : Number(visualization.test_r2).toFixed(4);
       if (visualization.selection_note) {
         const note = document.createElement("div");
         note.style.fontFamily = "Georgia, serif";
@@ -780,7 +799,7 @@
       }
       const padding = 56;
       const span = values => {
-        let low = Math.min(...values), high = Math.max(...values);
+        let low = arrayMin(values), high = arrayMax(values);
         if (high === low) { high += 1; low -= 1; }
         const margin = (high - low) * 0.06;
         return [low - margin, high + margin];
@@ -898,7 +917,7 @@
       if (effects.length === 0 || measured.length === 0) {
         return;
       }
-      let minY = Math.min(...measured), maxY = Math.max(...measured);
+      let minY = arrayMin(measured), maxY = arrayMax(measured);
       const margin = (maxY - minY) * 0.06 || 1;
       minY -= margin; maxY += margin;
       const used = new Set(visualization.inputs_used || []);
@@ -929,7 +948,7 @@
           return;
         }
         const ys = curve.map(point => point[1]);
-        const span = Math.max(...ys) - Math.min(...ys);
+        const span = arrayMax(ys) - arrayMin(ys);
         ctx.font = "13px Georgia, serif";
         ctx.textAlign = "right";
         ctx.fillText(isUsed ? `changes ${span.toPrecision(3)}` : "not used", right, 18);
@@ -1059,7 +1078,7 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         const left = 14, right = canvas.width - 10, top = 30, bottom = canvas.height - 16;
         const xs = points.map(point => point.inputs[column]);
-        let minX = Math.min(...xs), maxX = Math.max(...xs);
+        let minX = arrayMin(xs), maxX = arrayMax(xs);
         if (maxX === minX) { maxX += 1; minX -= 1; }
         const toX = x => left + (x - minX) * (right - left) / (maxX - minX);
         const toY = r => top + (bottom - top) * (limit - Math.max(-limit, Math.min(limit, r))) / (2 * limit);
@@ -1535,8 +1554,8 @@
           ? report.fitness_quartiles.map(Number) : null);
       const hasSpread = quartiles.every(q => q && q.slice(0, 4).every(Number.isFinite));
       const scaleValues = hasSpread ? values.concat(...quartiles.map(q => q.slice(1, 4))) : values;
-      const minValue = Math.min(...scaleValues);
-      const maxValue = Math.max(...scaleValues);
+      const minValue = arrayMin(scaleValues);
+      const maxValue = arrayMax(scaleValues);
       const padding = 22;
       const plotWidth = canvas.width - padding * 2;
       const plotHeight = canvas.height - padding * 2;

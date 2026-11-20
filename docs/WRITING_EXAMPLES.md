@@ -13,8 +13,10 @@ Good files to study before adding a new example:
 
 1. [examples/nqueens.hh](../examples/nqueens.hh) and [examples/nqueens.cc](../examples/nqueens.cc)
 2. [examples/knapsack.hh](../examples/knapsack.hh) and [examples/knapsack.cc](../examples/knapsack.cc)
-3. [examples/sudoku_constrained.hh](../examples/sudoku_constrained.hh) and [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc)
-4. [examples/GA.cc](../examples/GA.cc)
+3. [examples/ts.hh](../examples/ts.hh) and [examples/ts.cc](../examples/ts.cc)
+   for permutation-preserving operators
+4. [examples/sudoku_constrained.hh](../examples/sudoku_constrained.hh) and [examples/sudoku_constrained.cc](../examples/sudoku_constrained.cc)
+5. [examples/GA.cc](../examples/GA.cc)
 
 ## Choose The Right Example Style
 
@@ -59,7 +61,9 @@ Good fits:
 
 Examples:
 
-- `SudokuConstrained`
+- `TravelingSalesman`: every chromosome is a permutation (random-permutation
+  initialization, order crossover, swap mutation)
+- `SudokuConstrained`: rows stay permutations and givens stay locked
 
 For this style, you usually implement:
 
@@ -149,9 +153,13 @@ Some problems know when they are solved exactly.
 
 Examples in this repo:
 
+- `Dome`
 - `Spell`
 - `Alpha`
 - `NQueens`
+- `LatinSquare`
+- `GraphColoring`
+- `Timetable`
 - `Sudoku`
 - `SudokuConstrained`
 
@@ -167,6 +175,9 @@ When this returns `true`, the engine stops early and reports:
 
 - `RunResult::solutionFound`
 - `RunResult::stoppedEarly`
+
+(A run can also stop early without a solution: when duplicate rejection
+keeps every child out for 50 generations, `RunResult::stalled` is set.)
 
 Use this hook when:
 

@@ -6,7 +6,9 @@ against the ground truth below. The points are unevenly spaced, as real
 measurements usually are.
 
 The noise is deliberately heavy: about **30% of the spread of each true
-signal**, so even the true formula only reaches R² ≈ 0.91–0.93. That is close
+signal** on the one- and two-input files, so even the true formula only
+reaches R² ≈ 0.91–0.93 there (the physics files use 5–8% relative noise;
+see the table below). That is close
 to real noisy measurements and makes overfitting visible: a formula that
 scores better than the true one on the training rows is fitting noise.
 
