@@ -1478,6 +1478,29 @@ void test_regression_fits_each_additive_term()
                   "The visualization should record the inputs used");
 }
 
+void test_regression_counts_input_usage()
+{
+  Dataset data;
+  data.source = "three";
+  data.inputNames = {"a", "b", "c"};
+  data.targetName = "y";
+  for (int row = 0 ; row < 30 ; row++)
+    {
+      data.inputs.push_back({row * 0.1, row * 0.2, row * 0.3});
+      data.targets.push_back(row);
+    }
+  SymbolicRegression regression(data, SymbolicRegression::Config());
+  InstructionSet set(3);
+  const int multiply = geneFor(set, Operation::Multiply);
+  const int sinGene = geneFor(set, Operation::Sin);
+  const BaseString first = program(set, {0, 1, multiply});   // a*b
+  const BaseString second = program(set, {0, sinGene});      // sin(a)
+  const BaseString third = program(set, {2, 2, multiply});   // c*c
+  const std::vector<const BaseString*> members = {&first, &second, &third};
+  expect_true(regression.summarizePopulation(members) == "{ \"members\": 3, \"input_usage\": [2, 1, 1] }",
+              "Input usage should count each member once per input it uses");
+}
+
 void test_regression_sample_json_is_compact()
 {
   SymbolicRegression::Config config;
@@ -1840,6 +1863,7 @@ int main()
   test_regression_sample_json_is_compact();
   test_expression_additive_terms();
   test_regression_fits_each_additive_term();
+  test_regression_counts_input_usage();
   test_regression_output_and_visualization();
   test_regression_formula_variants_and_holdout();
   test_regression_configuration_errors();

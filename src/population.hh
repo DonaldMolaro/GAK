@@ -4,6 +4,7 @@
 #include <iosfwd>
 #include <memory>
 #include <random>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -31,6 +32,11 @@ public:
    // Defaults to writeVisualizationJson; problems whose full payload is large
    // can write a compact one, since several members are sampled per generation.
    virtual void writeSampleJson(const BaseString& genes, std::ostream& out) const;
+   // A problem-specific summary of a whole generation, as one JSON value
+   // (for example how many members use each input), recorded in generation
+   // reports. Return an empty string for none, the default. It must not
+   // change the population or touch the random number generator.
+   virtual std::string summarizePopulation(const std::vector<const BaseString*>& members) const;
    virtual bool hasReachedSolution(const Population& population,
                                    const BaseString& genes,
                                    double fitness) const;
@@ -125,6 +131,8 @@ public:
       // population: best, upper quartile, median, lower quartile, worst.
       std::vector<double> fitnessQuartiles;
       std::vector<MemberSample> samples;
+      // PopulationProblem::summarizePopulation's JSON value, or empty.
+      std::string populationSummary;
    };
 
 private:

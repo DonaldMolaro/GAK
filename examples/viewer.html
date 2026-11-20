@@ -546,7 +546,7 @@
       // frame, since it is the run's answer.
       const selected = report.result.selected;
       const isLastFrame = state.generationIndex === generations.length - 1;
-      const samples = { population_samples: frame.samples || [] };
+      const samples = Object.assign({ population_samples: frame.samples || [] }, runContext(report, generations));
       if (selected && selected.visualization && isLastFrame) {
         renderVisualization(Object.assign({}, selected.visualization, samples, {
           selection_note: `Selected by ${selected.cv_folds}-fold cross-validation from the best formula ` +
@@ -557,6 +557,37 @@
                             frame.best_candidate_genes || []);
       }
       renderPopulationSpread(frame);
+    }
+
+    // Data that spans the whole run, for views whose scale or content must
+    // not change from frame to frame: one residual scale for every frame, and
+    // the input usage of every generation (when the report has it).
+    function runContext(report, generations) {
+      if (state.runContext && state.runContext.report === report) {
+        return Object.assign({}, state.runContext.data, { frame_index: state.generationIndex });
+      }
+      const visualizations = generations.map(frame => frame.visualization)
+        .concat(report.result.selected ? [report.result.selected.visualization] : [])
+        .filter(viz => viz && viz.type === "regression");
+      // The 95th percentile of |residual| in each frame; the largest of those
+      // sets the scale, so early, poor frames fit too and outliers do not.
+      let residualScale = 0;
+      visualizations.forEach(viz => {
+        const residuals = (viz.points || [])
+          .filter(point => Number.isFinite(point.predicted) && Number.isFinite(point.y))
+          .map(point => Math.abs(point.y - point.predicted))
+          .sort((a, b) => a - b);
+        if (residuals.length > 0) {
+          residualScale = Math.max(residualScale, residuals[Math.floor(0.95 * (residuals.length - 1))]);
+        }
+      });
+      const usage = generations.map(frame => frame.population_summary || null);
+      const data = {
+        residual_scale: residualScale > 0 ? residualScale : 1,
+        input_usage_by_frame: usage.every(entry => entry && Array.isArray(entry.input_usage)) ? usage : null
+      };
+      state.runContext = { report, data };
+      return Object.assign({}, data, { frame_index: state.generationIndex });
     }
 
     function formatFitness(value) {
@@ -839,6 +870,156 @@
       ctx.fillText("● train", canvas.width - padding - 120, padding - 12);
       ctx.fillStyle = "#cc5a3d";
       ctx.fillText("○ test", canvas.width - padding - 60, padding - 12);
+
+      if (!singleInput) {
+        renderResidualPanels(wrapper, visualization);
+        renderInputUsage(wrapper, visualization);
+      }
+    }
+
+    // One small plot per input: residual (measured minus predicted) against
+    // that input, with a trend line of the average residual. Structure the
+    // formula has not found yet shows as a pattern in its input's panel (a
+    // U-shape for a missing squared term) and flattens once it is found. The
+    // scales are the same in every frame.
+    function renderResidualPanels(wrapper, visualization) {
+      const points = (visualization.points || [])
+        .filter(point => Number.isFinite(point.predicted) && Number.isFinite(point.y));
+      const inputs = visualization.inputs || [];
+      if (points.length === 0 || inputs.length === 0) {
+        return;
+      }
+      const used = new Set(visualization.inputs_used || []);
+      const limit = visualization.residual_scale || 1;
+      const heading = document.createElement("div");
+      heading.style.cssText = "font-family: Georgia, serif; font-weight: bold; margin: 18px 0 6px;";
+      heading.textContent = "Residuals against each input (measured minus predicted; the line is the average)";
+      wrapper.appendChild(heading);
+      const grid = document.createElement("div");
+      grid.style.cssText = "display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; width: 100%;";
+      wrapper.appendChild(grid);
+
+      inputs.forEach((name, column) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 300;
+        canvas.height = 200;
+        grid.appendChild(canvas);
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const left = 14, right = canvas.width - 10, top = 30, bottom = canvas.height - 16;
+        const xs = points.map(point => point.inputs[column]);
+        let minX = Math.min(...xs), maxX = Math.max(...xs);
+        if (maxX === minX) { maxX += 1; minX -= 1; }
+        const toX = x => left + (x - minX) * (right - left) / (maxX - minX);
+        const toY = r => top + (bottom - top) * (limit - Math.max(-limit, Math.min(limit, r))) / (2 * limit);
+        const isUsed = used.has(name);
+
+        ctx.fillStyle = isUsed ? "#1d1b18" : "#8a847b";
+        ctx.font = "bold 15px Georgia, serif";
+        ctx.textAlign = "left";
+        ctx.fillText(name, left, 18);
+        ctx.font = "13px Georgia, serif";
+        ctx.textAlign = "right";
+        ctx.fillText(isUsed ? "used" : "not used", right, 18);
+
+        ctx.strokeStyle = "#c7c0b5";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(left, top, right - left, bottom - top);
+        ctx.beginPath();
+        ctx.moveTo(left, toY(0));
+        ctx.lineTo(right, toY(0));
+        ctx.stroke();
+
+        points.forEach(point => {
+          const residual = point.y - point.predicted;
+          ctx.beginPath();
+          ctx.arc(toX(point.inputs[column]), toY(residual), 2.2, 0, Math.PI * 2);
+          if (point.set === "test") {
+            ctx.strokeStyle = "rgba(204, 90, 61, 0.8)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          } else {
+            ctx.fillStyle = "rgba(29, 27, 24, 0.55)";
+            ctx.fill();
+          }
+        });
+
+        // Average residual in 12 equal-width bins.
+        const bins = 12;
+        const sums = new Array(bins).fill(0), counts = new Array(bins).fill(0);
+        points.forEach(point => {
+          const bin = Math.min(bins - 1, Math.floor((point.inputs[column] - minX) / (maxX - minX) * bins));
+          sums[bin] += point.y - point.predicted;
+          counts[bin] += 1;
+        });
+        ctx.strokeStyle = "#1b6f5f";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        let started = false;
+        for (let bin = 0; bin < bins; bin += 1) {
+          if (counts[bin] === 0) continue;
+          const x = toX(minX + (bin + 0.5) * (maxX - minX) / bins);
+          const y = toY(sums[bin] / counts[bin]);
+          if (!started) { ctx.moveTo(x, y); started = true; } else { ctx.lineTo(x, y); }
+        }
+        ctx.stroke();
+      });
+    }
+
+    // Generations (columns) by inputs (rows): how much of the population
+    // uses each input. Feature selection as it happens: inputs that matter
+    // darken, irrelevant ones fade. The marker shows the current generation.
+    function renderInputUsage(wrapper, visualization) {
+      const frames = visualization.input_usage_by_frame;
+      const inputs = visualization.inputs || [];
+      if (!frames || frames.length === 0 || inputs.length === 0) {
+        return;
+      }
+      const heading = document.createElement("div");
+      heading.style.cssText = "font-family: Georgia, serif; font-weight: bold; margin: 18px 0 6px;";
+      heading.textContent = "Share of the population using each input, by generation";
+      wrapper.appendChild(heading);
+      const rowHeight = 18, labelWidth = 70, top = 8, axis = 22;
+      const canvas = document.createElement("canvas");
+      canvas.width = 900;
+      canvas.height = top + rowHeight * inputs.length + axis;
+      wrapper.appendChild(canvas);
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const plotWidth = canvas.width - labelWidth - 10;
+      const cellWidth = plotWidth / frames.length;
+
+      frames.forEach((entry, column) => {
+        const members = Math.max(1, entry.members || 1);
+        entry.input_usage.forEach((count, row) => {
+          ctx.fillStyle = `rgba(27, 111, 95, ${Math.min(1, count / members).toFixed(3)})`;
+          ctx.fillRect(labelWidth + column * cellWidth, top + row * rowHeight, Math.ceil(cellWidth), rowHeight - 2);
+        });
+      });
+
+      ctx.fillStyle = "#1d1b18";
+      ctx.font = "13px Georgia, serif";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      inputs.forEach((name, row) => ctx.fillText(name, labelWidth - 8, top + row * rowHeight + rowHeight / 2 - 1));
+      ctx.textBaseline = "alphabetic";
+
+      const index = Math.max(0, Math.min(frames.length - 1, visualization.frame_index || 0));
+      const markerX = labelWidth + (index + 0.5) * cellWidth;
+      ctx.strokeStyle = "#b6422e";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(markerX, top - 4);
+      ctx.lineTo(markerX, top + rowHeight * inputs.length);
+      ctx.stroke();
+
+      ctx.fillStyle = "#6a655d";
+      ctx.textAlign = "left";
+      ctx.fillText("first generation", labelWidth, canvas.height - 6);
+      ctx.textAlign = "right";
+      ctx.fillText("last generation  (darker = more of the population; red line = this frame)", canvas.width - 10, canvas.height - 6);
     }
 
     function renderSudoku(visualization) {

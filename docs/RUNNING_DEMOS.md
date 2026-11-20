@@ -67,7 +67,9 @@ also records N members at evenly spaced ranks from best to worst
 chart shades the middle 50% of the population and draws its median beside the
 best member, so convergence (the band collapsing onto the best line) is
 visible. Samples are chosen by rank, not at random, so they never change a
-seeded run.
+seeded run. A problem can also add its own per-generation summary
+(`population_summary`); symbolic regression records how many members use
+each input.
 
 ## What The Parameter Block Means
 
