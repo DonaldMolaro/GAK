@@ -76,12 +76,21 @@ search is limited to one or two. With several inputs:
     U-shape against `x3` until the `(x3 − 0.5)²` term is found) and flattens
     once it is. An input the formula leaves out is labelled "not used". The
     scales are the same in every frame.
+  - **Effect of each input**: one small plot per input of how the
+    prediction changes as that input varies, averaged over the data rows
+    (partial dependence). Inputs that matter show their fitted shape (a
+    straight line for `x4`, a parabola once `(x3 − 0.5)²` is found); ignored
+    inputs are flat. The vertical scale is the measured range.
+  - **Terms of the best formula**: each additive term's share of the
+    explained variance, stacked by generation so the stack's height is the
+    training R². Terms are coloured by the inputs they involve, so you can
+    watch the pieces of the law arrive (`x1·x2`, then `x4`, then `x5`).
   - **Share of the population using each input**: generations across,
     inputs down, darker where more of the population uses the input. It
     shows feature selection as it happens: in generation 0 every input is
     used by about a tenth of the population; inputs that matter darken and
     irrelevant ones fade. The JSON records the counts per generation as
-    `population_summary.input_usage`.
+    `population_summary.input_usage`, and each frame's `effects` and `terms`.
 
 ## Watching a run
 

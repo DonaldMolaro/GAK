@@ -284,6 +284,26 @@ bool Expression::usesVariable(int node) const
    return false;
 }
 
+std::vector<int> Expression::variablesUsedBy(int node) const
+{
+   std::vector<int> variables;
+   std::vector<int> pending(1, node);
+   while (!pending.empty())
+   {
+      const ExpressionNode& current = nodes_[pending.back()];
+      pending.pop_back();
+      if (current.operation == Operation::Variable &&
+          std::find(variables.begin(), variables.end(), current.variable) == variables.end())
+      {
+         variables.push_back(current.variable);
+      }
+      if (current.left >= 0) pending.push_back(current.left);
+      if (current.right >= 0) pending.push_back(current.right);
+   }
+   std::sort(variables.begin(), variables.end());
+   return variables;
+}
+
 std::vector<int> Expression::variablesUsed() const
 {
    std::vector<int> variables;

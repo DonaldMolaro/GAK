@@ -159,6 +159,11 @@ private:
    bool predictRows(const Expression& expression, const Fit& fit,
                     const std::vector<std::vector<double> >& inputs,
                     std::vector<double>& predictions) const;
+   // Visualization extras for several inputs: "effects" (partial dependence
+   // per input) and "terms" (each additive term's share of the explained
+   // variance and the inputs it involves).
+   void writeEffectsJson(const Expression& expression, const Fit& fit, std::ostream& out) const;
+   void writeTermSharesJson(const Expression& expression, const Fit& fit, std::ostream& out) const;
    // Out-of-fold mean squared error of a formula structure, and its
    // standard error over the training rows.
    bool crossValidationStats(const BaseString& genes, double& mse, double& standardError) const;

@@ -16,6 +16,7 @@ namespace
 constexpr double kVarianceEpsilon = 1e-12;
 constexpr int kCurveSamples = 200;
 constexpr int kSampleCurvePoints = 60;
+constexpr int kEffectPoints = 25;
 
 constexpr int kMaxTerms = 8;
 
@@ -759,7 +760,105 @@ void SymbolicRegression::writeVisualizationJson(const BaseString& genes, std::os
          out << "{ \"x\": " << x << ", \"y\": " << value[0] << " }";
       }
    }
-   out << "] }" << std::defaultfloat << std::setprecision(6);
+   out << "]";
+
+   // With several inputs: an effect curve per input and each term's share of
+   // the explained variance (see the header).
+   if (fit.valid && dataset_.inputCount() > 1)
+   {
+      writeEffectsJson(expression, fit, out);
+      writeTermSharesJson(expression, fit, out);
+   }
+   out << " }" << std::defaultfloat << std::setprecision(6);
+}
+
+// Partial dependence: for each input, the prediction averaged over every
+// data row with that input set to each value on a grid across its range.
+// Averaging over the data (rather than holding the other inputs at fixed
+// values) keeps interactions such as x1*x2 honest. A grid value at which the
+// formula is undefined for some row is left out.
+void SymbolicRegression::writeEffectsJson(const Expression& expression, const Fit& fit, std::ostream& out) const
+{
+   out << ", \"effects\": [";
+   std::vector<std::vector<double> > rows = dataset_.inputs;
+   std::vector<double> predictions;
+   for (int column = 0 ; column < dataset_.inputCount() ; column++)
+   {
+      double low = dataset_.inputs[0][column];
+      double high = low;
+      for (const std::vector<double>& row : dataset_.inputs)
+      {
+         low = std::min(low, row[column]);
+         high = std::max(high, row[column]);
+      }
+      out << (column == 0 ? "" : ", ") << "{ \"input\": ";
+      writeJsonString(out, dataset_.inputNames[column]);
+      out << ", \"curve\": [";
+      bool first = true;
+      for (int step = 0 ; step < kEffectPoints ; step++)
+      {
+         const double x = low + (high - low) * step / (kEffectPoints - 1);
+         for (std::vector<double>& row : rows) row[column] = x;
+         if (!predictRows(expression, fit, rows, predictions))
+         {
+            continue;
+         }
+         double mean = 0.0;
+         for (double value : predictions) mean += value;
+         mean /= static_cast<double>(predictions.size());
+         out << (first ? "" : ", ") << "[" << x << ", " << mean << "]";
+         first = false;
+      }
+      for (std::size_t row = 0 ; row < rows.size() ; row++) rows[row][column] = dataset_.inputs[row][column];
+      out << "] }";
+   }
+   out << "]";
+}
+
+// Each additive term's share of the explained variance on the training rows:
+// the variance of weight * term, scaled so the shares add up to the training
+// R^2 (correlated terms share credit in proportion to their own variance).
+// Each term also lists the inputs it involves, which identifies it across
+// generations better than its text does.
+void SymbolicRegression::writeTermSharesJson(const Expression& expression, const Fit& fit, std::ostream& out) const
+{
+   const std::vector<int> terms = modelTerms(expression);
+   std::vector<std::vector<double> > values;
+   out << ", \"terms\": [";
+   if (terms.size() != fit.weights.size() || !evaluateTerms(expression, terms, train_.inputs, values))
+   {
+      out << "]";
+      return;
+   }
+   std::vector<double> variances(terms.size(), 0.0);
+   double total = 0.0;
+   for (std::size_t i = 0 ; i < terms.size() ; i++)
+   {
+      double mean = 0.0;
+      for (double value : values[i]) mean += value;
+      mean /= static_cast<double>(values[i].size());
+      for (double value : values[i])
+      {
+         const double centred = fit.weights[i] * (value - mean);
+         variances[i] += centred * centred;
+      }
+      total += variances[i];
+   }
+   for (std::size_t i = 0 ; i < terms.size() ; i++)
+   {
+      const double share = total > 0.0 ? fit.trainR2 * variances[i] / total : 0.0;
+      out << (i == 0 ? "" : ", ") << "{ \"text\": ";
+      writeJsonString(out, fit.terms[i]);
+      out << ", \"weight\": " << fit.weights[i] << ", \"share\": " << share << ", \"inputs\": [";
+      const std::vector<int> used = expression.variablesUsedBy(terms[i]);
+      for (std::size_t v = 0 ; v < used.size() ; v++)
+      {
+         out << (v == 0 ? "" : ", ");
+         writeJsonString(out, dataset_.inputNames[used[v]]);
+      }
+      out << "] }";
+   }
+   out << "]";
 }
 
 void SymbolicRegression::writeSampleJson(const BaseString& genes, std::ostream& out) const
