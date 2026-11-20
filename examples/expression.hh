@@ -85,6 +85,8 @@ public:
    bool usesVariable(int node) const;
    // The input variables the formula uses, in ascending order.
    std::vector<int> variablesUsed() const;
+   // The input variables the subtree at `node` uses, in ascending order.
+   std::vector<int> variablesUsedBy(int node) const;
 
    // Indices of constant nodes, and write access to their values (used to
    // tune constants numerically after the GA has chosen the structure).

@@ -582,9 +582,11 @@
         }
       });
       const usage = generations.map(frame => frame.population_summary || null);
+      const terms = generations.map(frame => (frame.visualization && frame.visualization.terms) || null);
       const data = {
         residual_scale: residualScale > 0 ? residualScale : 1,
-        input_usage_by_frame: usage.every(entry => entry && Array.isArray(entry.input_usage)) ? usage : null
+        input_usage_by_frame: usage.every(entry => entry && Array.isArray(entry.input_usage)) ? usage : null,
+        terms_by_frame: terms.every(Array.isArray) ? terms : null
       };
       state.runContext = { report, data };
       return Object.assign({}, data, { frame_index: state.generationIndex });
@@ -872,9 +874,160 @@
       ctx.fillText("○ test", canvas.width - padding - 60, padding - 12);
 
       if (!singleInput) {
+        renderTermTimeline(wrapper, visualization);
         renderResidualPanels(wrapper, visualization);
+        renderEffectPanels(wrapper, visualization);
         renderInputUsage(wrapper, visualization);
       }
+    }
+
+    function sectionHeading(wrapper, text) {
+      const heading = document.createElement("div");
+      heading.style.cssText = "font-family: Georgia, serif; font-weight: bold; margin: 18px 0 6px;";
+      heading.textContent = text;
+      wrapper.appendChild(heading);
+    }
+
+    // How the prediction changes with each input: partial dependence, the
+    // prediction averaged over the data with that input set to each value.
+    // Inputs that matter show their fitted shape; ignored ones are flat. The
+    // vertical scale is the measured range, the same in every frame.
+    function renderEffectPanels(wrapper, visualization) {
+      const effects = visualization.effects || [];
+      const measured = (visualization.points || []).map(point => point.y).filter(Number.isFinite);
+      if (effects.length === 0 || measured.length === 0) {
+        return;
+      }
+      let minY = Math.min(...measured), maxY = Math.max(...measured);
+      const margin = (maxY - minY) * 0.06 || 1;
+      minY -= margin; maxY += margin;
+      const used = new Set(visualization.inputs_used || []);
+      sectionHeading(wrapper, "Effect of each input (the prediction averaged over the data, as that input varies)");
+      const grid = document.createElement("div");
+      grid.style.cssText = "display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; width: 100%;";
+      wrapper.appendChild(grid);
+
+      effects.forEach(effect => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 300;
+        canvas.height = 200;
+        grid.appendChild(canvas);
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const left = 14, right = canvas.width - 10, top = 30, bottom = canvas.height - 16;
+        const curve = effect.curve || [];
+        const isUsed = used.has(effect.input);
+        ctx.fillStyle = isUsed ? "#1d1b18" : "#8a847b";
+        ctx.font = "bold 15px Georgia, serif";
+        ctx.textAlign = "left";
+        ctx.fillText(effect.input, left, 18);
+        ctx.strokeStyle = "#c7c0b5";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(left, top, right - left, bottom - top);
+        if (curve.length < 2) {
+          return;
+        }
+        const ys = curve.map(point => point[1]);
+        const span = Math.max(...ys) - Math.min(...ys);
+        ctx.font = "13px Georgia, serif";
+        ctx.textAlign = "right";
+        ctx.fillText(isUsed ? `changes ${span.toPrecision(3)}` : "not used", right, 18);
+        const minX = curve[0][0], maxX = curve[curve.length - 1][0];
+        const toX = x => left + (x - minX) * (right - left) / Math.max(1e-12, maxX - minX);
+        const toY = y => bottom - (Math.max(minY, Math.min(maxY, y)) - minY) * (bottom - top) / (maxY - minY);
+        ctx.strokeStyle = isUsed ? "#1b6f5f" : "#b8b2a8";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        curve.forEach(([x, y], index) => {
+          if (index === 0) ctx.moveTo(toX(x), toY(y));
+          else ctx.lineTo(toX(x), toY(y));
+        });
+        ctx.stroke();
+      });
+    }
+
+    // Each frame's best formula split into its additive terms, stacked by the
+    // share of the variance each explains, so the stack's height is the
+    // training R². Terms are coloured by the inputs they involve, which stays
+    // stable while the term's exact text changes from frame to frame.
+    function renderTermTimeline(wrapper, visualization) {
+      const frames = visualization.terms_by_frame;
+      if (!frames || frames.length === 0) {
+        return;
+      }
+      const keyOf = term => (term.inputs || []).join("·") || "constant";
+      const keys = [];
+      frames.forEach(terms => terms.forEach(term => {
+        if (!keys.includes(keyOf(term))) keys.push(keyOf(term));
+      }));
+      const palette = ["#1b6f5f", "#cc5a3d", "#3d63b8", "#b08d2b", "#7a4fa0", "#2f8fa3", "#a0466b", "#6b8e23"];
+      const colorOf = key => {
+        const index = keys.indexOf(key);
+        return index < palette.length ? palette[index] : "#9a948a";
+      };
+      sectionHeading(wrapper, "Terms of the best formula: share of the variance each explains, by generation");
+      const canvas = document.createElement("canvas");
+      canvas.width = 900;
+      canvas.height = 220;
+      wrapper.appendChild(canvas);
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const left = 44, right = canvas.width - 10, top = 10, bottom = canvas.height - 24;
+      const cellWidth = (right - left) / frames.length;
+      const toY = share => bottom - Math.max(0, Math.min(1, share)) * (bottom - top);
+
+      frames.forEach((terms, column) => {
+        let stacked = 0;
+        keys.forEach(key => {
+          const share = terms.filter(term => keyOf(term) === key).reduce((sum, term) => sum + (term.share || 0), 0);
+          if (share <= 0) return;
+          ctx.fillStyle = colorOf(key);
+          ctx.fillRect(left + column * cellWidth, toY(stacked + share), Math.ceil(cellWidth), toY(stacked) - toY(stacked + share));
+          stacked += share;
+        });
+      });
+
+      ctx.strokeStyle = "#c7c0b5";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(left, top, right - left, bottom - top);
+      ctx.fillStyle = "#6a655d";
+      ctx.font = "13px Georgia, serif";
+      ctx.textAlign = "right";
+      ctx.fillText("R² 1", left - 4, top + 10);
+      ctx.fillText("0", left - 4, bottom);
+      ctx.textAlign = "left";
+      ctx.fillText("first generation", left, canvas.height - 6);
+      ctx.textAlign = "right";
+      ctx.fillText("last generation  (red line = this frame)", right, canvas.height - 6);
+      const index = Math.max(0, Math.min(frames.length - 1, visualization.frame_index || 0));
+      ctx.strokeStyle = "#b6422e";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(left + (index + 0.5) * cellWidth, top);
+      ctx.lineTo(left + (index + 0.5) * cellWidth, bottom);
+      ctx.stroke();
+
+      // Legend: one entry per input group, with this frame's term and share.
+      const legend = document.createElement("div");
+      legend.style.cssText = "display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: Georgia, serif; font-size: 14px; margin: 6px 0 0;";
+      const current = visualization.terms || frames[index] || [];
+      keys.forEach(key => {
+        const item = document.createElement("div");
+        const swatch = document.createElement("span");
+        swatch.style.cssText = `display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; background: ${colorOf(key)};`;
+        item.appendChild(swatch);
+        const term = current.find(entry => keyOf(entry) === key);
+        const label = document.createElement("span");
+        label.textContent = term
+          ? `${key}: ${Number(term.weight).toPrecision(4)}·(${term.text}), ${(100 * term.share).toFixed(1)}%`
+          : `${key}: not in this frame`;
+        item.appendChild(label);
+        if (!term) item.style.color = "#8a847b";
+        legend.appendChild(item);
+      });
+      wrapper.appendChild(legend);
     }
 
     // One small plot per input: residual (measured minus predicted) against
@@ -891,10 +1044,7 @@
       }
       const used = new Set(visualization.inputs_used || []);
       const limit = visualization.residual_scale || 1;
-      const heading = document.createElement("div");
-      heading.style.cssText = "font-family: Georgia, serif; font-weight: bold; margin: 18px 0 6px;";
-      heading.textContent = "Residuals against each input (measured minus predicted; the line is the average)";
-      wrapper.appendChild(heading);
+      sectionHeading(wrapper, "Residuals against each input (measured minus predicted; the line is the average)");
       const grid = document.createElement("div");
       grid.style.cssText = "display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; width: 100%;";
       wrapper.appendChild(grid);
@@ -976,10 +1126,7 @@
       if (!frames || frames.length === 0 || inputs.length === 0) {
         return;
       }
-      const heading = document.createElement("div");
-      heading.style.cssText = "font-family: Georgia, serif; font-weight: bold; margin: 18px 0 6px;";
-      heading.textContent = "Share of the population using each input, by generation";
-      wrapper.appendChild(heading);
+      sectionHeading(wrapper, "Share of the population using each input, by generation");
       const rowHeight = 18, labelWidth = 70, top = 8, axis = 22;
       const canvas = document.createElement("canvas");
       canvas.width = 900;

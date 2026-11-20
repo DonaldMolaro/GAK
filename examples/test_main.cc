@@ -1,6 +1,7 @@
 #include <cmath>
 #include <functional>
 #include <iostream>
+#include <set>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -1478,6 +1479,73 @@ void test_regression_fits_each_additive_term()
                   "The visualization should record the inputs used");
 }
 
+void test_regression_effects_and_term_shares()
+{
+  // y = 3*a + 2*b*b exactly; c is irrelevant.
+  Dataset data;
+  data.source = "effects";
+  data.inputNames = {"a", "b", "c"};
+  data.targetName = "y";
+  std::mt19937 generator(5);
+  for (int row = 0 ; row < 60 ; row++)
+    {
+      std::vector<double> inputs(3);
+      for (double& value : inputs) value = gak::uniformReal(generator, -1.0, 1.0);
+      data.inputs.push_back(inputs);
+      data.targets.push_back(3.0 * inputs[0] + 2.0 * inputs[1] * inputs[1]);
+    }
+  SymbolicRegression::Config config;
+  config.constantTuningBudget = 0;
+  SymbolicRegression regression(data, config);
+  InstructionSet set(3);
+  const BaseString genes = program(set, {0, 1, geneFor(set, Operation::Square), geneFor(set, Operation::Add)});
+  std::ostringstream json;
+  regression.writeVisualizationJson(genes, json);
+  const std::string text = json.str();
+  int effectCurves = 0;
+  for (std::size_t at = text.find("{ \"input\": ") ; at != std::string::npos ; at = text.find("{ \"input\": ", at + 1))
+    {
+      ++effectCurves;
+    }
+  expect_true(effectCurves == 3,
+              "The visualization should include an effect curve for every input");
+  // The effect of c is flat: every point on its curve has the same value.
+  const std::size_t cStart = text.find("{ \"input\": \"c\", \"curve\": [");
+  const std::size_t cEnd = text.find("] }", cStart);
+  std::istringstream cCurve(text.substr(cStart, cEnd - cStart));
+  std::string token;
+  std::set<std::string> values;
+  while (std::getline(cCurve, token, ']'))
+    {
+      const std::size_t comma = token.rfind(", ");
+      if (comma != std::string::npos && token.find('[') != std::string::npos)
+        {
+          values.insert(token.substr(comma + 2));
+        }
+    }
+  expect_true(values.size() == 1, "An unused input should have a flat effect curve");
+  expect_contains(text, "{ \"text\": \"a\", \"weight\": 3, \"share\": ",
+                  "Each term should report its fitted weight");
+  expect_contains(text, "\"inputs\": [\"b\"] }",
+                  "Each term should list the inputs it involves");
+  // Shares add up to the training R^2 (1 for this exact formula).
+  double total = 0.0;
+  for (std::size_t at = text.find("\"share\": ") ; at != std::string::npos ; at = text.find("\"share\": ", at + 1))
+    {
+      total += std::stod(text.substr(at + 10));
+    }
+  expect_true(std::fabs(total - 1.0) < 1e-6, "Term shares should add up to the training R^2");
+
+  // A single input gets neither view.
+  SymbolicRegression single(makeDataset(quadraticTarget, 20, -1.0, 1.0), config);
+  InstructionSet oneSet(1);
+  std::ostringstream singleJson;
+  single.writeVisualizationJson(program(oneSet, {geneFor(oneSet, Operation::Variable)}), singleJson);
+  expect_true(singleJson.str().find("\"effects\"") == std::string::npos &&
+              singleJson.str().find("\"terms\"") == std::string::npos,
+              "Single-input visualizations should not include effects or terms");
+}
+
 void test_regression_counts_input_usage()
 {
   Dataset data;
@@ -1627,8 +1695,8 @@ void test_regression_output_and_visualization()
   std::ostringstream multiJson;
   multi.writeVisualizationJson(program(multiSet, {0, 1, geneFor(multiSet, Operation::Multiply)}), multiJson);
   expect_contains(multiJson.str(), "\"inputs\": [\"a\", \"b\"]", "Visualization should list every input");
-  expect_true(multiJson.str().find("\"curve\": [] }") != std::string::npos,
-              "Multi-input visualizations should not include a curve");
+  expect_true(multiJson.str().find("\"curve\": [], \"effects\": [") != std::string::npos,
+              "Multi-input visualizations should have an empty main curve, then effect curves");
 }
 
 void test_regression_formula_variants_and_holdout()
@@ -1864,6 +1932,7 @@ int main()
   test_expression_additive_terms();
   test_regression_fits_each_additive_term();
   test_regression_counts_input_usage();
+  test_regression_effects_and_term_shares();
   test_regression_output_and_visualization();
   test_regression_formula_variants_and_holdout();
   test_regression_configuration_errors();

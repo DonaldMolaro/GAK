@@ -134,6 +134,13 @@ grep -qF '"type": "regression_sample"' "$WORK/r.json" || fail "mode R reports sh
 checks=$((checks + 1))
 grep -qF '"population_summary": { "members": 60, "input_usage": [' "$WORK/r.json" ||
   fail "mode R reports should count input usage across the population"
+expect 0 "" "a multi-input mode R run writes a report" -- \
+  $GA R --data data/two_input.csv $QUICK --restarts 1 --report-json "$WORK/two.json"
+checks=$((checks + 1))
+grep -qF '"effects": [{ "input": "x1", "curve": [' "$WORK/two.json" ||
+  fail "multi-input reports should include an effect curve per input"
+checks=$((checks + 1))
+grep -qF '"terms": [{ "text": ' "$WORK/two.json" || fail "multi-input reports should include term shares"
 checks=$((checks + 1))
 grep -qF '"generation": 0,' "$WORK/r.json" || fail "reports should start with generation 0, the initial population"
 expect 0 "" "--samples 0 writes reports without samples" -- \
