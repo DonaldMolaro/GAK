@@ -27,6 +27,10 @@ public:
    virtual double evaluateFitness(const BaseString& genes) = 0;
    virtual void printCandidate(const BaseString& genes, std::ostream& out) const = 0;
    virtual void writeVisualizationJson(const BaseString& genes, std::ostream& out) const;
+   // Visualization for a sampled population member in generation reports.
+   // Defaults to writeVisualizationJson; problems whose full payload is large
+   // can write a compact one, since several members are sampled per generation.
+   virtual void writeSampleJson(const BaseString& genes, std::ostream& out) const;
    virtual bool hasReachedSolution(const Population& population,
                                    const BaseString& genes,
                                    double fitness) const;
@@ -63,6 +67,10 @@ public:
       ReproductionMode reproduction = ReproductionMode::AllowDuplicates;
       ParentSelectionMode parentSelection = ParentSelectionMode::RouletteWheel;
       int tournamentSize = 3; // used by ParentSelectionMode::Tournament
+      // Members sampled per generation report, at evenly spaced fitness
+      // ranks from best to worst (0 = none). Ranks, not random draws, so
+      // sampling never touches the random number generator.
+      int reportSampleSize = 0;
       DeletionMode deletion = DeletionMode::DeleteAll;
       FitnessMode fitness = FitnessMode::Evaluation;
       VariableLengthMode variableLength = VariableLengthMode::Fixed;
@@ -98,13 +106,25 @@ public:
       std::vector<PopulationSummary> generationSummaries;
       PopulationSummary finalSummary;
    };
+   struct MemberSample
+   {
+      int rank = 0; // 0 = best member of the generation
+      double fitness = 0.0;
+      std::vector<int> genes;
+   };
    struct GenerationReport
    {
+      // Generation 0 is the random initial population, before any breeding;
+      // generation N follows N rounds of breeding.
       int generation = 0;
       int evaluations = 0;
       PopulationSummary summary;
       std::vector<int> bestCandidateGenes;
       double bestCandidateFitness = 0.0;
+      // Fitness at rank fractions 0, 0.25, 0.5, 0.75 and 1 of the whole
+      // population: best, upper quartile, median, lower quartile, worst.
+      std::vector<double> fitnessQuartiles;
+      std::vector<MemberSample> samples;
    };
 
 private:
@@ -157,6 +177,7 @@ public:
    double evaluateFitness(const BaseString& genes);
    void printCandidate(const BaseString& genes, std::ostream& out) const;
    void writeVisualizationJson(const BaseString& genes, std::ostream& out) const;
+   void writeSampleJson(const BaseString& genes, std::ostream& out) const;
    const Settings& settings() const noexcept { return settings_; }
    unsigned int randomSeed() const noexcept { return activeRandomSeed_; }
    std::mt19937& randomEngine() noexcept { return randomGenerator; }
@@ -177,6 +198,8 @@ private:
    PopulationSummary buildPopulationSummary() const;
    RunResult executeInternal(bool captureGenerationSummaries);
    int selectRandomParent();
+   int indexOfRank(int rank) const;
+   GenerationReport buildGenerationReport(int generation, int evaluations) const;
    int selectTournamentParent();
    int bestCandidateIndex() const;
    bool hasReachedSolution() const;

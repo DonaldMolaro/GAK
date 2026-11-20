@@ -100,6 +100,10 @@ public:
    double evaluateFitness(const BaseString& genes) override;
    void printCandidate(const BaseString& genes, std::ostream& out) const override;
    void writeVisualizationJson(const BaseString& genes, std::ostream& out) const override;
+   // Compact payload for sampled population members: the formula and its
+   // scores plus a coarse curve (one input) or one prediction per row (several
+   // inputs), without repeating the data points.
+   void writeSampleJson(const BaseString& genes, std::ostream& out) const override;
    std::unique_ptr<Chromosome> initializeCandidate(Population& population) override;
    std::pair<std::unique_ptr<Chromosome>, std::unique_ptr<Chromosome> >
       mateCandidates(Population& population, Chromosome& mother, Chromosome& father) override;

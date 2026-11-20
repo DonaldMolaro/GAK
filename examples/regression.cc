@@ -15,6 +15,7 @@ namespace
 {
 constexpr double kVarianceEpsilon = 1e-12;
 constexpr int kCurveSamples = 200;
+constexpr int kSampleCurvePoints = 60;
 
 struct Scaling
 {
@@ -571,6 +572,57 @@ void SymbolicRegression::writeVisualizationJson(const BaseString& genes, std::os
       }
    }
    out << "] }" << std::defaultfloat << std::setprecision(6);
+}
+
+void SymbolicRegression::writeSampleJson(const BaseString& genes, std::ostream& out) const
+{
+   const Fit fit = describe(genes);
+   Expression expression = Expression::compile(genes, instructions_);
+   tuneConstants(expression, train_);
+   out << "{ \"type\": \"regression_sample\", \"formula\": ";
+   writeJsonString(out, scaledFormula(fit));
+   out << std::setprecision(6)
+       << ", \"valid\": " << (fit.valid ? "true" : "false")
+       << ", \"nodes\": " << fit.size
+       << ", \"train_r2\": " << (fit.valid ? fit.trainR2 : 0.0);
+   if (fit.valid && dataset_.inputCount() == 1)
+   {
+      double low = dataset_.inputs[0][0];
+      double high = low;
+      for (const std::vector<double>& row : dataset_.inputs)
+      {
+         low = std::min(low, row[0]);
+         high = std::max(high, row[0]);
+      }
+      out << ", \"curve\": [";
+      bool first = true;
+      for (int sample = 0 ; sample < kSampleCurvePoints ; sample++)
+      {
+         const double x = low + (high - low) * sample / (kSampleCurvePoints - 1);
+         std::vector<double> value;
+         if (!expression.evaluate(std::vector<std::vector<double> >(1, std::vector<double>(1, x)), value))
+         {
+            continue;
+         }
+         out << (first ? "" : ", ") << "[" << x << ", " << (fit.intercept + fit.slope * value[0]) << "]";
+         first = false;
+      }
+      out << "]";
+   }
+   else if (fit.valid)
+   {
+      std::vector<double> predictions;
+      if (expression.evaluate(dataset_.inputs, predictions))
+      {
+         out << ", \"predicted\": [";
+         for (std::size_t row = 0 ; row < predictions.size() ; row++)
+         {
+            out << (row == 0 ? "" : ", ") << (fit.intercept + fit.slope * predictions[row]);
+         }
+         out << "]";
+      }
+   }
+   out << " }" << std::defaultfloat;
 }
 
 std::unique_ptr<Chromosome> SymbolicRegression::initializeCandidate(Population& population)

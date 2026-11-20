@@ -35,6 +35,7 @@ the held-out rows.
 | `--trials N` | Evaluation budget **per restart** (default `15000`). |
 | `--seed N`, `--population N`, `--mutation R`, `--crossover R`, `--selection S`, `--tournament N` | As for every mode. |
 | `--report-json P`, `--report-csv P` | Reports; the JSON includes a `regression` visualization for `viewer.html`. |
+| `--samples N` | Population members recorded per generation in reports, at evenly spaced fitness ranks (default `6`; `0` for none). |
 
 The CSV loader is strict: a non-numeric value, a ragged row, an unknown
 `--target`, or fewer than 3 data rows stops the run with the file and line.
@@ -53,6 +54,22 @@ below), printed after the GA's own best formulas. Each result line shows:
   the training score means the formula is fitting the noise.
 
 The number after `::` is the fitness being minimized (lower is better).
+
+## Watching a run
+
+Load a `--report-json` report into [examples/viewer.html](../examples/viewer.html):
+
+- **Generation 0 is the random starting population.** Expect chaos there:
+  in a typical run the median formula is no better than the mean (fitness
+  ≈ 1), most formulas never use the input, and the worst are undefined. The
+  *best* of 400 random formulas still often looks reasonable, because linear
+  scaling fits `a + b·f` to any shape and a plain `x` is common.
+- **The fitness chart** shows the best formula, the population median, and a
+  band for the middle 50%. Progress comes in jumps; the band collapsing onto
+  the best line shows the population converging.
+- **Sampled members** (best, 20%, 40%, …, worst by rank) are drawn as faint
+  curves behind the best formula and listed under the plot.
+- **The last frame** shows the formula chosen by cross-validation.
 
 ## How it works
 

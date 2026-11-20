@@ -1383,6 +1383,30 @@ void test_regression_archive_and_cross_validated_selection()
                                   "A negative standard-error margin should be rejected");
 }
 
+void test_regression_sample_json_is_compact()
+{
+  SymbolicRegression::Config config;
+  config.constantTuningBudget = 0;
+  SymbolicRegression regression(makeDataset(quadraticTarget, 40, -3.0, 3.0), config);
+  InstructionSet set(1);
+  const BaseString genes = program(set, {geneFor(set, Operation::Variable), geneFor(set, Operation::Square)});
+  std::ostringstream sample;
+  regression.writeSampleJson(genes, sample);
+  std::ostringstream full;
+  regression.writeVisualizationJson(genes, full);
+  expect_contains(sample.str(), "\"type\": \"regression_sample\"", "Sample payloads should be typed");
+  expect_contains(sample.str(), "\"formula\": \"2 + 3*(x^2)\"", "Sample payloads should carry the formula");
+  int separators = 0;
+  for (std::size_t at = sample.str().find("], [") ; at != std::string::npos ; at = sample.str().find("], [", at + 1))
+    {
+      ++separators;
+    }
+  expect_true(sample.str().find("\"points\"") == std::string::npos && separators == 59,
+              "Sample payloads should have a 60-point curve and no data points");
+  expect_true(sample.str().size() * 3 < full.str().size(),
+              "Sample payloads should be much smaller than the full visualization");
+}
+
 void test_regression_run_recovers_formula()
 {
   SymbolicRegression regression(makeDataset(quadraticTarget, 40, -3.0, 3.0), SymbolicRegression::Config());
@@ -1718,6 +1742,7 @@ int main()
   test_regression_run_recovers_formula();
   test_regression_tunes_constants();
   test_regression_archive_and_cross_validated_selection();
+  test_regression_sample_json_is_compact();
   test_regression_output_and_visualization();
   test_regression_formula_variants_and_holdout();
   test_regression_configuration_errors();

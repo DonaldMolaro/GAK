@@ -1338,12 +1338,17 @@ void test_population_execute_result_contents_are_consistent()
 	      "execute should report the expected number of generations for this configuration");
   expect_true(result.evaluations == 12,
 	      "execute should report the exact evaluation count for this configuration");
-  expect_true(result.generationReports.size() == static_cast<std::size_t>(result.generationsCompleted),
-	      "execute(true) should produce one generation report per completed generation");
-  expect_true(result.generationSummaries.size() == static_cast<std::size_t>(result.generationsCompleted),
-	      "execute(true) should produce one summary per completed generation");
-  expect_true(result.generationReports.back().generation == 0,
-	      "Generation reports should preserve the generation index");
+  // Generation 0 is the initial population, so there is one more report than
+  // completed breeding rounds.
+  expect_true(result.generationReports.size() == static_cast<std::size_t>(result.generationsCompleted + 1),
+	      "execute(true) should report the initial population plus every completed generation");
+  expect_true(result.generationSummaries.size() == static_cast<std::size_t>(result.generationsCompleted + 1),
+	      "execute(true) should produce one summary per report");
+  expect_true(result.generationReports.front().generation == 0 &&
+	      result.generationReports.front().evaluations == pop.settings().numberOfIndividuals,
+	      "Generation 0 should be the initial population, before any breeding");
+  expect_true(result.generationReports.back().generation == result.generationsCompleted,
+	      "The last report should be numbered by the completed breeding rounds");
   expect_true(result.generationReports.back().evaluations == result.evaluations,
 	      "Generation reports should preserve the evaluation count");
   expect_true(result.finalSummary.mostFit.size() == 5,
@@ -1424,8 +1429,8 @@ void test_population_stops_early_when_problem_reports_solution()
               "execute should stop before breeding when the initial population already contains a solution");
   expect_true(result.evaluations == pop.settings().numberOfIndividuals,
               "execute should stop after the initial evaluation pass when a solution is already present");
-  expect_true(result.generationReports.empty(),
-              "execute should not record generation reports when it stops before the first breeding generation");
+  expect_true(result.generationReports.size() == 1 && result.generationReports.front().generation == 0,
+              "A run solved by its initial population should report only generation 0");
 }
 
 void test_population_run_output_contains_progress_and_final_summary()
@@ -1440,8 +1445,9 @@ void test_population_run_output_contains_progress_and_final_summary()
   pop.run(output, PopulationRunReportOptions{true, true});
   const std::string rendered = output.str();
 
-  expect_true(rendered.find("Generation 0 Number of Evaluations 12") != std::string::npos,
-	      "run should print final generation progress");
+  expect_true(rendered.find("Generation 0 Number of Evaluations 6") != std::string::npos &&
+	      rendered.find("Generation 1 Number of Evaluations 12") != std::string::npos,
+	      "run should print the initial population and each generation's progress");
   expect_true(rendered.find("Chromosome:") != std::string::npos,
 	      "run should print chromosome summaries through printCandidate");
   expect_true(rendered.find("1.000000") != std::string::npos || rendered.find("0.000000") != std::string::npos,
@@ -1466,7 +1472,7 @@ void test_population_run_reporter_formats_execute_results()
 
   expect_true(output.find("Operation             :: Maximize") != std::string::npos,
 	      "RunReporter should be able to render settings");
-  expect_true(output.find("Generation 0 Number of Evaluations 12") != std::string::npos,
+  expect_true(output.find("Generation 1 Number of Evaluations 12") != std::string::npos,
 	      "RunReporter should be able to render generation progress from execute results");
   expect_true(output.find("Chromosome:") != std::string::npos,
 	      "RunReporter should render candidate output through printCandidate");
@@ -1514,8 +1520,8 @@ void test_population_run_reporter_writes_csv()
 
   expect_true(csv.find("generation,evaluations,best_fitness,worst_fitness") == 0,
 	      "RunReporter CSV should include a header row");
-  expect_true(csv.find("0,12,") != std::string::npos,
-	      "RunReporter CSV should include generation progress rows");
+  expect_true(csv.find("\n0,6,") != std::string::npos && csv.find("\n1,12,") != std::string::npos,
+	      "RunReporter CSV should include the initial population and generation progress rows");
 }
 
 void test_population_default_operator_hooks_are_explicitly_exercised()
@@ -2079,6 +2085,85 @@ void test_population_public_helpers_and_validation()
     "The text reporter should reject an unsupported operation mode");
 }
 
+// Fitness is the gene value itself, so a population of 1-gene, 8-state
+// chromosomes has a known fitness distribution.
+class GeneValueProblem : public PopulationProblem
+{
+public:
+  double evaluateFitness(const BaseString& genes) override { return genes.valueAt(0); }
+  void printCandidate(const BaseString&, std::ostream&) const override {}
+};
+
+void test_generation_reports_capture_population_spread()
+{
+  for (Population::OperationMode mode : {Population::OperationMode::Maximize, Population::OperationMode::Minimize})
+    {
+      GeneValueProblem problem;
+      Population::Settings settings = make_population_options(mode, 9, 18, 1, 0.3, 0.5,
+                                                              Population::ReproductionMode::AllowDuplicates,
+                                                              Population::ParentSelectionMode::Tournament,
+                                                              Population::DeletionMode::DeleteHalf,
+                                                              Population::FitnessMode::Evaluation,
+                                                              Population::VariableLengthMode::Fixed, 8);
+      settings.useFixedRandomSeed = true;
+      settings.randomSeed = 3;
+      settings.reportSampleSize = 3;
+      Population pop(settings, problem);
+      Population::RunResult result = pop.execute(true);
+      const bool maximize = mode == Population::OperationMode::Maximize;
+      for (const Population::GenerationReport& report : result.generationReports)
+        {
+          const std::vector<double>& q = report.fitnessQuartiles;
+          bool bestFirst = q.size() == 5;
+          for (std::size_t i = 1 ; bestFirst && i < q.size() ; i++)
+            {
+              bestFirst = maximize ? q[i - 1] >= q[i] : q[i - 1] <= q[i];
+            }
+          expect_true(bestFirst && q.front() == report.bestCandidateFitness,
+                      "Fitness quartiles should run from the best member to the worst");
+          expect_true(report.samples.size() == 3 && report.samples[0].rank == 0 &&
+                      report.samples[1].rank == 4 && report.samples[2].rank == 8,
+                      "Samples should sit at evenly spaced ranks from best to worst");
+          expect_true(report.samples[0].fitness == q[0] && report.samples[1].fitness == q[2] &&
+                      report.samples[2].fitness == q[4] &&
+                      report.samples[1].genes.size() == 1 &&
+                      report.samples[1].genes[0] == static_cast<int>(report.samples[1].fitness),
+                      "Each sample should carry its own fitness and genes");
+        }
+
+      // Sampling reads the population only: a seeded run is unchanged.
+      Population::Settings plain = settings;
+      plain.reportSampleSize = 0;
+      GeneValueProblem otherProblem;
+      Population other(plain, otherProblem);
+      Population::RunResult unsampled = other.execute(true);
+      expect_true(unsampled.generationsCompleted == result.generationsCompleted &&
+                  unsampled.finalSummary.mostFit == result.finalSummary.mostFit &&
+                  unsampled.generationReports.back().bestCandidateGenes ==
+                    result.generationReports.back().bestCandidateGenes &&
+                  unsampled.generationReports.back().samples.empty(),
+                  "Sampling members should not change a seeded run");
+
+      std::ostringstream json;
+      PopulationReporter::writeJson(json, pop, result);
+      expect_true(json.str().find("\"fitness_quartiles\": [") != std::string::npos &&
+                  json.str().find("{ \"rank\": 4, \"fitness\": ") != std::string::npos,
+                  "JSON reports should include the population spread");
+    }
+
+  GeneValueProblem problem;
+  Population::Settings bad = make_population_options(Population::OperationMode::Maximize, 4, 8, 1, 0.0, 0.0,
+                                                     Population::ReproductionMode::AllowDuplicates,
+                                                     Population::ParentSelectionMode::RouletteWheel,
+                                                     Population::DeletionMode::DeleteAll,
+                                                     Population::FitnessMode::Evaluation,
+                                                     Population::VariableLengthMode::Fixed, 8);
+  bad.reportSampleSize = -1;
+  Population invalid(bad, problem);
+  expect_throws<GAFatalException>([&invalid]() { (void)invalid.execute(true); },
+                                  "A negative report sample size should be rejected");
+}
+
 void test_tournament_selection()
 {
   for (Population::OperationMode mode : {Population::OperationMode::Maximize, Population::OperationMode::Minimize})
@@ -2218,6 +2303,7 @@ int main()
   test_verbose_report_prints_generation_snapshot();
   test_portable_random_golden_values();
   test_tournament_selection();
+  test_generation_reports_capture_population_spread();
   test_population_stops_when_solution_found_mid_run();
   test_report_labels_cover_every_mode();
   test_population_public_helpers_and_validation();

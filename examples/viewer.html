@@ -546,14 +546,17 @@
       // frame, since it is the run's answer.
       const selected = report.result.selected;
       const isLastFrame = state.generationIndex === generations.length - 1;
+      const samples = { population_samples: frame.samples || [] };
       if (selected && selected.visualization && isLastFrame) {
-        renderVisualization(Object.assign({}, selected.visualization, {
+        renderVisualization(Object.assign({}, selected.visualization, samples, {
           selection_note: `Selected by ${selected.cv_folds}-fold cross-validation from the best formula ` +
             `of each of ${selected.archived_sizes} sizes (cv R² ${Number(selected.cv_r2).toFixed(4)})`
         }), frame.best_candidate_genes || []);
       } else {
-        renderVisualization(frame.visualization, frame.best_candidate_genes || []);
+        renderVisualization(frame.visualization ? Object.assign({}, frame.visualization, samples) : null,
+                            frame.best_candidate_genes || []);
       }
+      renderPopulationSpread(frame);
     }
 
     function formatFitness(value) {
@@ -722,9 +725,17 @@
       const yOf = point => singleInput ? point.y : point.predicted;
       const plotted = points.filter(point => Number.isFinite(xOf(point)) && Number.isFinite(yOf(point)));
       const curve = singleInput ? (visualization.curve || []) : [];
+      // Sampled population members, drawn faintly behind the best formula.
+      const sampleCurves = singleInput
+        ? (visualization.population_samples || [])
+            .map(sample => (sample.visualization && sample.visualization.curve) || [])
+            .filter(points => points.length > 1)
+        : [];
 
       const xs = plotted.map(xOf).concat(curve.map(c => c.x));
       const ys = plotted.map(yOf).concat(curve.map(c => c.y));
+      // Sample curves may run far outside the data; keep the scale on the data.
+      const dataMinY = Math.min(...ys), dataMaxY = Math.max(...ys);
       if (!singleInput) {
         xs.push(...plotted.map(p => p.predicted));
         ys.push(...plotted.map(p => p.y));
@@ -760,6 +771,25 @@
       ctx.fillText(singleInput ? visualization.target : `predicted ${visualization.target}`, 0, 0);
       ctx.restore();
 
+      if (sampleCurves.length > 0) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(padding, padding, canvas.width - padding * 2, canvas.height - padding * 2);
+        ctx.clip();
+        ctx.strokeStyle = "rgba(120, 112, 100, 0.45)";
+        ctx.lineWidth = 1.5;
+        sampleCurves.forEach(points => {
+          ctx.beginPath();
+          points.forEach(([x, y], index) => {
+            const py = toY(Math.max(dataMinY - (dataMaxY - dataMinY), Math.min(dataMaxY + (dataMaxY - dataMinY), y)));
+            if (index === 0) ctx.moveTo(toX(x), py);
+            else ctx.lineTo(toX(x), py);
+          });
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
+
       ctx.strokeStyle = "#1b6f5f";
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -791,6 +821,11 @@
       ctx.textAlign = "left";
       ctx.font = "13px Georgia, serif";
       ctx.fillStyle = "#1d1b18";
+      if (sampleCurves.length > 0) {
+        ctx.fillStyle = "#787064";
+        ctx.fillText("— sampled members", canvas.width - padding - 260, padding - 12);
+        ctx.fillStyle = "#1d1b18";
+      }
       ctx.fillText("● train", canvas.width - padding - 120, padding - 12);
       ctx.fillStyle = "#cc5a3d";
       ctx.fillText("○ test", canvas.width - padding - 60, padding - 12);
@@ -1154,45 +1189,113 @@
       }
 
       const values = generations.map(report => Number(report.best_candidate_fitness || ((report.most_fit || [0])[0] || 0)));
-      const minValue = Math.min(...values);
-      const maxValue = Math.max(...values);
+      // Population spread, when the report has it: fitness at ranks
+      // [best, 25%, median, 75%, worst]. The worst is left off the chart; in
+      // symbolic regression it is often a penalty value for undefined formulas.
+      const quartiles = generations.map(report =>
+        Array.isArray(report.fitness_quartiles) && report.fitness_quartiles.length === 5
+          ? report.fitness_quartiles.map(Number) : null);
+      const hasSpread = quartiles.every(q => q && q.slice(0, 4).every(Number.isFinite));
+      const scaleValues = hasSpread ? values.concat(...quartiles.map(q => q.slice(1, 4))) : values;
+      const minValue = Math.min(...scaleValues);
+      const maxValue = Math.max(...scaleValues);
       const padding = 22;
       const plotWidth = canvas.width - padding * 2;
       const plotHeight = canvas.height - padding * 2;
+      const toX = index => padding + (index / Math.max(1, values.length - 1)) * plotWidth;
+      const toY = value => padding + plotHeight - ((value - minValue) / Math.max(1e-9, maxValue - minValue)) * plotHeight;
 
       ctx.strokeStyle = "#c9c1b5";
       ctx.lineWidth = 1;
       ctx.strokeRect(padding, padding, plotWidth, plotHeight);
 
+      if (hasSpread) {
+        // Middle 50% of the population as a band, then the median.
+        ctx.fillStyle = "rgba(204, 90, 61, 0.15)";
+        ctx.beginPath();
+        quartiles.forEach((q, index) => {
+          if (index === 0) ctx.moveTo(toX(index), toY(q[1]));
+          else ctx.lineTo(toX(index), toY(q[1]));
+        });
+        for (let index = quartiles.length - 1; index >= 0; index -= 1) {
+          ctx.lineTo(toX(index), toY(quartiles[index][3]));
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = "#cc5a3d";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        quartiles.forEach((q, index) => {
+          if (index === 0) ctx.moveTo(toX(index), toY(q[2]));
+          else ctx.lineTo(toX(index), toY(q[2]));
+        });
+        ctx.stroke();
+      }
+
       ctx.strokeStyle = "#1b6f5f";
       ctx.lineWidth = 3;
       ctx.beginPath();
       values.forEach((value, index) => {
-        const x = padding + (index / Math.max(1, values.length - 1)) * plotWidth;
-        const normalized = (value - minValue) / Math.max(1e-9, maxValue - minValue);
-        const y = padding + plotHeight - normalized * plotHeight;
         if (index === 0) {
-          ctx.moveTo(x, y);
+          ctx.moveTo(toX(index), toY(value));
         } else {
-          ctx.lineTo(x, y);
+          ctx.lineTo(toX(index), toY(value));
         }
       });
       ctx.stroke();
 
-      const selectedValue = values[state.generationIndex];
-      const selectedX = padding + (state.generationIndex / Math.max(1, values.length - 1)) * plotWidth;
-      const selectedNormalized = (selectedValue - minValue) / Math.max(1e-9, maxValue - minValue);
-      const selectedY = padding + plotHeight - selectedNormalized * plotHeight;
-
       ctx.fillStyle = "#b6422e";
       ctx.beginPath();
-      ctx.arc(selectedX, selectedY, 5, 0, Math.PI * 2);
+      ctx.arc(toX(state.generationIndex), toY(values[state.generationIndex]), 5, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = "#6a655d";
       ctx.font = "13px Georgia, serif";
+      ctx.textAlign = "left";
       ctx.fillText(`min ${minValue.toFixed(2)}`, padding, canvas.height - 6);
       ctx.fillText(`max ${maxValue.toFixed(2)}`, padding, 14);
+      if (hasSpread) {
+        ctx.textAlign = "right";
+        ctx.fillStyle = "#1b6f5f";
+        ctx.fillText("best", canvas.width - padding - 170, 14);
+        ctx.fillStyle = "#cc5a3d";
+        ctx.fillText("median, middle 50% shaded", canvas.width - padding, 14);
+        ctx.textAlign = "left";
+      }
+    }
+
+    // A short text summary of the population's spread for any mode: the
+    // fitness quartiles and the sampled members.
+    function renderPopulationSpread(frame) {
+      const quartiles = frame.fitness_quartiles;
+      const samples = frame.samples || [];
+      if (!Array.isArray(quartiles) || quartiles.length !== 5) {
+        return;
+      }
+      const block = document.createElement("div");
+      block.style.fontFamily = "Georgia, serif";
+      block.style.fontSize = "14px";
+      block.style.margin = "10px 0 0";
+      const heading = document.createElement("div");
+      heading.style.fontWeight = "bold";
+      heading.textContent = "Population spread (fitness at best, 25%, median, 75%, worst): " +
+        quartiles.map(value => formatSpreadValue(Number(value))).join(", ");
+      block.appendChild(heading);
+      samples.forEach(sample => {
+        const line = document.createElement("div");
+        const viz = sample.visualization || {};
+        const detail = viz.type === "regression_sample"
+          ? `${viz.formula}  (R² ${Number(viz.train_r2 || 0).toFixed(3)})`
+          : "";
+        line.textContent = `rank ${sample.rank}: fitness ${formatSpreadValue(Number(sample.fitness))}  ${detail}`;
+        block.appendChild(line);
+      });
+      elements.vizSurface.appendChild(block);
+    }
+
+    function formatSpreadValue(value) {
+      return Math.abs(value) >= 1e5 ? value.toExponential(1) : value.toFixed(3);
     }
 
     function escapeHtml(text) {
