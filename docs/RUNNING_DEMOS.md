@@ -58,6 +58,17 @@ The JSON report can be loaded into the local viewer at
 [examples/viewer.html](../examples/viewer.html) to
 scrub through per-generation progress visually.
 
+Reports start at **generation 0, the random initial population**, before any
+breeding; generation N follows N rounds of breeding. Each generation records
+the best member plus the population's spread: fitness at the best, 25%,
+median, 75% and worst ranks (`fitness_quartiles`). With `--samples N`, it
+also records N members at evenly spaced ranks from best to worst
+(`samples`; 6 by default in mode `R`, none otherwise). The viewer's fitness
+chart shades the middle 50% of the population and draws its median beside the
+best member, so convergence (the band collapsing onto the best line) is
+visible. Samples are chosen by rank, not at random, so they never change a
+seeded run.
+
 ## What The Parameter Block Means
 
 The runner prints a `GA parameters:` section before the run starts.

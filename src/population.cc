@@ -88,6 +88,16 @@ void PopulationProblem::writeVisualizationJson(const BaseString& genes, std::ost
    out << "] }";
 }
 
+void Population::writeSampleJson(const BaseString& genes, std::ostream& out) const
+{
+   problem_.writeSampleJson(genes, out);
+}
+
+void PopulationProblem::writeSampleJson(const BaseString& genes, std::ostream& out) const
+{
+   writeVisualizationJson(genes, out);
+}
+
 bool PopulationProblem::hasReachedSolution(const Population&, const BaseString&, double) const
 {
    return false;
@@ -193,6 +203,60 @@ bool Population::hasReachedSolution() const
                                       fitnessTable[index]);
 }
 
+// Table index of the member with fitness rank `rank` (0 = best): the table is
+// sorted ascending, so the best end depends on the optimization direction.
+int Population::indexOfRank(int rank) const
+{
+   return settings_.operation == Population::OperationMode::Maximize
+             ? (settings_.numberOfIndividuals - 1) - rank
+             : rank;
+}
+
+Population::GenerationReport Population::buildGenerationReport(int generation, int evaluations) const
+{
+   GenerationReport report;
+   report.generation = generation;
+   report.evaluations = evaluations;
+   report.summary = buildPopulationSummary();
+
+   auto genesAt = [this](int index) {
+      const BaseString& genes = populationTable[index].get()->genes();
+      std::vector<int> values;
+      values.reserve(genes.length());
+      for (int gene = 0 ; gene < genes.length() ; gene++)
+      {
+         values.push_back(genes.valueAt(gene));
+      }
+      return values;
+   };
+   const int bestIndex = bestCandidateIndex();
+   report.bestCandidateGenes = genesAt(bestIndex);
+   report.bestCandidateFitness = fitnessTable[bestIndex];
+
+   const int last = settings_.numberOfIndividuals - 1;
+   for (int quarter = 0 ; quarter <= 4 ; quarter++)
+   {
+      const int rank = static_cast<int>(std::lround(quarter * last / 4.0));
+      report.fitnessQuartiles.push_back(fitnessTable[indexOfRank(rank)]);
+   }
+
+   const int samples = std::min(settings_.reportSampleSize, settings_.numberOfIndividuals);
+   for (int i = 0 ; i < samples ; i++)
+   {
+      const int rank = samples == 1 ? 0 : static_cast<int>(std::lround(i * last / static_cast<double>(samples - 1)));
+      if (!report.samples.empty() && report.samples.back().rank == rank)
+      {
+         continue;
+      }
+      MemberSample sample;
+      sample.rank = rank;
+      sample.fitness = fitnessTable[indexOfRank(rank)];
+      sample.genes = genesAt(indexOfRank(rank));
+      report.samples.push_back(std::move(sample));
+   }
+   return report;
+}
+
 int Population::selectRandomParent()
 {
    return randomIndex(settings_.numberOfIndividuals);
@@ -289,8 +353,19 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
       throw GAFatalException(__FILE__,__LINE__,
                              "Deletion mode replaces no individuals (or more than exist) for this population size");
    }
+   if (settings_.reportSampleSize < 0)
+   {
+      throw GAFatalException(__FILE__,__LINE__,"Report sample size must not be negative");
+   }
    int numberBorn = initializePopulation();
    evaluatePopulation();
+   if (captureGenerationSummaries)
+   {
+      // Generation 0: the random initial population, before any breeding.
+      GenerationReport initial = buildGenerationReport(0, numberBorn);
+      result.generationSummaries.push_back(initial.summary);
+      result.generationReports.push_back(std::move(initial));
+   }
    if (hasReachedSolution())
    {
       result.stoppedEarly = true;
@@ -312,21 +387,9 @@ Population::RunResult Population::executeInternal(bool captureGenerationSummarie
       const bool solutionFound = hasReachedSolution();
       if (captureGenerationSummaries)
       {
-         PopulationSummary summary = buildPopulationSummary();
-         GenerationReport report;
-         report.generation = numGen;
-         report.evaluations = numberBorn;
-         report.summary = summary;
-         const int bestIndex = bestCandidateIndex();
-         const BaseString& bestGenes = populationTable[bestIndex].get()->genes();
-         report.bestCandidateGenes.reserve(bestGenes.length());
-         for (int gene = 0 ; gene < bestGenes.length() ; gene++)
-         {
-            report.bestCandidateGenes.push_back(bestGenes.valueAt(gene));
-         }
-         report.bestCandidateFitness = fitnessTable[bestIndex];
-         result.generationReports.push_back(report);
-         result.generationSummaries.push_back(summary);
+         GenerationReport report = buildGenerationReport(numGen + 1, numberBorn);
+         result.generationSummaries.push_back(report.summary);
+         result.generationReports.push_back(std::move(report));
       }
       ++numGen;
       if (solutionFound)

@@ -76,6 +76,8 @@ struct CliOptions
   int tuning = 0;
   bool restartsProvided = false;
   int restarts = 0;
+  bool samplesProvided = false;
+  int samples = 0;
   bool selectionProvided = false;
   Population::ParentSelectionMode selection = Population::ParentSelectionMode::RouletteWheel;
   bool tournamentProvided = false;
@@ -497,6 +499,7 @@ Population::Settings make_regression_options(int alphabetSize)
   options.fitness = Population::FitnessMode::LinearNormalized;
   options.variableLength = Population::VariableLengthMode::Variable;
   options.baseStates = alphabetSize;
+  options.reportSampleSize = 6; // show the population's spread, not just its best
   return options;
 }
 
@@ -596,6 +599,8 @@ void usage(std::ostream& out)
   out << "  --restarts N      Independent runs in mode R; the best training fit is reported (default 4)\n";
   out << "  --tuning N        Constant-tuning evaluations per formula in mode R (default 40, 0 = off)\n";
   out << "  --report-json P   Write a structured JSON run report to path P\n";
+  out << "  --samples N       Population members sampled per generation in reports, at evenly\n";
+  out << "                    spaced fitness ranks (default 6 for mode R, 0 otherwise)\n";
   out << "  --report-csv P    Write per-generation CSV progress to path P\n";
   out << "  --show-settings   Print the resolved settings report before the final summary\n";
   out << "  --help            Show this help\n";
@@ -757,6 +762,11 @@ bool parseCliOptions(int argc, char* argv[], CliOptions& options)
       options.restartsProvided = parsePositiveInt(value, options.restarts);
       if (!options.restartsProvided) return reportInvalidValue(arg, value, "a positive integer");
     }
+    else if (arg == "--samples")
+    {
+      options.samplesProvided = parseInt(value, options.samples) && options.samples >= 0;
+      if (!options.samplesProvided) return reportInvalidValue(arg, value, "a non-negative integer");
+    }
     else if (arg == "--selection")
     {
       options.selectionProvided = true;
@@ -836,6 +846,10 @@ Population::Settings applyOverrides(Population::Settings options, const CliOptio
   if (cli.selectionProvided)
   {
     options.parentSelection = cli.selection;
+  }
+  if (cli.samplesProvided)
+  {
+    options.reportSampleSize = cli.samples;
   }
   if (cli.tournamentProvided)
   {

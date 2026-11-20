@@ -61,6 +61,7 @@ expect 1 "Invalid value for --holdout: '1'" "holdout must be below 1" -- $GA R -
 expect 1 "Invalid value for --restarts: '0'" "restarts must be positive" -- $GA R --data data/quadratic.csv --restarts 0
 expect 1 "Invalid value for --tuning: '-1'" "tuning must be non-negative" -- $GA R --data data/quadratic.csv --tuning -1
 expect 1 "Invalid value for --folds: '-2'" "folds must be non-negative" -- $GA R --data data/quadratic.csv --folds -2
+expect 1 "Invalid value for --samples: '-1'" "samples must be non-negative" -- $GA R --data data/quadratic.csv --samples -1
 expect 1 "Invalid value for --cv-se: 'x'" "cv-se must be numeric" -- $GA R --data data/quadratic.csv --cv-se x
 expect 1 "Invalid value for --cv-se: '-1'" "cv-se must be non-negative" -- $GA R --data data/quadratic.csv --cv-se -1
 expect 1 "GA: Too few training rows for the requested cross-validation folds" "too many folds are reported" -- \
@@ -122,6 +123,18 @@ checks=$((checks + 1))
 grep -qF '"type": "regression"' "$WORK/r.json" || fail "the JSON report should contain a regression visualization"
 checks=$((checks + 1))
 grep -qF '"selected": { "archived_sizes": ' "$WORK/r.json" || fail "the JSON report should record the selected formula"
+checks=$((checks + 1))
+grep -qF '"type": "regression_sample"' "$WORK/r.json" || fail "mode R reports should sample population members by default"
+checks=$((checks + 1))
+grep -qF '"generation": 0,' "$WORK/r.json" || fail "reports should start with generation 0, the initial population"
+expect 0 "" "--samples 0 writes reports without samples" -- \
+  $GA R --data data/quadratic.csv $QUICK --restarts 1 --samples 0 --report-json "$WORK/r0.json"
+checks=$((checks + 1))
+! grep -qF '"type": "regression_sample"' "$WORK/r0.json" || fail "--samples 0 should record no samples"
+expect 0 "" "--samples works in other modes" -- \
+  $GA Q --seed 1 --population 24 --trials 120 --samples 3 --report-json "$WORK/q.json"
+checks=$((checks + 1))
+grep -qF '{ "rank": 23, "fitness": ' "$WORK/q.json" || fail "--samples 3 should sample the worst member (rank 23 of 24)"
 checks=$((checks + 1))
 head -n 1 "$WORK/r.csv" | grep -qx "generation,evaluations,best_fitness,worst_fitness" ||
   fail "the CSV report should start with its header"

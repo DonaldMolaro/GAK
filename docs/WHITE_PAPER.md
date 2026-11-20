@@ -138,9 +138,12 @@ This makes the same engine suitable for:
 - parameter sweeps
 - reproducible experiments
 
-The structured reporting path also supports visual analysis. Each generation
-report can carry the best candidate's fitness, decoded gene values, and an
-optional problem-specific visualization frame. Those frames can then be
+The structured reporting path also supports visual analysis. Reports begin
+with generation 0, the random initial population. Each generation report
+carries the best candidate's fitness, decoded gene values, an optional
+problem-specific visualization frame, the population's fitness quartiles, and
+optionally a few members sampled at evenly spaced ranks (rendered through
+`writeSampleJson(...)`, which problems can override with a compact payload). Those frames can then be
 consumed by lightweight tools such as the local browser viewer in
 [examples/viewer.html](../examples/viewer.html).
 

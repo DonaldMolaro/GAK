@@ -179,6 +179,15 @@ void PopulationReporter::write(std::ostream& out,
       }
       printFitnessList("Best", report.summary.mostFit);
       printFitnessList("Worst", report.summary.leastFit);
+      if (!report.fitnessQuartiles.empty())
+      {
+         out << "Population fitness (best, 25%, median, 75%, worst):";
+         for (double value : report.fitnessQuartiles)
+         {
+            out << ' ' << std::fixed << std::setprecision(8) << value << std::defaultfloat;
+         }
+         out << '\n';
+      }
    };
 
    auto printGenerationProgress = [&](const Population::GenerationReport& report, bool printSummary) {
@@ -199,13 +208,9 @@ void PopulationReporter::write(std::ostream& out,
    }
    else
    {
-      const Population::GenerationReport finalProgress = {
-         result.generationsCompleted,
-         result.evaluations,
-         Population::PopulationSummary(),
-         std::vector<int>(),
-         0.0
-      };
+      Population::GenerationReport finalProgress;
+      finalProgress.generation = result.generationsCompleted;
+      finalProgress.evaluations = result.evaluations;
       printGenerationProgress(finalProgress, false);
    }
 
@@ -283,7 +288,23 @@ void PopulationReporter::writeJson(std::ostream& out,
       out << ",\n";
       out << "        \"least_fit\": ";
       writeJsonArray(out, report.summary.leastFit);
-      out << "\n";
+      out << ",\n";
+      // The spread of the whole population: fitness at five ranks, and a few
+      // members sampled at evenly spaced ranks (best first).
+      out << "        \"fitness_quartiles\": ";
+      writeJsonArray(out, report.fitnessQuartiles);
+      out << ",\n";
+      out << "        \"samples\": [";
+      for (std::size_t s = 0 ; s < report.samples.size() ; s++)
+      {
+         const Population::MemberSample& sample = report.samples[s];
+         out << (s == 0 ? "\n" : ",\n") << "          { \"rank\": " << sample.rank
+             << ", \"fitness\": " << std::fixed << std::setprecision(8) << sample.fitness << std::defaultfloat
+             << ", \"visualization\": ";
+         population.writeSampleJson(buildSnapshotGenes(population, sample.genes), out);
+         out << " }";
+      }
+      out << (report.samples.empty() ? "]\n" : "\n        ]\n");
       out << "      }";
       if (i + 1 < result.generationReports.size())
       {
