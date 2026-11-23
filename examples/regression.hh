@@ -135,6 +135,7 @@ private:
    struct Split
    {
       std::vector<std::vector<double> > inputs;
+      InputColumns columns; // the same inputs, column-major, for fitting
       std::vector<double> targets;
       double mean = 0.0;
       double variance = 0.0; // population variance of the targets
@@ -142,9 +143,13 @@ private:
 
    static Split makeSplit(const Dataset& dataset, const std::vector<int>& rows);
    // Scaled MSE of `expression` on `rows`, or +infinity if it is undefined.
-   double scaledError(const Expression& expression, const Split& rows) const;
-   // Tune the formula's constants to minimize scaledError on `rows`.
-   void tuneConstants(Expression& expression, const Split& rows) const;
+   // Tune the formula's constants to minimize the fitted model's mean squared
+   // error on `rows`. Returns that error for the tuned formula (infinity if
+   // it is undefined), or NaN when nothing was tuned and no error computed.
+   double tuneConstants(Expression& expression, const Split& rows) const;
+   // The fitness of a formula of `size` nodes and `termCount` model terms
+   // with training error `trainMse`.
+   double fitnessOf(double trainMse, int size, std::size_t termCount) const;
    std::unique_ptr<Chromosome> truncated(std::unique_ptr<Chromosome> chromosome,
                                          const Population& population) const;
 

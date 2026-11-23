@@ -128,7 +128,8 @@ Clang/libc++, because random draws use the portable helpers in
   before the search, which is not implemented.
 - **Run time grows with inputs and rows.** The default budget is 15,000
   trials per restart for each pair of inputs; a ten-input, 250-row run takes
-  10–25 seconds.
+  5–12 seconds. Most of it is constant tuning, and the restarts run one
+  after another on a single core.
 
 Results, benchmarks and the reasoning behind the defaults are in
 [SYMBOLIC_REGRESSION.md](SYMBOLIC_REGRESSION.md).

@@ -237,9 +237,9 @@ and are directly comparable.
 inputs; see `--trials`), rank-based
 roulette selection (`LinearNormalized`), half the population replaced each
 generation, duplicates rejected, crossover 0.8, mutation 0.04 per gene,
-constant tuning with 40 evaluations. A run takes about a second on the one-
-and two-input datasets and up to about 25 seconds on the ten-input one (see
-the results tables).
+constant tuning with 40 evaluations. A run takes under a second on most of
+the one- and two-input datasets and about 12 seconds on the ten-input one
+(see the results tables).
 
 Tournament selection (`--tournament N`) is available but was not better here:
 with constant tuning it lowered the recovery rate.
@@ -279,11 +279,11 @@ term is charged.
 
 | Dataset | Inputs | Structure recovered | Median test R² (true formula) | Time per run |
 |---|---|---|---|---|
-| `gravitation` | 3 | 0 / 10 | 0.977 (0.986) | 2.0 s |
-| `ideal_gas` | 3 | 10 / 10 | 0.983 (0.991) | 1.0 s |
-| `mechanical_energy` | 3 | 10 / 10 | 0.992 (0.990) | 1.9 s |
-| `five_inputs` | 5 | 5 / 10 | 0.865 (0.907) | 1.5 s |
-| `friedman1` | 10 | 4 / 10 | 0.967 (0.964) | 21.9 s |
+| `gravitation` | 3 | 0 / 10 | 0.977 (0.986) | 1.1 s |
+| `ideal_gas` | 3 | 10 / 10 | 0.983 (0.991) | 0.7 s |
+| `mechanical_energy` | 3 | 10 / 10 | 0.992 (0.990) | 1.3 s |
+| `five_inputs` | 5 | 5 / 10 | 0.865 (0.907) | 1.0 s |
+| `friedman1` | 10 | 4 / 10 | 0.967 (0.964) | 11.1 s |
 | **Total** | | **29 / 50** | | |
 
 These counts move by a few between seed ranges and builds. Gravitation's
