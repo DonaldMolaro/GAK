@@ -1548,6 +1548,42 @@ void test_regression_scale_robustness()
                                   "Inputs above 1e12 should be rejected with a request to rescale");
 }
 
+void test_incremental_evaluation()
+{
+  InstructionSet set(1);
+  const int x = geneFor(set, Operation::Variable);
+  const int two = geneFor(set, Operation::Constant, 2.0);
+  const int add = geneFor(set, Operation::Add);
+  const int multiply = geneFor(set, Operation::Multiply);
+  const int sine = geneFor(set, Operation::Sin);
+
+  // x*2 + sin(x): nodes x, 2, x*2, x, sin(x), sum.
+  Expression expression = Expression::compile(program(set, {x, two, multiply, x, sine, add}), set);
+  const std::vector<int> chain = expression.nodeAndAncestors(1);
+  expect_true(chain == std::vector<int>({1, 2, 5}),
+              "nodeAndAncestors should list a node and the nodes above it, in order");
+
+  // Re-evaluating just the changed chain gives the same values as a full
+  // evaluation.
+  const InputColumns inputs(std::vector<std::vector<double> >({{0.5}, {1.5}, {-2.0}}));
+  std::vector<double> updated;
+  expect_true(expression.evaluateInto(inputs, updated), "evaluateInto should evaluate a defined formula");
+  expression.setConstant(1, 3.25);
+  std::vector<double> fresh;
+  expect_true(expression.reevaluate(inputs, chain, updated) && expression.evaluateInto(inputs, fresh) &&
+              updated == fresh,
+              "Re-evaluating the changed nodes should match a full evaluation exactly");
+
+  // The GA's fitness (tuned incrementally, reusing the tuner's score) is
+  // exactly the fitness of the tuned formula fitted from scratch.
+  Dataset data = makeDataset(quadraticTarget, 40, -2.0, 2.0);
+  for (std::size_t row = 0 ; row < data.targets.size() ; row++) data.targets[row] += std::sin(3.0 * row);
+  SymbolicRegression regression(data, SymbolicRegression::Config());
+  const BaseString genes = program(set, {x, two, multiply, sine, x, x, multiply, add});
+  expect_true(regression.evaluateFitness(genes) == regression.describe(genes).fitness,
+              "Incremental constant tuning should give exactly the from-scratch fitness");
+}
+
 void test_regression_reporting_edges()
 {
   SymbolicRegression::Config config;
@@ -2062,6 +2098,7 @@ int main()
   test_regression_effects_and_term_shares();
   test_regression_scale_robustness();
   test_regression_reporting_edges();
+  test_incremental_evaluation();
   test_regression_output_and_visualization();
   test_regression_formula_variants_and_holdout();
   test_regression_configuration_errors();

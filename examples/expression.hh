@@ -10,6 +10,7 @@
 // operators never produce an unusable candidate. The formula is whatever is
 // left on top of the stack; instructions that do not feed it are ignored.
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -57,6 +58,17 @@ struct ExpressionNode
    int right = -1;  // binary right operand
 };
 
+// Input rows stored one column per input, the layout the evaluator reads.
+// Build it once per data set and reuse it.
+struct InputColumns
+{
+   std::size_t rows = 0;
+   std::vector<std::vector<double> > columns; // columns[input][row]
+
+   InputColumns() = default;
+   explicit InputColumns(const std::vector<std::vector<double> >& rowMajor);
+};
+
 class Expression
 {
 public:
@@ -79,6 +91,25 @@ public:
    bool evaluateNodes(const std::vector<std::vector<double> >& inputs,
                       const std::vector<int>& nodes,
                       std::vector<std::vector<double> >& values) const;
+   // As evaluateNodes, on column-major inputs and without copying: values[i]
+   // points at nodes[i]'s values in a per-thread buffer, valid until the next
+   // evaluation on this thread. With no nodes it only checks the formula is
+   // defined. This is the fast path for repeated fitting.
+   bool evaluateNodes(const InputColumns& inputs,
+                      const std::vector<int>& nodes,
+                      std::vector<const double*>& values) const;
+
+   // Evaluate every node into `values` (node i at values[i * rows]), a
+   // buffer the caller keeps; false if the formula is undefined on any row.
+   bool evaluateInto(const InputColumns& inputs, std::vector<double>& values) const;
+   // Recompute just `nodes` (ascending, each after its children) in a buffer
+   // filled by evaluateInto, e.g. after a constant changed. False if any of
+   // them is undefined; the buffer is then partly updated.
+   bool reevaluate(const InputColumns& inputs, const std::vector<int>& nodes,
+                   std::vector<double>& values) const;
+   // `node` and every node above it up to the root, in ascending order: the
+   // nodes whose values change when `node` does.
+   std::vector<int> nodeAndAncestors(int node) const;
 
    // The top-level additive terms: the nodes reached from the root through
    // +, - and negation, e.g. x*y + sin(x) - 3 gives x*y, sin(x) and 3. Their
@@ -107,7 +138,8 @@ public:
 private:
    // Evaluate every node on every row into a per-thread buffer laid out
    // node-major (buffer[node * rows + row]); nullptr if undefined anywhere.
-   const double* evaluateAll(const std::vector<std::vector<double> >& inputs) const;
+   const double* evaluateAll(const InputColumns& inputs) const;
+   bool evaluateNode(std::size_t index, const InputColumns& inputs, double* values) const;
    std::vector<std::string> allTexts(const std::vector<std::string>& variableNames) const;
 
    std::vector<ExpressionNode> nodes_;

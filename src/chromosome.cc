@@ -55,6 +55,10 @@ bool Chromosome::randomChance(std::mt19937& randomGenerator, double probability)
 
 Chromosome::BaseStringValue Chromosome::cloneBaseString(const BaseString& source, int baseStates)
 {
+  if (source.states() == baseStates)
+    {
+      return source;
+    }
   BaseString clone(source.length(), baseStates);
   for ( int i = 0 ; i < source.length() ; i++ )
     {
@@ -300,13 +304,5 @@ Chromosome::mate(Chromosome& father,double crossoverRate,CrossoverType crossover
 
 bool Chromosome::equals(const Chromosome& candidate) const
 {
-  if (candidate.length() == length())
-    {
-      for ( int i = 0 ; i < length() ; i++ )
-	{
-	  if (genes().valueAt(i) != candidate.genes().valueAt(i)) return false;
-	}
-      return true;
-    }
-  return false;
+  return candidate.length() == length() && genes().sameValues(candidate.genes());
 }

@@ -65,123 +65,252 @@ std::vector<int> modelTerms(const Expression& expression)
    return terms;
 }
 
+// Term values as one pointer per term, each to `count` values (the targets'
+// count). Points either into Expression's evaluation buffer or into copies.
+using TermColumns = std::vector<const double*>;
+
+TermColumns columnsOf(const std::vector<std::vector<double> >& values)
+{
+   TermColumns columns;
+   for (const std::vector<double>& value : values) columns.push_back(value.data());
+   return columns;
+}
+
 // Least squares for y ~= a + sum w_i t_i, solved on centred data with a tiny
 // ridge so that duplicated or (near-)constant terms cannot make it singular.
 // A term with no variation gets weight 0, so a formula carrying no shape
 // information falls back to predicting the mean.
-TermModel fitTerms(const std::vector<std::vector<double> >& terms, const std::vector<double>& targets)
+//
+// The sums it needs (each term's mean and centred values, and the product
+// sums of every pair of centred terms and of each term with the centred
+// targets) are kept per term, so that when one term changes, as during
+// constant tuning, only that term's sums are recomputed. Every sum adds the
+// rows in order, so an updated fit is bit-for-bit the fit from scratch.
+class TermFit
 {
-   const std::size_t count = targets.size();
-   const std::size_t k = terms.size();
-   TermModel model;
-   model.weights.assign(k, 0.0);
-   double meanY = 0.0;
-   for (double target : targets) meanY += target;
-   meanY /= static_cast<double>(count);
+public:
+   // Compute every sum for these terms (which must stay valid while used).
+   void reset(const TermColumns& terms, const std::vector<double>& targets)
+   {
+      terms_ = terms;
+      targets_ = &targets;
+      count_ = targets.size();
+      const std::size_t k = terms.size();
+      meanY_ = 0.0;
+      for (double target : targets) meanY_ += target;
+      meanY_ /= static_cast<double>(count_);
+      centredY_.resize(count_);
+      for (std::size_t row = 0 ; row < count_ ; row++) centredY_[row] = targets[row] - meanY_;
+      means_.assign(k, 0.0);
+      deviations_.assign(k, 0.0);
+      squares_.assign(k, 0.0);
+      cross_.assign(k, 0.0);
+      products_.assign(k * k, 0.0);
+      centred_.resize(k);
+      for (std::size_t i = 0 ; i < k ; i++) computeTerm(i);
+      for (std::size_t i = 0 ; i < k ; i++)
+      {
+         for (std::size_t j = i ; j < k ; j++) computeProduct(i, j);
+      }
+   }
 
-   std::vector<double> means(k, 0.0);
-   for (std::size_t i = 0 ; i < k ; i++)
+   // Term `changed` has new values (at the same address): recompute its sums.
+   void update(std::size_t changed)
    {
-      for (double value : terms[i]) means[i] += value;
-      means[i] /= static_cast<double>(count);
-   }
-   // Normal equations A w = b on centred columns; columns with no variation
-   // are left out (weight 0).
-   std::vector<std::size_t> active;
-   for (std::size_t i = 0 ; i < k ; i++)
-   {
-      double deviations = 0.0;
-      double squares = 0.0;
-      for (double value : terms[i])
+      computeTerm(changed);
+      for (std::size_t i = 0 ; i < terms_.size() ; i++)
       {
-         deviations += (value - means[i]) * (value - means[i]);
-         squares += value * value;
-      }
-      if (varies(deviations, squares))
-      {
-         active.push_back(i);
+         if (i <= changed) computeProduct(i, changed);
+         else computeProduct(changed, i);
       }
    }
-   const std::size_t m = active.size();
-   if (m > 0)
+
+   // Save term `index`'s sums, to restore them if a change is rejected.
+   void save(std::size_t index)
    {
-      std::vector<double> a(m * m, 0.0);
-      std::vector<double> b(m, 0.0);
-      for (std::size_t r = 0 ; r < m ; r++)
+      const std::size_t k = terms_.size();
+      saved_.index = index;
+      saved_.mean = means_[index];
+      saved_.deviations = deviations_[index];
+      saved_.squares = squares_[index];
+      saved_.cross = cross_[index];
+      saved_.centred = centred_[index];
+      saved_.products.assign(products_.begin() + index * k, products_.begin() + (index + 1) * k);
+   }
+
+   void restore()
+   {
+      const std::size_t k = terms_.size();
+      const std::size_t index = saved_.index;
+      means_[index] = saved_.mean;
+      deviations_[index] = saved_.deviations;
+      squares_[index] = saved_.squares;
+      cross_[index] = saved_.cross;
+      centred_[index].swap(saved_.centred);
+      for (std::size_t i = 0 ; i < k ; i++)
       {
-         const std::vector<double>& tr = terms[active[r]];
-         for (std::size_t row = 0 ; row < count ; row++)
+         products_[index * k + i] = saved_.products[i];
+         products_[i * k + index] = saved_.products[i];
+      }
+   }
+
+   // Solve for the coefficients from the current sums.
+   void solve(TermModel& model) const
+   {
+      const std::size_t k = terms_.size();
+      const std::vector<double>& means = means_;
+      const double meanY = meanY_;
+      model.weights.assign(k, 0.0);
+      // Scratch space reused across calls: this runs for every constant-
+      // tuning step of every formula.
+      thread_local std::vector<std::size_t> active;
+      thread_local std::vector<double> a;
+      thread_local std::vector<double> b;
+      thread_local std::vector<double> w;
+      // Normal equations A w = b on centred columns; columns with no
+      // variation are left out (weight 0).
+      active.clear();
+      for (std::size_t i = 0 ; i < k ; i++)
+      {
+         if (varies(deviations_[i], squares_[i]))
          {
-            b[r] += (tr[row] - means[active[r]]) * (targets[row] - meanY);
-         }
-         for (std::size_t c = r ; c < m ; c++)
-         {
-            const std::vector<double>& tc = terms[active[c]];
-            double sum = 0.0;
-            for (std::size_t row = 0 ; row < count ; row++)
-            {
-               sum += (tr[row] - means[active[r]]) * (tc[row] - means[active[c]]);
-            }
-            a[r * m + c] = sum;
-            a[c * m + r] = sum;
+            active.push_back(i);
          }
       }
-      // A small ridge, the same for every column, scaled by the average
-      // column. It shrinks terms far smaller than the others (scales more
-      // than about 1e4 apart), which a per-column ridge would not; that was
-      // tried and halved recovery on Friedman #1 (21/60 to 11/60 seeds),
-      // because the shared ridge also discourages explosive terms.
-      double trace = 0.0;
-      for (std::size_t r = 0 ; r < m ; r++) trace += a[r * m + r];
-      const double ridge = 1e-10 * trace / static_cast<double>(m);
-      for (std::size_t r = 0 ; r < m ; r++) a[r * m + r] += ridge;
-      // Gaussian elimination with partial pivoting.
-      std::vector<double> w(m, 0.0);
-      bool solved = true;
-      for (std::size_t col = 0 ; col < m && solved ; col++)
+      const std::size_t m = active.size();
+      if (m > 0)
       {
-         std::size_t pivot = col;
-         for (std::size_t r = col + 1 ; r < m ; r++)
-         {
-            if (std::fabs(a[r * m + col]) > std::fabs(a[pivot * m + col])) pivot = r;
-         }
-         if (!(std::fabs(a[pivot * m + col]) > 0.0))
-         {
-            solved = false;
-            break;
-         }
-         if (pivot != col)
-         {
-            for (std::size_t c = 0 ; c < m ; c++) std::swap(a[col * m + c], a[pivot * m + c]);
-            std::swap(b[col], b[pivot]);
-         }
-         for (std::size_t r = col + 1 ; r < m ; r++)
-         {
-            const double factor = a[r * m + col] / a[col * m + col];
-            for (std::size_t c = col ; c < m ; c++) a[r * m + c] -= factor * a[col * m + c];
-            b[r] -= factor * b[col];
-         }
-      }
-      if (solved)
-      {
-         for (std::size_t r = m ; r-- > 0 ; )
-         {
-            double sum = b[r];
-            for (std::size_t c = r + 1 ; c < m ; c++) sum -= a[r * m + c] * w[c];
-            w[r] = sum / a[r * m + r];
-         }
+         a.assign(m * m, 0.0);
+         b.assign(m, 0.0);
          for (std::size_t r = 0 ; r < m ; r++)
          {
-            if (std::isfinite(w[r])) model.weights[active[r]] = w[r];
+            b[r] = cross_[active[r]];
+            for (std::size_t c = 0 ; c < m ; c++) a[r * m + c] = products_[active[r] * k + active[c]];
+         }
+         // A small ridge, the same for every column, scaled by the average
+         // column. It shrinks terms far smaller than the others (scales more
+         // than about 1e4 apart), which a per-column ridge would not; that was
+         // tried and halved recovery on Friedman #1 (21/60 to 11/60 seeds),
+         // because the shared ridge also discourages explosive terms.
+         double trace = 0.0;
+         for (std::size_t r = 0 ; r < m ; r++) trace += a[r * m + r];
+         const double ridge = 1e-10 * trace / static_cast<double>(m);
+         for (std::size_t r = 0 ; r < m ; r++) a[r * m + r] += ridge;
+         // Gaussian elimination with partial pivoting.
+         w.assign(m, 0.0);
+         bool solved = true;
+         for (std::size_t col = 0 ; col < m && solved ; col++)
+         {
+            std::size_t pivot = col;
+            for (std::size_t r = col + 1 ; r < m ; r++)
+            {
+               if (std::fabs(a[r * m + col]) > std::fabs(a[pivot * m + col])) pivot = r;
+            }
+            if (!(std::fabs(a[pivot * m + col]) > 0.0))
+            {
+               solved = false;
+               break;
+            }
+            if (pivot != col)
+            {
+               for (std::size_t c = 0 ; c < m ; c++) std::swap(a[col * m + c], a[pivot * m + c]);
+               std::swap(b[col], b[pivot]);
+            }
+            for (std::size_t r = col + 1 ; r < m ; r++)
+            {
+               const double factor = a[r * m + col] / a[col * m + col];
+               for (std::size_t c = col ; c < m ; c++) a[r * m + c] -= factor * a[col * m + c];
+               b[r] -= factor * b[col];
+            }
+         }
+         if (solved)
+         {
+            for (std::size_t r = m ; r-- > 0 ; )
+            {
+               double sum = b[r];
+               for (std::size_t c = r + 1 ; c < m ; c++) sum -= a[r * m + c] * w[c];
+               w[r] = sum / a[r * m + r];
+            }
+            for (std::size_t r = 0 ; r < m ; r++)
+            {
+               if (std::isfinite(w[r])) model.weights[active[r]] = w[r];
+            }
          }
       }
+      model.intercept = meanY;
+      for (std::size_t i = 0 ; i < k ; i++) model.intercept -= model.weights[i] * means[i];
    }
-   model.intercept = meanY;
-   for (std::size_t i = 0 ; i < k ; i++) model.intercept -= model.weights[i] * means[i];
-   return model;
+
+private:
+   void computeTerm(std::size_t i)
+   {
+      const double* column = terms_[i];
+      double mean = 0.0;
+      for (std::size_t row = 0 ; row < count_ ; row++) mean += column[row];
+      mean /= static_cast<double>(count_);
+      std::vector<double>& centred = centred_[i];
+      centred.resize(count_);
+      double deviations = 0.0;
+      double squares = 0.0;
+      double cross = 0.0;
+      for (std::size_t row = 0 ; row < count_ ; row++)
+      {
+         const double value = column[row];
+         centred[row] = value - mean;
+         deviations += centred[row] * centred[row];
+         squares += value * value;
+         cross += centred[row] * centredY_[row];
+      }
+      means_[i] = mean;
+      deviations_[i] = deviations;
+      squares_[i] = squares;
+      cross_[i] = cross;
+   }
+
+   void computeProduct(std::size_t i, std::size_t j)
+   {
+      const std::vector<double>& left = centred_[i];
+      const std::vector<double>& right = centred_[j];
+      double sum = 0.0;
+      for (std::size_t row = 0 ; row < count_ ; row++) sum += left[row] * right[row];
+      const std::size_t k = terms_.size();
+      products_[i * k + j] = sum;
+      products_[j * k + i] = sum;
+   }
+
+   struct Saved
+   {
+      std::size_t index = 0;
+      double mean = 0.0;
+      double deviations = 0.0;
+      double squares = 0.0;
+      double cross = 0.0;
+      std::vector<double> centred;
+      std::vector<double> products;
+   };
+
+   TermColumns terms_;
+   const std::vector<double>* targets_ = nullptr;
+   std::size_t count_ = 0;
+   double meanY_ = 0.0;
+   std::vector<double> centredY_;
+   std::vector<double> means_;
+   std::vector<double> deviations_;
+   std::vector<double> squares_;
+   std::vector<double> cross_;          // sum of centred term * centred target
+   std::vector<double> products_;       // k x k sums of centred term products
+   std::vector<std::vector<double> > centred_;
+   Saved saved_;
+};
+
+void fitTerms(const TermColumns& terms, const std::vector<double>& targets, TermModel& model)
+{
+   thread_local TermFit fit;
+   fit.reset(terms, targets);
+   fit.solve(model);
 }
 
-double predictRow(const TermModel& model, const std::vector<std::vector<double> >& terms, std::size_t row)
+double predictRow(const TermModel& model, const TermColumns& terms, std::size_t row)
 {
    double value = model.intercept;
    for (std::size_t i = 0 ; i < terms.size() ; i++) value += model.weights[i] * terms[i][row];
@@ -189,7 +318,7 @@ double predictRow(const TermModel& model, const std::vector<std::vector<double> 
 }
 
 double meanSquaredError(const TermModel& model,
-                        const std::vector<std::vector<double> >& terms,
+                        const TermColumns& terms,
                         const std::vector<double>& targets)
 {
    double total = 0.0;
@@ -215,6 +344,123 @@ bool evaluateTerms(const Expression& expression, const std::vector<int>& terms,
    }
    return expression.evaluateNodes(inputs, terms, values);
 }
+
+// Fit the term model of `expression` on the given rows: `terms` receives the
+// model terms, `model` the coefficients and `mse` the error. False when the
+// formula is undefined on these rows or the error is not finite.
+bool fitModel(const Expression& expression, const InputColumns& inputs,
+              const std::vector<double>& targets,
+              const std::vector<int>& terms, TermModel& model, double& mse)
+{
+   thread_local TermColumns values;
+   if (!expression.evaluateNodes(inputs, terms, values))
+   {
+      return false;
+   }
+   fitTerms(values, targets, model);
+   mse = meanSquaredError(model, values, targets);
+   return std::isfinite(mse);
+}
+
+// Scores a formula repeatedly while its constants are tuned. A changed
+// constant only changes its own node, the nodes above it, and the one model
+// term containing it (if any), so each try recomputes just those, and a
+// rejected try restores them from a saved copy. The scores are bit-for-bit
+// those of fitting from scratch; this only avoids repeating work.
+class ConstantTuner
+{
+public:
+   ConstantTuner(const Expression& expression, const InputColumns& inputs,
+                 const std::vector<double>& targets, const std::vector<int>& terms,
+                 const std::vector<int>& constants)
+      : expression_(expression), inputs_(inputs), targets_(targets), terms_(terms),
+        chains_(static_cast<std::size_t>(expression.size())),
+        termOf_(static_cast<std::size_t>(expression.size()), -1)
+   {
+      for (int node : constants)
+      {
+         chains_[node] = expression.nodeAndAncestors(node);
+         for (std::size_t term = 0 ; term < terms.size() ; term++)
+         {
+            for (int above : chains_[node])
+            {
+               if (above == terms[term]) termOf_[node] = static_cast<int>(term);
+            }
+         }
+      }
+   }
+
+   // The training error of the formula as it stands (infinity if undefined).
+   double start()
+   {
+      if (!expression_.evaluateInto(inputs_, values_))
+      {
+         return std::numeric_limits<double>::infinity();
+      }
+      columns_.resize(terms_.size());
+      for (std::size_t term = 0 ; term < terms_.size() ; term++)
+      {
+         columns_[term] = &values_[static_cast<std::size_t>(terms_[term]) * inputs_.rows];
+      }
+      fit_.reset(columns_, targets_);
+      return score();
+   }
+
+   // The error after constant `node` was changed in the expression. Follow
+   // with undo() if the change is not kept.
+   double tryChange(int node)
+   {
+      const std::size_t rows = inputs_.rows;
+      changed_ = node;
+      const std::vector<int>& chain = chains_[node];
+      saved_.resize(chain.size() * rows);
+      for (std::size_t i = 0 ; i < chain.size() ; i++)
+      {
+         const double* from = &values_[static_cast<std::size_t>(chain[i]) * rows];
+         std::copy(from, from + rows, &saved_[i * rows]);
+      }
+      if (termOf_[node] >= 0) fit_.save(static_cast<std::size_t>(termOf_[node]));
+      if (!expression_.reevaluate(inputs_, chain, values_))
+      {
+         return std::numeric_limits<double>::infinity();
+      }
+      if (termOf_[node] >= 0) fit_.update(static_cast<std::size_t>(termOf_[node]));
+      return score();
+   }
+
+   void undo()
+   {
+      const std::size_t rows = inputs_.rows;
+      const std::vector<int>& chain = chains_[changed_];
+      for (std::size_t i = 0 ; i < chain.size() ; i++)
+      {
+         std::copy(&saved_[i * rows], &saved_[i * rows] + rows,
+                   &values_[static_cast<std::size_t>(chain[i]) * rows]);
+      }
+      if (termOf_[changed_] >= 0) fit_.restore();
+   }
+
+private:
+   double score()
+   {
+      fit_.solve(model_);
+      const double mse = meanSquaredError(model_, columns_, targets_);
+      return std::isfinite(mse) ? mse : std::numeric_limits<double>::infinity();
+   }
+
+   const Expression& expression_;
+   const InputColumns& inputs_;
+   const std::vector<double>& targets_;
+   const std::vector<int>& terms_;
+   std::vector<std::vector<int> > chains_; // per constant node: it and its ancestors
+   std::vector<int> termOf_;               // per constant node: its model term, or -1
+   std::vector<double> values_;            // every node's values
+   TermColumns columns_;                   // the model terms' values, in values_
+   TermFit fit_;
+   TermModel model_;
+   std::vector<double> saved_;             // the changed chain's previous values
+   int changed_ = -1;
+};
 
 double rSquared(double mse, double variance)
 {
@@ -406,6 +652,7 @@ SymbolicRegression::Split SymbolicRegression::makeSplit(const Dataset& dataset, 
       return split;
    }
    split.mean /= static_cast<double>(rows.size());
+   split.columns = InputColumns(split.inputs);
    for (double target : split.targets)
    {
       split.variance += (target - split.mean) * (target - split.mean);
@@ -414,35 +661,27 @@ SymbolicRegression::Split SymbolicRegression::makeSplit(const Dataset& dataset, 
    return split;
 }
 
-double SymbolicRegression::scaledError(const Expression& expression, const Split& rows) const
-{
-   thread_local std::vector<std::vector<double> > values;
-   const std::vector<int> terms = modelTerms(expression);
-   if (!evaluateTerms(expression, terms, rows.inputs, values))
-   {
-      return std::numeric_limits<double>::infinity();
-   }
-   const double mse = meanSquaredError(fitTerms(values, rows.targets), values, rows.targets);
-   return std::isfinite(mse) ? mse : std::numeric_limits<double>::infinity();
-}
-
 // Deterministic pattern search over the formula's constants: try moving each
 // constant up or down by a relative step, keep any move that lowers the
 // training error, and halve the step when no move helps. The GA chooses the
 // structure; this finds values such as the 0.3 in exp(-0.3 t) that the
 // constant table cannot express directly. No randomness is used, so the
 // result depends only on the formula and the data.
-void SymbolicRegression::tuneConstants(Expression& expression, const Split& rows) const
+double SymbolicRegression::tuneConstants(Expression& expression, const Split& rows) const
 {
    const std::vector<int> constants = expression.constantNodes();
    if (constants.empty() || config_.constantTuningBudget <= 0)
    {
-      return;
+      return std::numeric_limits<double>::quiet_NaN();
    }
-   double best = scaledError(expression, rows);
+   // Tuning changes constant values, never the structure, so the model
+   // terms stay the same throughout.
+   const std::vector<int> terms = modelTerms(expression);
+   ConstantTuner tuner(expression, rows.columns, rows.targets, terms, constants);
+   double best = tuner.start();
    if (!std::isfinite(best))
    {
-      return;
+      return best;
    }
    double step = 0.5;
    int evaluations = 0;
@@ -456,7 +695,7 @@ void SymbolicRegression::tuneConstants(Expression& expression, const Split& rows
          for (double candidate : {original + delta, original - delta})
          {
             expression.setConstant(node, candidate);
-            const double error = scaledError(expression, rows);
+            const double error = tuner.tryChange(node);
             ++evaluations;
             if (error < best)
             {
@@ -465,6 +704,7 @@ void SymbolicRegression::tuneConstants(Expression& expression, const Split& rows
                break;
             }
             expression.setConstant(node, original);
+            tuner.undo();
          }
          if (evaluations >= config_.constantTuningBudget)
          {
@@ -476,6 +716,7 @@ void SymbolicRegression::tuneConstants(Expression& expression, const Split& rows
          step *= 0.5;
       }
    }
+   return best;
 }
 
 SymbolicRegression::Fit SymbolicRegression::describe(const BaseString& genes) const
@@ -488,14 +729,9 @@ SymbolicRegression::Fit SymbolicRegression::describe(const BaseString& genes) co
    fit.formula = expression.toString(dataset_.inputNames);
 
    const std::vector<int> terms = modelTerms(expression);
-   std::vector<std::vector<double> > values;
-   if (!evaluateTerms(expression, terms, train_.inputs, values))
-   {
-      return fit;
-   }
-   const TermModel model = fitTerms(values, train_.targets);
-   const double trainMse = meanSquaredError(model, values, train_.targets);
-   if (!std::isfinite(trainMse))
+   TermModel model;
+   double trainMse = 0.0;
+   if (!fitModel(expression, train_.columns, train_.targets, terms, model, trainMse))
    {
       return fit;
    }
@@ -514,9 +750,7 @@ SymbolicRegression::Fit SymbolicRegression::describe(const BaseString& genes) co
    }
    fit.trainRmse = std::sqrt(trainMse);
    fit.trainR2 = rSquared(trainMse, train_.variance);
-   const double extraTerms = terms.size() > 1 ? static_cast<double>(terms.size() - 1) : 0.0;
-   fit.fitness = trainMse / train_.variance +
-                 config_.parsimony * (fit.size + config_.termPenaltyNodes * extraTerms);
+   fit.fitness = fitnessOf(trainMse, fit.size, terms.size());
 
    heldOutScore(expression, fit, test_, fit.testR2, fit.testRmse, fit.testR2Defined);
    return fit;
@@ -535,10 +769,11 @@ bool SymbolicRegression::predictRows(const Expression& expression, const Fit& fi
    TermModel model;
    model.intercept = fit.intercept;
    model.weights = fit.weights;
+   const TermColumns columns = columnsOf(values);
    predictions.resize(inputs.size());
    for (std::size_t row = 0 ; row < inputs.size() ; row++)
    {
-      predictions[row] = predictRow(model, values, row);
+      predictions[row] = predictRow(model, columns, row);
    }
    return true;
 }
@@ -640,18 +875,24 @@ bool SymbolicRegression::crossValidationStats(const BaseString& genes, double& m
    std::vector<double> squared;
    squared.reserve(trainRows_.size());
    const std::vector<int> terms = modelTerms(structure);
-   std::vector<std::vector<double> > fitValues;
-   std::vector<std::vector<double> > heldValues;
+   TermColumns values;
+   TermModel model;
    for (std::size_t fold = 0 ; fold < foldFit_.size() ; fold++)
    {
       Expression expression = structure;
       tuneConstants(expression, foldFit_[fold]);
-      if (!evaluateTerms(expression, terms, foldFit_[fold].inputs, fitValues) ||
-          !evaluateTerms(expression, terms, foldHeld_[fold].inputs, heldValues))
+      // Fit before evaluating the held-out rows: both evaluations share one
+      // buffer.
+      if (!expression.evaluateNodes(foldFit_[fold].columns, terms, values))
       {
          return false;
       }
-      const TermModel model = fitTerms(fitValues, foldFit_[fold].targets);
+      fitTerms(values, foldFit_[fold].targets, model);
+      if (!expression.evaluateNodes(foldHeld_[fold].columns, terms, values))
+      {
+         return false;
+      }
+      const TermColumns& heldValues = values;
       for (std::size_t i = 0 ; i < foldHeld_[fold].targets.size() ; i++)
       {
          const double error = foldHeld_[fold].targets[i] - predictRow(model, heldValues, i);
@@ -735,26 +976,48 @@ void SymbolicRegression::validatePopulation(const Population& population) const
    }
 }
 
+double SymbolicRegression::fitnessOf(double trainMse, int size, std::size_t termCount) const
+{
+   const double extraTerms = termCount > 1 ? static_cast<double>(termCount - 1) : 0.0;
+   return trainMse / train_.variance + config_.parsimony * (size + config_.termPenaltyNodes * extraTerms);
+}
+
+// The GA's fitness call: the same fit as describe(), without the text and
+// held-out scores it also builds (this runs for every evaluation).
 double SymbolicRegression::evaluateFitness(const BaseString& genes)
 {
-   const Fit fit = describe(genes);
-   if (fit.valid)
+   Expression expression = Expression::compile(genes, instructions_);
+   // Tuning already scored the tuned formula, bit-for-bit as fitModel would.
+   double trainMse = tuneConstants(expression, train_);
+   const std::vector<int> terms = modelTerms(expression);
+   if (std::isnan(trainMse))
    {
-      // Keep the best (lowest training error) formula of each size for the
-      // final cross-validated choice.
-      auto found = archive_.find(fit.size);
-      if (found == archive_.end() || fit.trainRmse < found->second.trainRmse)
+      thread_local TermModel model;
+      if (!fitModel(expression, train_.columns, train_.targets, terms, model, trainMse))
       {
-         Archived& slot = archive_[fit.size];
-         slot.trainRmse = fit.trainRmse;
-         slot.genes.resize(genes.length());
-         for (int i = 0 ; i < genes.length() ; i++)
-         {
-            slot.genes[i] = genes.valueAt(i);
-         }
+         return kInvalidFitness;
       }
    }
-   return fit.fitness;
+   else if (!std::isfinite(trainMse))
+   {
+      return kInvalidFitness;
+   }
+   const int size = expression.size();
+   const double trainRmse = std::sqrt(trainMse);
+   // Keep the best (lowest training error) formula of each size for the
+   // final cross-validated choice.
+   auto found = archive_.find(size);
+   if (found == archive_.end() || trainRmse < found->second.trainRmse)
+   {
+      Archived& slot = archive_[size];
+      slot.trainRmse = trainRmse;
+      slot.genes.resize(genes.length());
+      for (int i = 0 ; i < genes.length() ; i++)
+      {
+         slot.genes[i] = genes.valueAt(i);
+      }
+   }
+   return fitnessOf(trainMse, size, terms.size());
 }
 
 void SymbolicRegression::printCandidate(const BaseString& genes, std::ostream& out) const

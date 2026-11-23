@@ -7,20 +7,21 @@
 class BaseString
 {
 private:
-  // Packed gene storage. Each logical base occupies enough bits to represent
-  // values in [0, numStates), so symbolic chromosomes can share the same
-  // storage class as binary chromosomes.
-  std::vector<unsigned char> bits;
-  std::vector<int> startPos;
-  std::vector<int> endPos;
+  // One integer per gene position. The bit view (bitString, decodeBits,
+  // bitCount) is derived from it: gene i occupies bits
+  // [i * bitsPerValue(), (i + 1) * bitsPerValue()), least significant first,
+  // so binary and symbolic chromosomes share one storage class. Genes are
+  // stored whole because GA operators read and write whole genes; assembling
+  // each one from packed bits dominated the run time of permutation problems.
+  std::vector<int> values;
   int stringLength;
   int stateCount;
-  int numBytes;
   int baseLength;
   int bitLength;
   int testBit(int i) const;
   void setBit(int i);
   void clearBit(int i);
+  [[noreturn]] static void outOfRange(const char* what);
 
 public:
   // Build a logical string with `length` gene positions and `numStates`
@@ -37,7 +38,11 @@ public:
   // Read or write the symbolic value stored at a gene position. Within a
   // gene the lowest-numbered bit is the least significant. `setValue` throws
   // if `value` is outside [0, states()).
-  int valueAt(int index) const;
+  int valueAt(int index) const
+  {
+     if (index < 0 || index >= stringLength) outOfRange("Attempted to TEST out of range base");
+     return values[index];
+  }
   // Decode the raw bit range [startBit, endBit) as an unsigned integer with
   // the lowest-numbered bit as the MOST significant (the opposite order to
   // `valueAt`). Intended for binary encodings of numeric parameters; do not
@@ -46,6 +51,9 @@ public:
   void setValue(int index,int value = 1);
   void clearValue(int index);
   void swapValues(int first, int second);
+
+  // True when both strings hold the same values at every position.
+  bool sameValues(const BaseString& other) const { return values == other.values; }
 
   // Convenience formatting helpers for debugging and tests.
   std::string bitString() const;

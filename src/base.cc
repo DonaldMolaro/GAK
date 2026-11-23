@@ -34,76 +34,39 @@ BaseString::BaseString(int length, int numStates)
   baseLength   = bitsRequiredForStates(numStates);
   stringLength = length;
   bitLength    = stringLength * baseLength;
-  numBytes     = bitLength / 8;
-  if (bitLength % 8 ) numBytes++;
+  values.assign(stringLength, 0);
+}
 
-  bits.assign(numBytes, 0);
-  startPos.resize(stringLength);
-  endPos.resize(stringLength);
-
-  for ( int baseNo = 0 ; baseNo < stringLength ; baseNo++ )
-    {
-      int startBit = baseNo * baseLength;
-      int endBit   = (baseNo * baseLength) + baseLength;
-      startPos[baseNo] = startBit;
-      endPos[baseNo]   = endBit;
-    }
+void BaseString::outOfRange(const char* what)
+{
+  throw GAFatalException(__FILE__,__LINE__,what);
 }
 
 int BaseString::testBit(int i) const
 {
   if (i < 0 || i >= bitLength)
     {
-      throw GAFatalException(__FILE__,__LINE__,"Attempted to TEST out of range bit");
+      outOfRange("Attempted to TEST out of range bit");
     }
-  return (bits[i >> 3] & (0x80 >> (i & 0x07))) ? 1 : 0;
+  return (values[i / baseLength] >> (i % baseLength)) & 1;
 }
 
 void BaseString::setBit(int i)
 {
-  if ( ( i >= 0)&&(i < bitLength) )
+  if (i < 0 || i >= bitLength)
     {
-      int byteoffset = i >> 3;
-      int bitoffset  = i & 0x07;
-      bits[byteoffset] |= ( 0x80 >> bitoffset );
+      outOfRange("Attempted to SET out of range bit");
     }
-  else
-    {
-      throw GAFatalException(__FILE__,__LINE__,"Attempted to SET out of range bit");
-    }
+  values[i / baseLength] |= 1 << (i % baseLength);
 }
 
 void BaseString::clearBit(int i)
 {
-  if ( ( i >= 0)&&(i < bitLength) )
+  if (i < 0 || i >= bitLength)
     {
-      int byteoffset = i >> 3;
-      int bitoffset  = i & 0x07;
-      bits[byteoffset] &= ~( 0x80 >> bitoffset );
+      outOfRange("Attempted to CLEAR out of range bit");
     }
-  else
-    {
-      throw GAFatalException(__FILE__,__LINE__,"Attempted to CLEAR out of range bit");
-    }
-}
-
-int BaseString::valueAt(int index) const
-{
-   int result = 0;
-   if  ( (index >= 0)&&(index < stringLength) )
-     {
-       int startBit = startPos[index];
-       int endBit   = endPos[index];
-       for ( int i = startBit ; i < endBit ; i++ )
-	 {
-	   result += testBit(i) << (i - startBit);
-	 }
-     }
-   else
-     {
-      throw GAFatalException(__FILE__,__LINE__,"Attempted to TEST out of range base");
-     }
-   return result;
+  values[i / baseLength] &= ~(1 << (i % baseLength));
 }
 
 int BaseString::decodeBits(int startBit, int endBit) const
@@ -130,46 +93,22 @@ void BaseString::setValue(int index, int value)
 {
   if (value < 0 || value >= stateCount)
     {
-      throw GAFatalException(__FILE__,__LINE__,"Attempted to SET a value outside the state range");
+      outOfRange("Attempted to SET a value outside the state range");
     }
-  if (( index >= 0)&&(index < stringLength))
+  if (index < 0 || index >= stringLength)
     {
-      int startBit = startPos[index];
-      int endBit   = endPos[index];
-      for ( int i = startBit ; i < endBit ; i++ )
-	{
-	  if (value & (0x01 << (i - startBit)))
-	    {
-	      setBit(i);
-	    }
-	  else
-	    {
-	      clearBit(i);
-	    }
-	}
+      outOfRange("Attempted to SET out of range base");
     }
-  else
-    {
-      throw GAFatalException(__FILE__,__LINE__,"Attempted to SET out of range base");
-    }
+  values[index] = value;
 }
 
 void BaseString::clearValue(int index)
 {
-  if ( ( index >= 0)&&(index < stringLength) )
+  if (index < 0 || index >= stringLength)
     {
-      int startBit = startPos[index];
-      int endBit   = endPos[index];
-
-      for ( int i = startBit ; i < endBit ; i++ )
-	{
-	  clearBit(i);
-	}
+      outOfRange("Attempted to CLEAR out of range base");
     }
-  else
-    {
-      throw GAFatalException(__FILE__,__LINE__,"Attempted to CLEAR out of range base");
-    }
+  values[index] = 0;
 }
 
 void BaseString::swapValues(int first, int second)

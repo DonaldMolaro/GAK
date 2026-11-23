@@ -202,11 +202,28 @@ Expression Expression::compile(const BaseString& genes, const InstructionSet& in
    return expression;
 }
 
+InputColumns::InputColumns(const std::vector<std::vector<double> >& rowMajor)
+   : rows(rowMajor.size())
+{
+   if (rows == 0)
+   {
+      return;
+   }
+   columns.assign(rowMajor[0].size(), std::vector<double>(rows, 0.0));
+   for (std::size_t row = 0 ; row < rows ; row++)
+   {
+      for (std::size_t column = 0 ; column < columns.size() ; column++)
+      {
+         columns[column][row] = rowMajor[row][column];
+      }
+   }
+}
+
 bool Expression::evaluate(const std::vector<std::vector<double> >& inputs,
                           std::vector<double>& predictions) const
 {
    const std::size_t rows = inputs.size();
-   const double* values = evaluateAll(inputs);
+   const double* values = evaluateAll(InputColumns(inputs));
    if (values == nullptr)
    {
       predictions.assign(rows, 0.0);
@@ -222,7 +239,7 @@ bool Expression::evaluateNodes(const std::vector<std::vector<double> >& inputs,
                                std::vector<std::vector<double> >& values) const
 {
    const std::size_t rows = inputs.size();
-   const double* all = evaluateAll(inputs);
+   const double* all = evaluateAll(InputColumns(inputs));
    values.resize(nodes.size());
    if (all == nullptr)
    {
@@ -232,6 +249,23 @@ bool Expression::evaluateNodes(const std::vector<std::vector<double> >& inputs,
    {
       const double* start = &all[static_cast<std::size_t>(nodes[i]) * rows];
       values[i].assign(start, start + rows);
+   }
+   return true;
+}
+
+bool Expression::evaluateNodes(const InputColumns& inputs,
+                               const std::vector<int>& nodes,
+                               std::vector<const double*>& values) const
+{
+   const double* all = evaluateAll(inputs);
+   values.resize(nodes.size());
+   if (all == nullptr)
+   {
+      return false;
+   }
+   for (std::size_t i = 0 ; i < nodes.size() ; i++)
+   {
+      values[i] = &all[static_cast<std::size_t>(nodes[i]) * inputs.rows];
    }
    return true;
 }
@@ -322,84 +356,123 @@ std::vector<int> Expression::variablesUsed() const
    return variables;
 }
 
-const double* Expression::evaluateAll(const std::vector<std::vector<double> >& inputs) const
+// Compute node `index` into values[index * rows ...], from its children's
+// values already in the buffer. False if it is undefined on any row.
+bool Expression::evaluateNode(std::size_t index, const InputColumns& inputs, double* values) const
 {
-   const std::size_t rows = inputs.size();
+   const std::size_t rows = inputs.rows;
+   const ExpressionNode& node = nodes_[index];
+   double* out = &values[index * rows];
+   if (node.operation == Operation::Variable)
+   {
+      if (rows > 0)
+      {
+         const double* column = inputs.columns[node.variable].data();
+         std::copy(column, column + rows, out);
+      }
+      return true;
+   }
+   if (node.operation == Operation::Constant)
+   {
+      for (std::size_t row = 0 ; row < rows ; row++) out[row] = node.constant;
+      return true;
+   }
+   const double* left = &values[node.left * rows];
+   const double* right = node.right >= 0 ? &values[node.right * rows] : nullptr;
+   // One tight loop per operator; domain errors are checked inline and
+   // overflow/non-finite results in a single pass afterwards. The
+   // semantics match apply() exactly.
+   std::size_t row = 0;
+   switch (node.operation)
+   {
+   case Operation::Add: for (; row < rows ; row++) out[row] = left[row] + right[row]; break;
+   case Operation::Subtract: for (; row < rows ; row++) out[row] = left[row] - right[row]; break;
+   case Operation::Multiply: for (; row < rows ; row++) out[row] = left[row] * right[row]; break;
+   case Operation::Divide:
+      for (; row < rows ; row++)
+      {
+         if (std::fabs(right[row]) < kDivisionEpsilon) return false;
+         out[row] = left[row] / right[row];
+      }
+      break;
+   case Operation::Sin: for (; row < rows ; row++) out[row] = std::sin(left[row]); break;
+   case Operation::Cos: for (; row < rows ; row++) out[row] = std::cos(left[row]); break;
+   case Operation::Exp:
+      for (; row < rows ; row++)
+      {
+         if (left[row] > 700.0) return false;
+         out[row] = std::exp(left[row]);
+      }
+      break;
+   case Operation::Log:
+      for (; row < rows ; row++)
+      {
+         if (left[row] <= 0.0) return false;
+         out[row] = std::log(left[row]);
+      }
+      break;
+   case Operation::Sqrt:
+      for (; row < rows ; row++)
+      {
+         if (left[row] < 0.0) return false;
+         out[row] = std::sqrt(left[row]);
+      }
+      break;
+   case Operation::Square: for (; row < rows ; row++) out[row] = left[row] * left[row]; break;
+   case Operation::Negate: for (; row < rows ; row++) out[row] = -left[row]; break;
+   default:
+      throw GAFatalException(__FILE__, __LINE__, "Expression: unexpected operation");
+   }
+   for (row = 0 ; row < rows ; row++)
+   {
+      if (!(std::fabs(out[row]) <= kMaximumMagnitude)) return false; // also rejects NaN
+   }
+   return true;
+}
+
+bool Expression::evaluateInto(const InputColumns& inputs, std::vector<double>& values) const
+{
    if (nodes_.empty())
    {
-      return nullptr;
+      return false;
    }
-
-   // Node-major evaluation: one pass over all rows per node, in a reused
-   // per-thread buffer (this runs millions of times per search).
-   thread_local std::vector<double> values;
-   values.resize(nodes_.size() * rows);
+   values.resize(nodes_.size() * inputs.rows);
    for (std::size_t index = 0 ; index < nodes_.size() ; index++)
    {
-      const ExpressionNode& node = nodes_[index];
-      double* out = &values[index * rows];
-      if (node.operation == Operation::Variable)
-      {
-         for (std::size_t row = 0 ; row < rows ; row++) out[row] = inputs[row][node.variable];
-         continue;
-      }
-      if (node.operation == Operation::Constant)
-      {
-         for (std::size_t row = 0 ; row < rows ; row++) out[row] = node.constant;
-         continue;
-      }
-      const double* left = &values[node.left * rows];
-      const double* right = node.right >= 0 ? &values[node.right * rows] : nullptr;
-      // One tight loop per operator; domain errors are checked inline and
-      // overflow/non-finite results in a single pass afterwards. The
-      // semantics match apply() exactly.
-      std::size_t row = 0;
-      switch (node.operation)
-      {
-      case Operation::Add: for (; row < rows ; row++) out[row] = left[row] + right[row]; break;
-      case Operation::Subtract: for (; row < rows ; row++) out[row] = left[row] - right[row]; break;
-      case Operation::Multiply: for (; row < rows ; row++) out[row] = left[row] * right[row]; break;
-      case Operation::Divide:
-         for (; row < rows ; row++)
-         {
-            if (std::fabs(right[row]) < kDivisionEpsilon) return nullptr;
-            out[row] = left[row] / right[row];
-         }
-         break;
-      case Operation::Sin: for (; row < rows ; row++) out[row] = std::sin(left[row]); break;
-      case Operation::Cos: for (; row < rows ; row++) out[row] = std::cos(left[row]); break;
-      case Operation::Exp:
-         for (; row < rows ; row++)
-         {
-            if (left[row] > 700.0) return nullptr;
-            out[row] = std::exp(left[row]);
-         }
-         break;
-      case Operation::Log:
-         for (; row < rows ; row++)
-         {
-            if (left[row] <= 0.0) return nullptr;
-            out[row] = std::log(left[row]);
-         }
-         break;
-      case Operation::Sqrt:
-         for (; row < rows ; row++)
-         {
-            if (left[row] < 0.0) return nullptr;
-            out[row] = std::sqrt(left[row]);
-         }
-         break;
-      case Operation::Square: for (; row < rows ; row++) out[row] = left[row] * left[row]; break;
-      case Operation::Negate: for (; row < rows ; row++) out[row] = -left[row]; break;
-      default:
-         throw GAFatalException(__FILE__, __LINE__, "Expression: unexpected operation");
-      }
-      for (row = 0 ; row < rows ; row++)
-      {
-         if (!(std::fabs(out[row]) <= kMaximumMagnitude)) return nullptr; // also rejects NaN
-      }
+      if (!evaluateNode(index, inputs, values.data())) return false;
    }
-   return values.data();
+   return true;
+}
+
+bool Expression::reevaluate(const InputColumns& inputs, const std::vector<int>& nodes,
+                            std::vector<double>& values) const
+{
+   for (int index : nodes)
+   {
+      if (!evaluateNode(static_cast<std::size_t>(index), inputs, values.data())) return false;
+   }
+   return true;
+}
+
+std::vector<int> Expression::nodeAndAncestors(int node) const
+{
+   std::vector<int> parent(nodes_.size(), -1);
+   for (int index = 0 ; index < static_cast<int>(nodes_.size()) ; index++)
+   {
+      if (nodes_[index].left >= 0) parent[nodes_[index].left] = index;
+      if (nodes_[index].right >= 0) parent[nodes_[index].right] = index;
+   }
+   std::vector<int> chain;
+   for (int index = node ; index >= 0 ; index = parent[index]) chain.push_back(index);
+   return chain;
+}
+
+// Node-major evaluation: one pass over all rows per node, in a reused
+// per-thread buffer (this runs millions of times per search).
+const double* Expression::evaluateAll(const InputColumns& inputs) const
+{
+   thread_local std::vector<double> values;
+   return evaluateInto(inputs, values) ? values.data() : nullptr;
 }
 
 std::vector<int> Expression::constantNodes() const
