@@ -103,6 +103,11 @@ public:
    // lowest training error evaluated so far (across every run that used this
    // problem object).
    int archivedSizeCount() const { return static_cast<int>(archive_.size()); }
+   // Fold another run's archive into this one, as if its evaluations had
+   // come after this one's: a size's entry is replaced only by a strictly
+   // lower training error. Merging independent restarts in restart order
+   // gives exactly the archive of running them one after another.
+   void mergeArchive(const SymbolicRegression& other);
    // Choose the final formula from the archive by cross-validated error.
    // Returns false when cross-validation is disabled or nothing has been
    // evaluated.

@@ -41,6 +41,7 @@ expect() {
 expect 1 "Usage:" "no arguments prints usage and fails" -- $GA
 expect 0 "Usage:" "--help prints usage and succeeds" -- $GA --help
 expect 0 "--restarts N" "help lists the regression options" -- $GA D --help
+expect 0 "--threads N" "help lists the thread option" -- $GA D --help
 expect 1 "Usage:" "an unknown mode fails" -- $GA Z --seed 1
 expect 1 "Usage:" "an unknown option fails" -- $GA D --bogus 1
 expect 1 "Usage:" "an option without a value fails" -- $GA D --seed
@@ -59,6 +60,7 @@ expect 1 "Invalid value for --selection: 'best'" "an unknown selection is reject
 expect 1 "Invalid value for --tournament: '0'" "tournament size must be positive" -- $GA D --tournament 0
 expect 1 "Invalid value for --holdout: '1'" "holdout must be below 1" -- $GA R --data data/quadratic.csv --holdout 1
 expect 1 "Invalid value for --restarts: '0'" "restarts must be positive" -- $GA R --data data/quadratic.csv --restarts 0
+expect 1 "Invalid value for --threads: '0'" "threads must be positive" -- $GA R --data data/quadratic.csv --threads 0
 expect 1 "Invalid value for --tuning: '-1'" "tuning must be non-negative" -- $GA R --data data/quadratic.csv --tuning -1
 expect 1 "Invalid value for --folds: '-2'" "folds must be non-negative" -- $GA R --data data/quadratic.csv --folds -2
 expect 1 "Invalid value for --samples: '-1'" "samples must be non-negative" -- $GA R --data data/quadratic.csv --samples -1
@@ -110,6 +112,13 @@ expect 0 "Selected by 3-fold cross-validation" "--folds changes the selection" -
 expect 0 "cv folds          : 0" "--folds 0 turns selection off" -- $GA R --data data/pendulum.csv $QUICK --restarts 1 --folds 0
 expect 0 "Selected by 5-fold" "--cv-se is accepted" -- $GA R --data data/pendulum.csv $QUICK --restarts 1 --cv-se 0.5
 expect 0 "restarts          : 1" "--restarts is applied" -- $GA R --data data/pendulum.csv $QUICK --restarts 1
+# Restarts run on threads; the thread count must not change any result.
+checks=$((checks + 1))
+$GA R --data data/two_input.csv $QUICK --restarts 3 --threads 1 > "$WORK/threads1.txt" 2>&1
+$GA R --data data/two_input.csv $QUICK --restarts 3 --threads 3 > "$WORK/threads3.txt" 2>&1
+if ! cmp -s "$WORK/threads1.txt" "$WORK/threads3.txt"; then
+  fail "--threads changed the output of mode R"
+fi
 expect 0 "test rows         : 0" "--holdout 0 keeps every row for training" -- \
   $GA R --data data/pendulum.csv $QUICK --restarts 1 --holdout 0
 expect 0 "inputs            : x1 x2" "multi-input CSVs are supported" -- \

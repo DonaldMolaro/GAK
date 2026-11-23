@@ -11,6 +11,9 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <exception>
+#include <atomic>
 
 #include <genetic.hh>
 
@@ -77,6 +80,8 @@ struct CliOptions
   int tuning = 0;
   bool restartsProvided = false;
   int restarts = 0;
+  bool threadsProvided = false;
+  int threads = 0;
   bool samplesProvided = false;
   int samples = 0;
   bool selectionProvided = false;
@@ -601,6 +606,8 @@ void usage(std::ostream& out)
   out << "  --cv-se R         Choose the smallest formula within R standard errors of the best\n";
   out << "                    cross-validated error (default 1; lower favours richer formulas)\n";
   out << "  --restarts N      Independent runs in mode R; the best training fit is reported (default 4)\n";
+  out << "  --threads N       Restarts run at once in mode R (default: one per CPU core); results\n";
+  out << "                    are the same for any value\n";
   out << "  --tuning N        Constant-tuning evaluations per formula in mode R (default 40, 0 = off)\n";
   out << "  --report-json P   Write a structured JSON run report to path P\n";
   out << "  --samples N       Population members sampled per generation in reports, at evenly\n";
@@ -766,6 +773,11 @@ bool parseCliOptions(int argc, char* argv[], CliOptions& options)
       options.restartsProvided = parsePositiveInt(value, options.restarts);
       if (!options.restartsProvided) return reportInvalidValue(arg, value, "a positive integer");
     }
+    else if (arg == "--threads")
+    {
+      options.threadsProvided = parsePositiveInt(value, options.threads);
+      if (!options.threadsProvided) return reportInvalidValue(arg, value, "a positive integer");
+    }
     else if (arg == "--samples")
     {
       options.samplesProvided = parseInt(value, options.samples) && options.samples >= 0;
@@ -928,30 +940,75 @@ int runRegression(SymbolicRegression& regression, const Population::Settings& ba
   printLabeledLine("restarts", restarts);
   std::cout << '\n';
 
-  std::unique_ptr<Population> best;
-  Population::RunResult bestResult;
-  double bestFitness = 0.0;
+  // Each restart gets its own copy of the problem (whose archive of the best
+  // formula of each size is the only state evaluation changes) and its own
+  // seeded population, so restarts can run on separate threads. Afterwards
+  // the restarts are reported, compared and their archives merged in restart
+  // order, which gives exactly the result of running them one by one.
+  struct Restart
+  {
+    std::unique_ptr<SymbolicRegression> problem;
+    std::unique_ptr<Population> population;
+    Population::RunResult result;
+    std::exception_ptr error;
+  };
   const unsigned int baseSeed = baseSettings.useFixedRandomSeed ? baseSettings.randomSeed
                                                                 : std::random_device{}();
+  std::vector<Restart> runs(restarts);
   for (int index = 0 ; index < restarts ; index++)
   {
     Population::Settings settings = baseSettings;
     settings.useFixedRandomSeed = true;
     settings.randomSeed = restartSeed(baseSeed, index);
-    std::unique_ptr<Population> population(new Population(settings, regression));
-    Population::RunResult result = population->execute(shouldCaptureGenerations(cli));
+    runs[index].problem.reset(new SymbolicRegression(regression));
+    runs[index].population.reset(new Population(settings, *runs[index].problem));
+  }
+
+  const bool capture = shouldCaptureGenerations(cli);
+  std::atomic<int> next(0);
+  auto work = [&]() {
+    for (int index = next++ ; index < restarts ; index = next++)
+    {
+      try
+      {
+        runs[index].result = runs[index].population->execute(capture);
+      }
+      catch (...)
+      {
+        runs[index].error = std::current_exception();
+      }
+    }
+  };
+  const unsigned int cores = std::max(1u, std::thread::hardware_concurrency());
+  const int threads = std::min(restarts, cli.threadsProvided ? cli.threads : static_cast<int>(cores));
+  std::vector<std::thread> helpers;
+  for (int helper = 1 ; helper < threads ; helper++) helpers.emplace_back(work);
+  work();
+  for (std::thread& helper : helpers) helper.join();
+  for (const Restart& run : runs)
+  {
+    if (run.error) std::rethrow_exception(run.error);
+  }
+
+  Population* best = nullptr;
+  Population::RunResult bestResult;
+  double bestFitness = 0.0;
+  for (int index = 0 ; index < restarts ; index++)
+  {
+    const Population::RunResult& result = runs[index].result;
     const double fitness = result.finalSummary.mostFit.front();
     if (restarts > 1)
     {
-      std::cout << "Restart " << (index + 1) << " (seed " << settings.randomSeed << "): fitness "
-                << fitness << '\n';
+      std::cout << "Restart " << (index + 1) << " (seed " << runs[index].population->randomSeed()
+                << "): fitness " << fitness << '\n';
     }
     if (!best || fitness < bestFitness)
     {
-      best = std::move(population);
+      best = runs[index].population.get();
       bestResult = result;
       bestFitness = fitness;
     }
+    regression.mergeArchive(*runs[index].problem);
   }
   if (restarts > 1)
   {

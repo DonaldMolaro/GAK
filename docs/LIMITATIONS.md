@@ -34,8 +34,10 @@ concrete, operational limits a user can run into.
   whole population each generation (no elitism); `DeleteAllButBest`,
   `DeleteHalf`, `DeleteQuarter` and `DeleteLast` keep the best.
 - **Fitness is not cached.** A chromosome that reappears is evaluated again.
-- **One thread.** A `Population` is not safe to share between threads, and
-  evaluation is sequential.
+- **One thread per population.** A `Population` is not safe to share
+  between threads, and evaluates its members one after another. Separate
+  populations, each with its own problem object, can run on separate threads
+  (mode `R` runs its restarts this way).
 
 ### Reproducibility
 
@@ -128,8 +130,9 @@ Clang/libc++, because random draws use the portable helpers in
   before the search, which is not implemented.
 - **Run time grows with inputs and rows.** The default budget is 15,000
   trials per restart for each pair of inputs; a ten-input, 250-row run takes
-  5–12 seconds. Most of it is constant tuning, and the restarts run one
-  after another on a single core.
+  about 5 seconds on four cores (12 seconds on one). Most of it is constant
+  tuning. The restarts run in parallel, but one restart uses one core, so
+  more cores than restarts do not help.
 
 Results, benchmarks and the reasoning behind the defaults are in
 [SYMBOLIC_REGRESSION.md](SYMBOLIC_REGRESSION.md).

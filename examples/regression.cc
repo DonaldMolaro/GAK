@@ -976,6 +976,18 @@ void SymbolicRegression::validatePopulation(const Population& population) const
    }
 }
 
+void SymbolicRegression::mergeArchive(const SymbolicRegression& other)
+{
+   for (const auto& entry : other.archive_)
+   {
+      auto found = archive_.find(entry.first);
+      if (found == archive_.end() || entry.second.trainRmse < found->second.trainRmse)
+      {
+         archive_[entry.first] = entry.second;
+      }
+   }
+}
+
 double SymbolicRegression::fitnessOf(double trainMse, int size, std::size_t termCount) const
 {
    const double extraTerms = termCount > 1 ? static_cast<double>(termCount - 1) : 0.0;

@@ -20,6 +20,9 @@ override CXXFLAGS += $(WARNING_FLAGS)
 # which changes fitness values in the last bit and makes fixed-seed runs
 # diverge between compilers.
 override CXXFLAGS += -ffp-contract=off
+# Mode R runs its restarts on threads.
+override CXXFLAGS += -pthread
+override LDFLAGS += -pthread
 
 ifeq ($(COVERAGE),1)
 override CXXFLAGS += -fprofile-instr-generate -fcoverage-mapping

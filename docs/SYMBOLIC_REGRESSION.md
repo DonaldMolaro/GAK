@@ -29,6 +29,7 @@ the held-out rows.
 | `--target NAME` | Output column. Defaults to the last column; every other column is an input. |
 | `--holdout R` | Share of rows held out to test generalization (default `0.25`, may be `0`). |
 | `--restarts N` | Independent populations; the one with the best *training* fitness is reported (default `4`). |
+| `--threads N` | Restarts run at once (default: one per CPU core). Results are identical for any value. |
 | `--tuning N` | Constant-tuning evaluations per formula (default `40`; `0` turns tuning off). |
 | `--folds N` | Cross-validation folds for choosing the final formula (default `5`; `0` reports the GA's best training fit instead). |
 | `--cv-se R` | Choose the smallest formula within R standard errors of the best cross-validated error (default `1`; lower favours richer formulas). |
@@ -237,9 +238,9 @@ and are directly comparable.
 inputs; see `--trials`), rank-based
 roulette selection (`LinearNormalized`), half the population replaced each
 generation, duplicates rejected, crossover 0.8, mutation 0.04 per gene,
-constant tuning with 40 evaluations. A run takes under a second on most of
-the one- and two-input datasets and about 12 seconds on the ten-input one
-(see the results tables).
+constant tuning with 40 evaluations. On four cores, with the restarts running
+in parallel, a run takes well under a second on the one- and two-input
+datasets and about 5 seconds on the ten-input one (see the results tables).
 
 Tournament selection (`--tournament N`) is available but was not better here:
 with constant tuning it lowered the recovery rate.
@@ -279,11 +280,11 @@ term is charged.
 
 | Dataset | Inputs | Structure recovered | Median test R² (true formula) | Time per run |
 |---|---|---|---|---|
-| `gravitation` | 3 | 0 / 10 | 0.977 (0.986) | 1.1 s |
-| `ideal_gas` | 3 | 10 / 10 | 0.983 (0.991) | 0.7 s |
-| `mechanical_energy` | 3 | 10 / 10 | 0.992 (0.990) | 1.3 s |
-| `five_inputs` | 5 | 5 / 10 | 0.865 (0.907) | 1.0 s |
-| `friedman1` | 10 | 4 / 10 | 0.967 (0.964) | 11.1 s |
+| `gravitation` | 3 | 0 / 10 | 0.977 (0.986) | 0.5 s |
+| `ideal_gas` | 3 | 10 / 10 | 0.983 (0.991) | 0.3 s |
+| `mechanical_energy` | 3 | 10 / 10 | 0.992 (0.990) | 0.6 s |
+| `five_inputs` | 5 | 5 / 10 | 0.865 (0.907) | 0.5 s |
+| `friedman1` | 10 | 4 / 10 | 0.967 (0.964) | 5.4 s |
 | **Total** | | **29 / 50** | | |
 
 These counts move by a few between seed ranges and builds. Gravitation's
